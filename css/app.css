@@ -26,6 +26,11 @@
   --th-bg: #ede3fd;
   --th-text: #5b0fc0;
   --hover: #f3ecfe;
+  --login-base: #12148f;
+  --login-bg: linear-gradient(135deg, #0d0f6e 0%, #1c1fc8 45%, #5a12c4 100%);
+  --login-luz-1: rgba(160, 70, 255, 0.85);
+  --login-luz-2: rgba(70, 190, 255, 0.55);
+  --login-luz-3: rgba(255, 255, 255, 0.35);
   --line: rgba(74, 32, 140, 0.14);
   --text: #20183a;
   --muted: #625a7e;
@@ -74,12 +79,17 @@
   --th-bg: #171c16;
   --th-text: #a29c8b;
   --hover: #1d231c;
+  --login-base: #0b0e0a;
+  --login-bg: linear-gradient(135deg, #070906 0%, #10140f 50%, #1a2018 100%);
+  --login-luz-1: rgba(196, 160, 86, 0.45);
+  --login-luz-2: rgba(111, 154, 118, 0.4);
+  --login-luz-3: rgba(232, 185, 90, 0.25);
   --line: rgba(232, 224, 204, 0.12);
   --text: #ece6d4;
   --muted: #a29c8b;
   --brass: #c4a056;
   --brass-strong: #e8b95a;
-  --on-brass: var(--on-brass);
+  --on-brass: #14120c;
   --alert: #d85a3c;
   --alert-strong: #ff6a45;
   --ok: #6f9a76;
@@ -942,13 +952,41 @@ textarea:focus {
 }
 
 .login form {
-  width: min(420px, calc(100vw - 32px));
-  margin: 12vh auto;
-  padding: 32px;
+  position: relative;
+  z-index: 1;
+  width: min(400px, calc(100vw - 32px));
+  padding: 36px 32px 32px;
   background: var(--panel);
   border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   display: grid;
   gap: 14px;
+}
+
+.login form h1 {
+  margin: 4px 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.login__logo {
+  justify-self: center;
+  width: 180px;
+  height: auto;
+}
+
+.login__logo--branca {
+  display: none;
+}
+
+:root[data-theme="dark"] .login__logo--preta {
+  display: none;
+}
+
+:root[data-theme="dark"] .login__logo--branca {
+  display: block;
 }
 
 .login__kicker,
@@ -981,6 +1019,32 @@ textarea:focus {
   color: var(--on-brass);
   border-color: var(--brass);
   font-weight: 600;
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+/* Hover próprio: o hover geral pinta o texto de roxo, que some no fundo roxo do botão. */
+.login form button[type="submit"]:hover:not(:disabled),
+.login form button[type="submit"]:focus-visible {
+  background: var(--brass-strong);
+  border-color: var(--brass-strong);
+  color: var(--on-brass);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--brass) 40%, transparent);
+  transform: translateY(-1px);
+}
+
+.login form button[type="submit"]:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+}
+
+.login form button[type="submit"]:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.login form button[type="submit"]:disabled {
+  opacity: 0.75;
+  cursor: wait;
 }
 
 .modal__form {
@@ -1489,4 +1553,104 @@ dl.dados dd {
   border-radius: 50%;
   border: 1.5px solid currentColor;
   background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+}
+
+/* ---------- tela de login: tela cheia com fundo animado ---------- */
+/* O diálogo cobre a página inteira: nada do painel aparece por trás. */
+.login[open] {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--login-bg);
+}
+
+.login::backdrop {
+  background: var(--login-base);
+}
+
+/* Duas manchas de luz que flutuam devagar e um anel de cor que gira. */
+.login__fundo,
+.login__fundo span {
+  position: absolute;
+  pointer-events: none;
+}
+
+.login__fundo {
+  inset: 0;
+  overflow: hidden;
+}
+
+.login__fundo span {
+  border-radius: 50%;
+  filter: blur(70px);
+  will-change: transform;
+}
+
+.login__fundo span:nth-child(1) {
+  width: 55vmax;
+  height: 55vmax;
+  top: -18vmax;
+  left: -12vmax;
+  background: radial-gradient(circle, var(--login-luz-1), transparent 65%);
+  animation: login-flutua-1 18s ease-in-out infinite alternate;
+}
+
+.login__fundo span:nth-child(2) {
+  width: 50vmax;
+  height: 50vmax;
+  right: -14vmax;
+  bottom: -20vmax;
+  background: radial-gradient(circle, var(--login-luz-2), transparent 65%);
+  animation: login-flutua-2 22s ease-in-out infinite alternate;
+}
+
+.login__fundo span:nth-child(3) {
+  width: 80vmax;
+  height: 80vmax;
+  top: 50%;
+  left: 50%;
+  margin: -40vmax 0 0 -40vmax;
+  filter: blur(40px);
+  opacity: 0.6;
+  background: conic-gradient(from 0deg, transparent 0deg, var(--login-luz-3) 60deg, transparent 140deg, var(--login-luz-1) 220deg, transparent 300deg);
+  -webkit-mask: radial-gradient(circle, transparent 38%, #000 40%, #000 52%, transparent 54%);
+  mask: radial-gradient(circle, transparent 38%, #000 40%, #000 52%, transparent 54%);
+  animation: login-gira 40s linear infinite;
+}
+
+@keyframes login-flutua-1 {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(18vw, 14vh) scale(1.15);
+  }
+}
+
+@keyframes login-flutua-2 {
+  from {
+    transform: translate(0, 0) scale(1.1);
+  }
+  to {
+    transform: translate(-16vw, -12vh) scale(0.95);
+  }
+}
+
+@keyframes login-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login__fundo span {
+    animation: none;
+  }
 }
