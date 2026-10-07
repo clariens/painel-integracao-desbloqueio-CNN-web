@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clariens · Configuração do bloqueio</title>
+    <meta name="description" content="Parâmetros em uso pela automação de bloqueio por falta (somente leitura)." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2310140f'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%23c4a056' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script>
+      // Tema antes da pintura: o salvo nesta máquina ou o claro (padrão Clariens).
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("clariens.cnn.tema") || "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#config">Ir para a configuração</a>
+
+    <dialog class="login" id="login" aria-labelledby="login-title">
+      <form id="login-form" method="dialog">
+        <p class="login__kicker">Acesso interno</p>
+        <h1 id="login-title">Bloqueio por falta</h1>
+        <p class="login__copy">Entre com o seu usuário. Cada liberação e cada bloqueio ficam registrados no seu nome.</p>
+        <label>
+          Usuário
+          <input id="login-user" name="user" autocomplete="username" required />
+        </label>
+        <label>
+          Senha
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
+        <button type="submit">Entrar</button>
+      </form>
+    </dialog>
+
+    <aside class="sidebar" id="sidebar" aria-label="Menu">
+      <div class="sidebar__head">
+        <p class="sidebar__brand">
+          <img class="sidebar__logo" src="/img/clariens-logo.png" alt="Clariens Educação" width="150" height="43" />
+        </p>
+        <button class="sidebar__close" type="button" data-nav-close aria-label="Fechar menu">×</button>
+      </div>
+      <nav class="sidebar__nav" aria-label="Seções do painel">
+        <a href="/pacientes">Pacientes</a>
+        <a href="/relatorios">Relatórios de faltas</a>
+        <a href="/historico">Histórico de ações</a>
+        <a href="/configuracao" aria-current="page">Configuração</a>
+      </nav>
+      <p class="sidebar__user">Usuário: <strong id="usuario-nome">—</strong><button id="sair" type="button">Sair</button></p>
+    </aside>
+    <div class="nav-backdrop" data-nav-close aria-hidden="true"></div>
+    <script src="/js/layout.js"></script>
+
+    <div class="shell">
+      <p class="api-error" id="api-error" hidden role="alert"></p>
+
+      <header class="pagina__head">
+        <h1>Configuração do bloqueio</h1>
+        <p>Somente leitura · valores em uso pelos workflows</p>
+      </header>
+
+      <main class="config" id="config">
+        <section class="cartao" aria-labelledby="c-prazos">
+          <h2 id="c-prazos">Prazo para liberação, pela falta vigente</h2>
+          <table class="prazos"><tbody id="prazos"><tr><td>—</td><td></td></tr></tbody></table>
+          <p>Toda falta no ciclo bloqueia o paciente (se estiver ativo no CNN). O prazo diz a partir de quando ele pode ser liberado, contado da data da falta vigente (a de maior número no ciclo). Uma falta nova substitui a anterior.</p>
+        </section>
+        <section class="cartao" aria-labelledby="c-ciclo">
+          <h2 id="c-ciclo">Ciclo</h2>
+          <dl class="dados">
+            <dt>Começa em</dt><dd id="ciclo-regra">—</dd>
+            <dt>Ciclo atual desde</dt><dd id="ciclo-inicio">—</dd>
+            <dt>Fuso</dt><dd id="fuso">—</dd>
+          </dl>
+          <p>Faltas antes do início do ciclo não contam para o número da falta.</p>
+        </section>
+        <section class="cartao" aria-labelledby="c-auto">
+          <h2 id="c-auto">Automação</h2>
+          <dl class="dados">
+            <dt>Bloqueio automático</dt><dd id="horario">—</dd>
+            <dt>Liberação automática</dt><dd id="liberacao-auto">—</dd>
+            <dt>Última coleta de faltas</dt><dd id="ultima-coleta">—</dd>
+            <dt>Último bloqueio automático</dt><dd id="ultimo-bloqueio">—</dd>
+            <dt>Última ação no painel</dt><dd id="ultima-acao">—</dd>
+            <dt>Pacientes no controle</dt><dd id="linhas-controle">—</dd>
+            <dt>Faltas registradas</dt><dd id="linhas-faltas">—</dd>
+          </dl>
+        </section>
+        <section class="cartao" aria-labelledby="c-mudar">
+          <h2 id="c-mudar">Como mudar</h2>
+          <p>Os parâmetros ficam em <code>workflows/code/_regra.js</code>, no repositório. Para mudar:</p>
+          <p>
+            1. Edite o arquivo e rode <code>npm run inject</code> e <code>npm run check</code>.<br />
+            2. Cole os workflows de bloqueio, Leitura e Ações no n8n.<br />
+            3. Faça o commit. Esta tela passa a mostrar os novos valores.
+          </p>
+          <p>O horário do bloqueio fica no nó "Todo dia 01:00" do workflow de bloqueio.</p>
+        </section>
+      </main>
+    </div>
+
+    <footer class="statusbar" aria-label="Status do painel">
+      <div class="statusbar__left">
+        <button class="nav-toggle" type="button" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Abrir menu">
+          <span class="nav-toggle__bars" aria-hidden="true"></span>
+          Configuração
+        </button>
+        <p class="statusbar__meta">
+          <span id="clock">—</span>
+          <span class="dot" id="sync-dot" aria-hidden="true"></span>
+          <span id="sync-state" aria-live="polite">aguardando</span>
+        </p>
+      </div>
+      <div class="statusbar__actions">
+        <button class="ghost tema-toggle" type="button" data-tema-toggle>Modo escuro</button>
+        <button class="ghost" id="refresh" type="button">Atualizar agora</button>
+      </div>
+    </footer>
+
+    <script src="/js/configuracao.js" type="module"></script>
+  </body>
+</html>

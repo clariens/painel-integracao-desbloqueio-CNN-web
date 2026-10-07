@@ -1,0 +1,15 @@
+{
+  "name": "cnn-bloqueio-painel",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env.local server.js",
+    "start": "node --env-file=.env.local server.js",
+    "inject": "node workflows/code/inject.mjs",
+    "senha": "node scripts/gerar-senha.mjs",
+    "check": "node scripts/checar.mjs"
+  }
+}

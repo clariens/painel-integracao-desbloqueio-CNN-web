@@ -1,0 +1,68 @@
+// Formatação compartilhada pelas páginas. Datas de falta chegam como "AAAA-MM-DD"; instantes, em ISO UTC.
+export const escapeHtml = (value) =>
+  String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+export const dataBr = (iso) => {
+  const [ano, mes, dia] = String(iso || "").slice(0, 10).split("-");
+  return ano && mes && dia ? `${dia}/${mes}/${ano}` : "—";
+};
+
+export const dataHoraBr = (iso) => {
+  if (!iso) return "—";
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return "—";
+  return data.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  });
+};
+
+export const numero = (valor) => Number(valor || 0).toLocaleString("pt-BR");
+
+// Diferença em dias entre duas datas "AAAA-MM-DD" (b - a).
+export const diasEntre = (a, b) => {
+  const ms = Date.parse(`${String(b).slice(0, 10)}T00:00:00Z`) - Date.parse(`${String(a).slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(ms) ? Math.round(ms / 86_400_000) : null;
+};
+
+export const prazoTexto = (dataFim, hoje) => {
+  const dias = diasEntre(hoje, dataFim);
+  if (dias === null) return "";
+  if (dias > 1) return `faltam ${dias} dias`;
+  if (dias === 1) return "termina amanhã";
+  if (dias === 0) return "termina hoje";
+  if (dias === -1) return "venceu ontem";
+  return `venceu há ${-dias} dias`;
+};
+
+export const STATUS = {
+  pendente: "Aguardando bloqueio",
+  bloqueado: "Bloqueado",
+  apto: "Apto a liberar",
+  liberado_antecipado: "Liberado antes do prazo",
+  liberado: "Liberado",
+};
+
+export const selo = (status, texto = STATUS[status] || status) =>
+  `<span class="selo selo--${escapeHtml(status)}">${escapeHtml(texto)}</span>`;
+
+export const ACAO = { BLOQUEIO: "Bloqueio", LIBERACAO: "Liberação" };
+export const ORIGEM = { AUTOMATICO: "Automático (01:00)", PAINEL: "Painel", CARGA_INICIAL: "Carga inicial" };
+
+export const hojeSp = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+// Mesma regra do ciclo de workflows/code/_regra.js (início em 1/8), usada só nos atalhos de período.
+export const inicioCiclo = (hoje = hojeSp()) => {
+  const [ano, mes] = hoje.split("-").map(Number);
+  return `${mes >= 8 ? ano : ano - 1}-08-01`;
+};

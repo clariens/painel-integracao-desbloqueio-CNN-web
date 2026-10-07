@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clariens · Relatórios de faltas</title>
+    <meta name="description" content="Faltas por mês, dia da semana, profissional e reincidência, a partir da tabela de faltas." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2310140f'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%23c4a056' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script>
+      // Tema antes da pintura: o salvo nesta máquina ou o claro (padrão Clariens).
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("clariens.cnn.tema") || "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#relatorio">Ir para o relatório</a>
+
+    <dialog class="login" id="login" aria-labelledby="login-title">
+      <form id="login-form" method="dialog">
+        <p class="login__kicker">Acesso interno</p>
+        <h1 id="login-title">Bloqueio por falta</h1>
+        <p class="login__copy">Entre com o seu usuário. Cada liberação e cada bloqueio ficam registrados no seu nome.</p>
+        <label>
+          Usuário
+          <input id="login-user" name="user" autocomplete="username" required />
+        </label>
+        <label>
+          Senha
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
+        <button type="submit">Entrar</button>
+      </form>
+    </dialog>
+
+    <aside class="sidebar" id="sidebar" aria-label="Menu">
+      <div class="sidebar__head">
+        <p class="sidebar__brand">
+          <img class="sidebar__logo" src="/img/clariens-logo.png" alt="Clariens Educação" width="150" height="43" />
+        </p>
+        <button class="sidebar__close" type="button" data-nav-close aria-label="Fechar menu">×</button>
+      </div>
+      <nav class="sidebar__nav" aria-label="Seções do painel">
+        <a href="/pacientes">Pacientes</a>
+        <a href="/relatorios" aria-current="page">Relatórios de faltas</a>
+        <a href="/historico">Histórico de ações</a>
+        <a href="/configuracao">Configuração</a>
+      </nav>
+      <p class="sidebar__user">Usuário: <strong id="usuario-nome">—</strong><button id="sair" type="button">Sair</button></p>
+    </aside>
+    <div class="nav-backdrop" data-nav-close aria-hidden="true"></div>
+    <script src="/js/layout.js"></script>
+
+    <div class="shell">
+      <p class="api-error" id="api-error" hidden role="alert"></p>
+
+      <header class="pagina__head">
+        <h1>Relatórios de faltas</h1>
+        <p id="periodo-texto">—</p>
+      </header>
+
+      <form class="toolbar" id="filtros" aria-label="Período">
+        <div class="campo">
+          Período
+          <div class="segmented" role="group" aria-label="Atalhos de período" id="atalhos">
+            <button type="button" data-atalho="ciclo" aria-pressed="true">Ciclo atual</button>
+            <button type="button" data-atalho="anterior" aria-pressed="false">Ciclo anterior</button>
+            <button type="button" data-atalho="mes" aria-pressed="false">Mês atual</button>
+            <button type="button" data-atalho="30" aria-pressed="false">30 dias</button>
+          </div>
+        </div>
+        <label>De <input id="de" type="date" required /></label>
+        <label>Até <input id="ate" type="date" required /></label>
+        <button class="btn" type="submit">Aplicar</button>
+        <button class="ghost" type="button" id="exportar" disabled>Exportar CSV</button>
+      </form>
+
+      <section class="stats stats--4" aria-label="Totais do período">
+        <article><p>Faltas</p><strong id="kpi-faltas">—</strong></article>
+        <article><p>Pacientes</p><strong id="kpi-pacientes">—</strong></article>
+        <article><p>Faltas por paciente</p><strong id="kpi-media">—</strong></article>
+        <article class="stat--brass"><p>Reincidentes (2+)</p><strong id="kpi-reincidentes">—</strong><small id="kpi-tres">—</small></article>
+      </section>
+
+      <main id="relatorio">
+        <div class="graficos">
+          <section class="grafico grafico--largo" aria-labelledby="g-mes">
+            <header><h2 id="g-mes">Faltas por mês</h2><p>passe o mouse para ver os pacientes</p></header>
+            <div id="grafico-mes"></div>
+          </section>
+          <section class="grafico" aria-labelledby="g-prof">
+            <header><h2 id="g-prof">Faltas por profissional</h2><p>top 30</p></header>
+            <ol class="barras" id="grafico-profissional"></ol>
+          </section>
+          <section class="grafico" aria-labelledby="g-dia">
+            <header><h2 id="g-dia">Faltas por dia da semana</h2></header>
+            <div id="grafico-dia"></div>
+            <header class="grafico__sub"><h2 id="g-reinc">Pacientes por quantidade de faltas</h2><p>no período</p></header>
+            <ol class="barras" id="grafico-reincidencia" aria-labelledby="g-reinc"></ol>
+          </section>
+          <section class="grafico grafico--largo" aria-labelledby="g-top">
+            <header><h2 id="g-top">Pacientes que mais faltaram</h2><p>2 faltas ou mais no período</p></header>
+            <div class="tabela-wrap">
+              <table class="tabela tabela--compacta">
+                <thead><tr><th scope="col">Paciente</th><th scope="col" class="num">Faltas</th><th scope="col">Última falta</th></tr></thead>
+                <tbody id="reincidentes"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+        <p class="aviso" id="aviso-truncado" hidden>O período tem mais de 5.000 faltas: o CSV traz só as 5.000 mais recentes. Os totais e os gráficos consideram todas.</p>
+      </main>
+    </div>
+
+    <footer class="statusbar" aria-label="Status do painel">
+      <div class="statusbar__left">
+        <button class="nav-toggle" type="button" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Abrir menu">
+          <span class="nav-toggle__bars" aria-hidden="true"></span>
+          Relatórios
+        </button>
+        <p class="statusbar__meta">
+          <span id="clock">—</span>
+          <span class="dot" id="sync-dot" aria-hidden="true"></span>
+          <span id="sync-state" aria-live="polite">aguardando</span>
+        </p>
+      </div>
+      <div class="statusbar__actions">
+        <button class="ghost tema-toggle" type="button" data-tema-toggle>Modo escuro</button>
+        <button class="ghost" id="refresh" type="button">Atualizar agora</button>
+      </div>
+    </footer>
+
+    <script src="/js/relatorios.js" type="module"></script>
+  </body>
+</html>

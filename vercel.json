@@ -1,0 +1,20 @@
+{
+  "outputDirectory": ".",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    { "source": "/pacientes", "destination": "/index.html" },
+    { "source": "/relatorios", "destination": "/relatorios.html" },
+    { "source": "/historico", "destination": "/historico.html" },
+    { "source": "/configuracao", "destination": "/configuracao.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    }
+  ]
+}

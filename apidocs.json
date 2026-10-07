@@ -1,0 +1,6106 @@
+{
+    "swagger": "2.0",
+    "info": {
+      "description": "API REST de serviços do Clínica nas Nuvens.",
+      "version": "V 1.0",
+      "title": "API Rest - Clínica nas Nuvens",
+      "contact": {
+        "name": "Clínica nas Nuvens",
+        "url": "https://clinicanasnuvens.com.br",
+        "email": "suporte@clinicanasnuvens.com.br"
+      },
+      "license": {
+        "name": "Área do desenvolvedor - Orientações gerais",
+        "url": "https://api.clinicanasnuvens.com.br"
+      }
+    },
+    "host": "api.clinicanasnuvens.com.br",
+    "basePath": "/",
+    "tags": [
+      {
+        "name": "Agenda",
+        "description": "Agenda Controller"
+      },
+      {
+        "name": "Cadastros gerais",
+        "description": "Cidade Controller"
+      },
+      {
+        "name": "Info",
+        "description": "Info Controller"
+      },
+      {
+        "name": "Lista de espera",
+        "description": "Lista Espera Controller"
+      },
+      {
+        "name": "Orçamento",
+        "description": "Orcamento Controller"
+      },
+      {
+        "name": "Paciente",
+        "description": "Origem Paciente Controller"
+      },
+      {
+        "name": "Plano de tratamento odontológico",
+        "description": "Odo Plano Tratamento Controller"
+      },
+      {
+        "name": "Profissional de saúde escola",
+        "description": "Profissional Saude Escola Controller"
+      },
+      {
+        "name": "Turma escola",
+        "description": "Turma Controller"
+      }
+    ],
+    "produces": [
+      "application/json"
+    ],
+    "paths": {
+      "/agenda-rotulo/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna uma lista de rótulos",
+          "operationId": "listaUsingGET_8",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«RotuloAgendaFormRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/alteracao-status": {
+        "put": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Permite alterar status de agenda conforme parâmetros.",
+          "operationId": "alterarStatusUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/AlteracaoAgendaAPI"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/AgendaFormRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna uma lista de agendamentos com base no filtro.",
+          "operationId": "listaUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codigoPaciente",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "codigoPessoaExecutor",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "dataFinal",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataInicial",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataPor",
+              "in": "query",
+              "required": false,
+              "type": "string",
+              "enum": [
+                "AGENDAMENTO",
+                "CRIACAO"
+              ]
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«AgendaFormRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/novo": {
+        "post": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Criar uma agenda.",
+          "operationId": "criarUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/AgendaFormAPI"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/AgendaFormRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/origem": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna a lista de origens de pacientes ativas para agendamentos.",
+          "operationId": "listaOrigemUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«OrigemPacienteRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/profissional": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca agendas resumidas do profissional de acordo com o filtro especificado.",
+          "operationId": "getAgendasDoProfissionalUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codExecutorAgenda",
+              "in": "query",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "dataFinal",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataInicial",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«AgendaProfissionalRetorno»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca uma agenda pelo seu ID.",
+          "operationId": "getAgendaByIdUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/AgendaFormRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        },
+        "put": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Alterar uma agenda.",
+          "operationId": "alterarUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/AgendaAlteracaoFormAPI"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/AgendaFormRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/{id}/remarcar": {
+        "post": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Remarcar uma agenda.",
+          "operationId": "remarcarAgendaUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/AgendaRemarcacaoFormAPI"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/AgendaFormRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/agenda/{id}/resumida": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca uma agenda resumida pelo seu ID.",
+          "operationId": "getAgendaResumidaByIdUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/AgendaProfissionalRetorno"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/cidade/lista": {
+        "get": {
+          "tags": [
+            "Cadastros gerais"
+          ],
+          "summary": "Retorna a lista de cidades de acordo com o filtro especificado.",
+          "operationId": "listarUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«CidadeRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/cidade/{id}": {
+        "get": {
+          "tags": [
+            "Cadastros gerais"
+          ],
+          "summary": "Busca uma cidade pelo seu ID.",
+          "operationId": "buscarUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/CidadeRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/clinica-escola/aluno/novo": {
+        "post": {
+          "tags": [
+            "Profissional de saúde escola"
+          ],
+          "summary": "Adiciona um profissional de saúde aluno.",
+          "operationId": "novoAlunoUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeEscolaAlunoForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeEscolaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/clinica-escola/aluno/{email}": {
+        "put": {
+          "tags": [
+            "Profissional de saúde escola"
+          ],
+          "summary": "Altera um profissional de saúde aluno.",
+          "operationId": "alterarAlunoUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "in": "path",
+              "description": "email",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeEscolaAlunoAlteracaoForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeEscolaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/clinica-escola/profissional/ativar/{email}": {
+        "put": {
+          "tags": [
+            "Profissional de saúde escola"
+          ],
+          "summary": "Ativa um profissional por e-mail.",
+          "operationId": "ativarUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "in": "path",
+              "description": "email",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/clinica-escola/profissional/configurar/{email}": {
+        "put": {
+          "tags": [
+            "Profissional de saúde escola"
+          ],
+          "summary": "Configura um profissional por e-mail.",
+          "operationId": "configurarUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "in": "path",
+              "description": "email",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeConfiguracaoForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/clinica-escola/profissional/inativar/{email}": {
+        "put": {
+          "tags": [
+            "Profissional de saúde escola"
+          ],
+          "summary": "Inativa um profissional por e-mail.",
+          "operationId": "inativarUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "in": "path",
+              "description": "email",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/clinica-escola/supervisor/novo": {
+        "post": {
+          "tags": [
+            "Profissional de saúde escola"
+          ],
+          "summary": "Adiciona um profissional de saúde supervisor.",
+          "operationId": "novoSupervisorUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeEscolaSupervisorForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ProfissionalSaudeEscolaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/convenio-paciente/associar": {
+        "post": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Permite associar um convênio/plano a um paciente.",
+          "operationId": "associarUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/AssociarConvenioPacienteForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PacienteConvenioRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/convenio-paciente/lista": {
+        "get": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Busca os convênios/planos do paciente de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_7",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idPaciente",
+              "in": "query",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«PacienteConvenioRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/convenio-paciente/{id}": {
+        "get": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Busca um convênio/paciente pelo seu ID.",
+          "operationId": "buscarUsingGET_7",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PacienteConvenioRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        },
+        "put": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Altera os dados de um convênio/paciente pelo seu ID.",
+          "operationId": "alterarUsingPUT_3",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/PacienteConvenioAlteracaoForm"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PacienteConvenioRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/especialidade/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna a lista de especialidades de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_1",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtendidasNaClinica",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "name": "somenteAtivasNaWeb",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«EspecialidadeRetorno»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/especialidade/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca uma especialidade pelo seu ID.",
+          "operationId": "buscarUsingGET_1",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/EspecialidadeRetorno"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/executor-agenda/disponibilidade": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna disponibilidade de horários do executor",
+          "operationId": "buscarDisponibilidadeUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codTipoAtendimento",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "data",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataFim",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "idExecutorAgenda",
+              "in": "query",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/DisponibilidadeExecutorRetornoAPI"
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/executor-agenda/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna a lista de executores de agenda de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_2",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idEspecialidade",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "idTipoConvenio",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "name": "somenteAtivosNaWeb",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "name": "somenteProfissionaisSaude",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«ExecutorAgendaRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/executor-agenda/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca um executor de agenda pelo ID com detalhes quando profissional de saúde.",
+          "operationId": "buscarDetalhadoUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ExecutorAgendaDetalhadoRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/info": {
+        "get": {
+          "tags": [
+            "Info"
+          ],
+          "summary": "Obtém informações sobre determinado token",
+          "operationId": "cnnHelloUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ClinicaRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/lista-espera/novo": {
+        "post": {
+          "tags": [
+            "Lista de espera"
+          ],
+          "summary": "Adiciona um paciente na lista de espera.",
+          "operationId": "novoUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/ListaEsperaFormNovo"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ListaEsperaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/lista-espera/{id}": {
+        "get": {
+          "tags": [
+            "Lista de espera"
+          ],
+          "summary": "Busca um registro da lista de espera pelo seu ID.",
+          "operationId": "buscarUsingGET_2",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ListaEsperaRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        },
+        "put": {
+          "tags": [
+            "Lista de espera"
+          ],
+          "summary": "Altera os dados de um registro da lista de espera pelo seu ID.",
+          "operationId": "alterarUsingPUT_1",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/ListaEsperaFormEditar"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ListaEsperaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/local-agenda/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna a lista de múltiplas agendas de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_3",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«LocalAgendaRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/local-agenda/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca uma múltipla agenda pelo seu ID.",
+          "operationId": "buscarUsingGET_3",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/LocalAgendaRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/nacionalidade/lista": {
+        "get": {
+          "tags": [
+            "Cadastros gerais"
+          ],
+          "summary": "Retorna a lista de nacionalidades de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_4",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«NacionalidadeRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/nacionalidade/{id}": {
+        "get": {
+          "tags": [
+            "Cadastros gerais"
+          ],
+          "summary": "Busca uma nacionalidade pelo seu ID.",
+          "operationId": "buscarUsingGET_4",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/NacionalidadeRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/orcamento/lista": {
+        "get": {
+          "tags": [
+            "Orçamento"
+          ],
+          "summary": "Retorna a lista de orçamentos de acordo com o filtro especificado.",
+          "operationId": "listarUsingGET_1",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataFinal",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataInicial",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idPaciente",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "status",
+              "in": "query",
+              "required": false,
+              "type": "string",
+              "enum": [
+                "ABERTO",
+                "APROVADO",
+                "PERDIDO",
+                "CANCELADO"
+              ]
+            },
+            {
+              "name": "tipoData",
+              "in": "query",
+              "required": true,
+              "type": "string",
+              "enum": [
+                "CRIACAO",
+                "APROVACAO",
+                "PREVISAO_EXECUCAO"
+              ]
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«OrcamentoRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/orcamento/{id}": {
+        "get": {
+          "tags": [
+            "Orçamento"
+          ],
+          "summary": "Busca um orçamento pelo seu ID.",
+          "operationId": "buscarUsingGET_5",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/OrcamentoRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/origem/lista": {
+        "get": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Retorna a lista de origens ativas de pacientes.",
+          "operationId": "listaUsingGET_5",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«OrigemPacienteRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/origem/novo": {
+        "post": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Cria uma nova origem.",
+          "operationId": "novoUsingPOST_1",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/OrigemPacienteApiForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/OrigemPacienteRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/paciente/lista": {
+        "get": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Retorna a lista de pacientes de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_6",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "cpfCnpj",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "dataFinal",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "dataInicial",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "dataPor",
+              "in": "query",
+              "required": false,
+              "type": "string",
+              "enum": [
+                "CRIACAO"
+              ]
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "numeroIdentificacao",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«PacienteRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/paciente/novo": {
+        "post": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Cria um novo paciente.",
+          "operationId": "novoUsingPOST_2",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/PacienteForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PacienteRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/paciente/{id}": {
+        "get": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Busca um paciente pelo seu ID.",
+          "operationId": "buscarUsingGET_6",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PacienteRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        },
+        "put": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Altera os dados de um paciente pelo seu ID.",
+          "operationId": "alterarUsingPUT_2",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/PacienteForm"
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PacienteRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/plano-beneficio/elegibilidade": {
+        "get": {
+          "tags": [
+            "Paciente"
+          ],
+          "summary": "Retorna se o cartão de benefício está elegível.",
+          "operationId": "consultarElegibilidadeUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "numeroCartao",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "tipoElegibilidade",
+              "in": "query",
+              "required": false,
+              "type": "string",
+              "enum": [
+                "MATRIZ",
+                "FILIAL"
+              ]
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ElegibilidadePlanoBeneficioRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/plano-tratamento/lista": {
+        "get": {
+          "tags": [
+            "Plano de tratamento odontológico"
+          ],
+          "summary": "Retorna os planos de tratamento odontológico de um paciente.",
+          "operationId": "consultarOdoPlanoTratamentoUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idPaciente",
+              "in": "query",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«OdoPlanoTratamentoRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-consulta/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna a lista de tipos de consulta de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_9",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«TipoConsultaRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-consulta/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca um tipo de consulta pelo seu ID.",
+          "operationId": "buscarUsingGET_8",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/TipoConsultaRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-convenio/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna a lista de tipos de convênio/planos cadastrados na clínica de acordo com o filtro especificado.",
+          "operationId": "listaUsingGET_10",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idExecutor",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "name": "somenteParticulares",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«TipoConvenioRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-convenio/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca um tipo de convênio pelo seu ID.",
+          "operationId": "buscarUsingGET_9",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/TipoConvenioRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-procedimento/lista": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna lista de procedimentos baseado no filtro especificado",
+          "operationId": "listaUsingGET_11",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idTipoConvenio",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "nomeContem",
+              "in": "query",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "somenteAtivos",
+              "in": "query",
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "name": "tipo",
+              "in": "query",
+              "required": false,
+              "type": "string",
+              "enum": [
+                "TODOS",
+                "SOMENTE_EXAME",
+                "EXCETO_EXAME"
+              ]
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/PageAPI«TipoProcedimentoRetornoAPI»"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-procedimento/valores-venda": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Retorna objeto com os valores do procedimento para determinada especialidade em uma determinada data/hora.",
+          "operationId": "valorTipoProcedimentoUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "dataBase",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "horaBase",
+              "in": "query",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "idEspecialidade",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "idTipoConvenio",
+              "in": "query",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "idTipoProcedimento",
+              "in": "query",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "name": "pagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            },
+            {
+              "name": "registrosPorPagina",
+              "in": "query",
+              "required": false,
+              "type": "integer",
+              "format": "int32"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/ValorProcedimentoRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/tipo-procedimento/{id}": {
+        "get": {
+          "tags": [
+            "Agenda"
+          ],
+          "summary": "Busca um procedimento pelo seu ID.",
+          "operationId": "buscarUsingGET_10",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "description": "id",
+              "required": true,
+              "type": "integer",
+              "format": "int64"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/TipoProcedimentoDetalheRetornoAPI"
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/turma/nova": {
+        "post": {
+          "tags": [
+            "Turma escola"
+          ],
+          "summary": "Adiciona uma nova turma.",
+          "operationId": "novaTurmaUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/TurmaForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/TurmaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/turma/profissional/{email}": {
+        "get": {
+          "tags": [
+            "Turma escola"
+          ],
+          "summary": "Retorna a lista das turmas e tipo de vínculo do profissional.",
+          "operationId": "getTurmasByProfissionalUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "in": "path",
+              "description": "email",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/TurmaTipoProfissionalRetornoAPI"
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/turma/{codigoTurma}": {
+        "get": {
+          "tags": [
+            "Turma escola"
+          ],
+          "summary": "Retorna os dados da turma.",
+          "operationId": "getDadosTurmaUsingGET",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codigoTurma",
+              "in": "path",
+              "description": "codigoTurma",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/TurmaProfissionaisRetornoAPI"
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        },
+        "put": {
+          "tags": [
+            "Turma escola"
+          ],
+          "summary": "Altera uma turma.",
+          "operationId": "alterarTurmaUsingPUT",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codigoTurma",
+              "in": "path",
+              "description": "codigoTurma",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/TurmaAlteracaoForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK",
+              "schema": {
+                "$ref": "#/definitions/TurmaRetornoAPI"
+              }
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/turma/{codigoTurma}/profissionais": {
+        "post": {
+          "tags": [
+            "Turma escola"
+          ],
+          "summary": "Vincula profissionais a uma turma.",
+          "operationId": "vincularProfissionaisUsingPOST",
+          "consumes": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codigoTurma",
+              "in": "path",
+              "description": "codigoTurma",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "in": "body",
+              "name": "form",
+              "description": "form",
+              "required": true,
+              "schema": {
+                "$ref": "#/definitions/TurmaProfissionaisForm"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            },
+            "201": {
+              "description": "Created"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            },
+            "404": {
+              "description": "Not Found"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      },
+      "/turma/{codigoTurma}/profissionais/{email}": {
+        "delete": {
+          "tags": [
+            "Turma escola"
+          ],
+          "summary": "Remove um profissional de uma turma.",
+          "operationId": "removerProfissionalUsingDELETE",
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "in": "header",
+              "description": "Token de integração da clínica",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "codigoTurma",
+              "in": "path",
+              "description": "codigoTurma",
+              "required": true,
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "in": "path",
+              "description": "email",
+              "required": true,
+              "type": "string"
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "OK"
+            },
+            "204": {
+              "description": "No Content"
+            },
+            "401": {
+              "description": "Unauthorized"
+            },
+            "403": {
+              "description": "Forbidden"
+            }
+          },
+          "security": [
+            {
+              "basicAuth": []
+            }
+          ],
+          "deprecated": false
+        }
+      }
+    },
+    "securityDefinitions": {
+      "basicAuth": {
+        "type": "basic"
+      }
+    },
+    "definitions": {
+      "AgendaAlteracaoFormAPI": {
+        "type": "object",
+        "required": [
+          "data",
+          "horaFim",
+          "horaInicio",
+          "idLocalAgenda",
+          "idPaciente",
+          "idPacienteConvenio",
+          "idTipoConsulta",
+          "status"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "emailPaciente": {
+            "type": "string"
+          },
+          "encaminhamento": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 150
+          },
+          "horaFim": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "idLocalAgenda": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idOrigemPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPacienteConvenio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idRotulo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notificarEmailPaciente": {
+            "type": "boolean"
+          },
+          "notificarEmailProfissional": {
+            "type": "boolean"
+          },
+          "notificarSMSPaciente": {
+            "type": "boolean"
+          },
+          "notificarSMSProfissional": {
+            "type": "boolean"
+          },
+          "notificarWhatsappPaciente": {
+            "type": "boolean"
+          },
+          "observacoes": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "procedimentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/AgendaProcedimentoAlteracaoFormAPI"
+            }
+          },
+          "salaEspera": {
+            "type": "string",
+            "enum": [
+              "NAO_ALTERAR",
+              "CRIAR",
+              "REMOVER"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AGENDADO",
+              "CONFIRMADO",
+              "CONFIRMADO_PACIENTE",
+              "CANCELADO",
+              "CANCELADO_PACIENTE",
+              "EM_ESPERA",
+              "EM_ANDAMENTO",
+              "FINALIZADO",
+              "FALTOU",
+              "PAGAMENTO",
+              "PRE_ATENDIMENTO",
+              "REMARCOU"
+            ]
+          },
+          "telefoneCelularPaciente": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 20
+          }
+        },
+        "title": "AgendaAlteracaoFormAPI"
+      },
+      "AgendaFormAPI": {
+        "type": "object",
+        "required": [
+          "data",
+          "horaFim",
+          "horaInicio",
+          "idLocalAgenda",
+          "idPaciente",
+          "idPacienteConvenio",
+          "idTipoConsulta",
+          "status"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "emailPaciente": {
+            "type": "string"
+          },
+          "encaminhamento": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 150
+          },
+          "horaFim": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "idLocalAgenda": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idOrigemPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPacienteConvenio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idRotulo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notificarEmailPaciente": {
+            "type": "boolean"
+          },
+          "notificarEmailProfissional": {
+            "type": "boolean"
+          },
+          "notificarSMSPaciente": {
+            "type": "boolean"
+          },
+          "notificarSMSProfissional": {
+            "type": "boolean"
+          },
+          "notificarWhatsappPaciente": {
+            "type": "boolean"
+          },
+          "observacoes": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 500
+          },
+          "procedimentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/AgendaProcedimentoFormAPI"
+            }
+          },
+          "salaEspera": {
+            "type": "string",
+            "enum": [
+              "CRIAR"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AGENDADO",
+              "CONFIRMADO",
+              "CONFIRMADO_PACIENTE",
+              "CANCELADO",
+              "CANCELADO_PACIENTE",
+              "EM_ESPERA",
+              "EM_ANDAMENTO",
+              "FINALIZADO",
+              "FALTOU",
+              "PAGAMENTO",
+              "PRE_ATENDIMENTO",
+              "REMARCOU"
+            ]
+          },
+          "telefoneCelularPaciente": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 20
+          }
+        },
+        "title": "AgendaFormAPI"
+      },
+      "AgendaFormRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "emailPaciente": {
+            "type": "string"
+          },
+          "encaminhamento": {
+            "type": "string"
+          },
+          "horaFim": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idLocalAgenda": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idOrigemPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idRotulo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConvenio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "observacoes": {
+            "type": "string"
+          },
+          "procedimentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/AgendaProcedimentoFormRetornoAPI"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AGENDADO",
+              "CONFIRMADO",
+              "CONFIRMADO_PACIENTE",
+              "CANCELADO",
+              "CANCELADO_PACIENTE",
+              "EM_ESPERA",
+              "EM_ANDAMENTO",
+              "FINALIZADO",
+              "FALTOU",
+              "PAGAMENTO",
+              "PRE_ATENDIMENTO",
+              "REMARCOU"
+            ]
+          },
+          "telefoneCelularPaciente": {
+            "type": "string"
+          },
+          "urlSalaEspera": {
+            "type": "string"
+          }
+        },
+        "title": "AgendaFormRetornoAPI"
+      },
+      "AgendaProcedimentoAlteracaoFormAPI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idEspecialidade": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPromocao": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoProcedimento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantidade": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "AgendaProcedimentoAlteracaoFormAPI"
+      },
+      "AgendaProcedimentoFormAPI": {
+        "type": "object",
+        "properties": {
+          "idEspecialidade": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPromocao": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoProcedimento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quantidade": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "AgendaProcedimentoFormAPI"
+      },
+      "AgendaProcedimentoFormRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idEspecialidade": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPromocao": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoProcedimento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "quantidade": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "AgendaProcedimentoFormRetornoAPI"
+      },
+      "AgendaProfissionalRetorno": {
+        "type": "object",
+        "properties": {
+          "contatoPaciente": {
+            "$ref": "#/definitions/AgendaProfissionalRetornoContato"
+          },
+          "data": {
+            "type": "string"
+          },
+          "horaFinal": {
+            "type": "string"
+          },
+          "horaInicial": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nomePaciente": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "title": "AgendaProfissionalRetorno"
+      },
+      "AgendaProfissionalRetornoContato": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "telefoneCelular": {
+            "type": "string"
+          },
+          "telefoneComercial": {
+            "type": "string"
+          },
+          "telefoneResidencial": {
+            "type": "string"
+          }
+        },
+        "title": "AgendaProfissionalRetornoContato"
+      },
+      "AgendaRemarcacaoFormAPI": {
+        "type": "object",
+        "required": [
+          "novaData",
+          "novoHorarioFinal",
+          "novoHorarioInicial"
+        ],
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 200
+          },
+          "novaData": {
+            "type": "string"
+          },
+          "novoHorarioFinal": {
+            "type": "string"
+          },
+          "novoHorarioInicial": {
+            "type": "string"
+          }
+        },
+        "title": "AgendaRemarcacaoFormAPI"
+      },
+      "AlteracaoAgendaAPI": {
+        "type": "object",
+        "required": [
+          "idAgenda",
+          "status"
+        ],
+        "properties": {
+          "idAgenda": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AGENDADO",
+              "CONFIRMADO",
+              "CONFIRMADO_PACIENTE",
+              "CANCELADO",
+              "CANCELADO_PACIENTE",
+              "EM_ESPERA",
+              "EM_ANDAMENTO",
+              "FINALIZADO",
+              "FALTOU",
+              "PAGAMENTO",
+              "PRE_ATENDIMENTO",
+              "REMARCOU"
+            ]
+          }
+        },
+        "title": "AlteracaoAgendaAPI"
+      },
+      "AssociarConvenioPacienteForm": {
+        "type": "object",
+        "required": [
+          "idPaciente",
+          "idTipoConvenio"
+        ],
+        "properties": {
+          "carteirinha": {
+            "type": "string"
+          },
+          "dataValidade": {
+            "type": "string"
+          },
+          "idPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConvenio": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "title": "AssociarConvenioPacienteForm"
+      },
+      "AtendimentoForm": {
+        "type": "object",
+        "properties": {
+          "escalasAtendimento": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/EscalaAtendimentoForm"
+            }
+          },
+          "horariosAtendimento": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/HorarioAtendimentoForm"
+            }
+          },
+          "isBloqueiaAtendimentoSemAgendamento": {
+            "type": "boolean"
+          },
+          "tipoAtendimento": {
+            "type": "string",
+            "enum": [
+              "HORARIO_ATENDIMENTO",
+              "ESCALA_ATENDIMENTO"
+            ]
+          }
+        },
+        "title": "AtendimentoForm"
+      },
+      "CboRetorno": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string"
+          }
+        },
+        "title": "CboRetorno"
+      },
+      "CidadeRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "codIbge": {
+            "type": "string"
+          },
+          "estado": {
+            "$ref": "#/definitions/EstadoRetornoAPI"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "CidadeRetornoAPI"
+      },
+      "ClienteFornecedorRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfCnpj": {
+            "type": "string"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nomeFantasia": {
+            "type": "string"
+          },
+          "razaoSocial": {
+            "type": "string"
+          }
+        },
+        "title": "ClienteFornecedorRetornoAPI"
+      },
+      "ClinicaRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfCnpj": {
+            "type": "string"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "horarioFim": {
+            "type": "string"
+          },
+          "horarioInicio": {
+            "type": "string"
+          },
+          "horarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/PeriodoTrabalhoAPI"
+            }
+          },
+          "nomeFantasia": {
+            "type": "string"
+          },
+          "razaoSocial": {
+            "type": "string"
+          }
+        },
+        "title": "ClinicaRetornoAPI"
+      },
+      "ContatoAPI": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "ramalTelefoneComercial": {
+            "type": "string"
+          },
+          "ramalTelefoneRecados": {
+            "type": "string"
+          },
+          "ramalTelefoneResidencial": {
+            "type": "string"
+          },
+          "skype": {
+            "type": "string"
+          },
+          "telefoneCelular": {
+            "type": "string"
+          },
+          "telefoneComercial": {
+            "type": "string"
+          },
+          "telefoneRecados": {
+            "type": "string"
+          },
+          "telefoneResidencial": {
+            "type": "string"
+          }
+        },
+        "title": "ContatoAPI"
+      },
+      "DadosExecucaoOrcamentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "dataExecucao": {
+            "type": "string"
+          },
+          "dataFinalExecucao": {
+            "type": "string"
+          },
+          "dataPrevista": {
+            "type": "string"
+          },
+          "localExecucao": {
+            "$ref": "#/definitions/ClienteFornecedorRetornoAPI"
+          },
+          "nomeProfissionalAuxiliar": {
+            "type": "string"
+          },
+          "profissionalResponsavel": {
+            "$ref": "#/definitions/ProfissionalSaudeRetornoAPI"
+          }
+        },
+        "title": "DadosExecucaoOrcamentoRetornoAPI"
+      },
+      "DisciplinaDto": {
+        "type": "object",
+        "properties": {
+          "codigoDisciplina": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          }
+        },
+        "title": "DisciplinaDto"
+      },
+      "DisponibilidadeExecutorRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "horaFim": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "title": "DisponibilidadeExecutorRetornoAPI"
+      },
+      "ElegibilidadePlanoBeneficioRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "elegivel": {
+            "type": "boolean"
+          },
+          "motivosInelegibilidade": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nomeConvenio": {
+            "type": "string"
+          },
+          "nomePaciente": {
+            "type": "string"
+          },
+          "validadeConvenio": {
+            "type": "string"
+          }
+        },
+        "title": "ElegibilidadePlanoBeneficioRetornoAPI"
+      },
+      "EnderecoAPI": {
+        "type": "object",
+        "properties": {
+          "bairro": {
+            "type": "string"
+          },
+          "cep": {
+            "type": "string"
+          },
+          "complemento": {
+            "type": "string"
+          },
+          "idCidade": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "numero": {
+            "type": "string"
+          },
+          "rua": {
+            "type": "string"
+          }
+        },
+        "title": "EnderecoAPI"
+      },
+      "EscalaAtendimentoForm": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "diaDisponivel": {
+            "type": "boolean"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "periodo1": {
+            "$ref": "#/definitions/PeriodoForm"
+          },
+          "periodo2": {
+            "$ref": "#/definitions/PeriodoForm"
+          }
+        },
+        "title": "EscalaAtendimentoForm"
+      },
+      "EspecialidadeRetorno": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "EspecialidadeRetorno"
+      },
+      "EstadoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "sigla": {
+            "type": "string"
+          }
+        },
+        "title": "EstadoRetornoAPI"
+      },
+      "ExecutorAgendaDetalhadoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idpessoa": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "profissional": {
+            "type": "boolean"
+          },
+          "profissionalSaude": {
+            "$ref": "#/definitions/ProfissionalSaudeRetornoApi"
+          },
+          "tipoExecutor": {
+            "type": "string",
+            "enum": [
+              "PROFISSIONAL",
+              "CLIENTE_FORNECEDOR"
+            ]
+          }
+        },
+        "title": "ExecutorAgendaDetalhadoRetornoAPI"
+      },
+      "ExecutorAgendaRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idpessoa": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "tipoExecutor": {
+            "type": "string",
+            "enum": [
+              "PROFISSIONAL",
+              "CLIENTE_FORNECEDOR"
+            ]
+          }
+        },
+        "title": "ExecutorAgendaRetornoAPI"
+      },
+      "GrupoPermissaoBloqueioForm": {
+        "type": "object",
+        "properties": {
+          "idGrupoBloqueio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idGrupoPermissao": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "title": "GrupoPermissaoBloqueioForm"
+      },
+      "HorarioAcessoForm": {
+        "type": "object",
+        "properties": {
+          "dia": {
+            "type": "string",
+            "enum": [
+              "SEGUNDA",
+              "TERCA",
+              "QUARTA",
+              "QUINTA",
+              "SEXTA",
+              "SABADO",
+              "DOMINGO"
+            ]
+          },
+          "diaBloqueado": {
+            "type": "boolean"
+          },
+          "periodo1": {
+            "$ref": "#/definitions/PeriodoForm"
+          },
+          "periodo2": {
+            "$ref": "#/definitions/PeriodoForm"
+          }
+        },
+        "title": "HorarioAcessoForm"
+      },
+      "HorarioAtendimentoForm": {
+        "type": "object",
+        "properties": {
+          "dia": {
+            "type": "string",
+            "enum": [
+              "SEGUNDA",
+              "TERCA",
+              "QUARTA",
+              "QUINTA",
+              "SEXTA",
+              "SABADO",
+              "DOMINGO"
+            ]
+          },
+          "diaDisponivel": {
+            "type": "boolean"
+          },
+          "periodo1": {
+            "$ref": "#/definitions/PeriodoForm"
+          },
+          "periodo2": {
+            "$ref": "#/definitions/PeriodoForm"
+          }
+        },
+        "title": "HorarioAtendimentoForm"
+      },
+      "ListaEsperaFormEditar": {
+        "type": "object",
+        "required": [
+          "observacoes"
+        ],
+        "properties": {
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "observacoes": {
+            "type": "string"
+          }
+        },
+        "title": "ListaEsperaFormEditar"
+      },
+      "ListaEsperaFormNovo": {
+        "type": "object",
+        "required": [
+          "idPaciente",
+          "observacoes"
+        ],
+        "properties": {
+          "idPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "observacoes": {
+            "type": "string"
+          }
+        },
+        "title": "ListaEsperaFormNovo"
+      },
+      "ListaEsperaRetornoAPI": {
+        "type": "object",
+        "required": [
+          "idPaciente",
+          "observacoes"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPaciente": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConsulta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "observacoes": {
+            "type": "string"
+          }
+        },
+        "title": "ListaEsperaRetornoAPI"
+      },
+      "LocalAgendaRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "cor": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "LocalAgendaRetornoAPI"
+      },
+      "NacionalidadeRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nacionalidade": {
+            "type": "string"
+          }
+        },
+        "title": "NacionalidadeRetornoAPI"
+      },
+      "OdoPlanoTratamentoProcedimentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "convenio": {
+            "type": "string"
+          },
+          "dente": {
+            "type": "string"
+          },
+          "especialidade": {
+            "type": "string"
+          },
+          "faces": {
+            "type": "string"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "quadrantes": {
+            "type": "string"
+          },
+          "raizes": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "title": "OdoPlanoTratamentoProcedimentoRetornoAPI"
+      },
+      "OdoPlanoTratamentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "dataCriacao": {
+            "type": "string"
+          },
+          "procedimentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/OdoPlanoTratamentoProcedimentoRetornoAPI"
+            }
+          },
+          "profissionalSolicitante": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "title": "OdoPlanoTratamentoRetornoAPI"
+      },
+      "OrcamentoProcedimentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "especialidade": {
+            "$ref": "#/definitions/EspecialidadeRetorno"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoProcedimento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nomeProcedimento": {
+            "type": "string"
+          },
+          "quantidade": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "realizadoPorTerceiros": {
+            "type": "boolean"
+          },
+          "valorUnitario": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "title": "OrcamentoProcedimentoRetornoAPI"
+      },
+      "OrcamentoProdutoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idProduto": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nomeProduto": {
+            "type": "string"
+          },
+          "quantidade": {
+            "type": "number",
+            "format": "double"
+          },
+          "valorUnitario": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "title": "OrcamentoProdutoRetornoAPI"
+      },
+      "OrcamentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "clientePagadorFinanceiro": {
+            "$ref": "#/definitions/ClienteFornecedorRetornoAPI"
+          },
+          "dadosExecucao": {
+            "$ref": "#/definitions/DadosExecucaoOrcamentoRetornoAPI"
+          },
+          "dataAprovacao": {
+            "type": "string"
+          },
+          "descricao": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "numeroContrato": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "numeroControle": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paciente": {
+            "$ref": "#/definitions/PacienteRetornoAPI"
+          },
+          "pessoaProspector": {
+            "$ref": "#/definitions/PessoaRetornoAPI"
+          },
+          "pessoaResponsavel": {
+            "$ref": "#/definitions/PessoaRetornoAPI"
+          },
+          "procedimentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/OrcamentoProcedimentoRetornoAPI"
+            }
+          },
+          "produtos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/OrcamentoProdutoRetornoAPI"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ABERTO",
+              "APROVADO",
+              "PERDIDO",
+              "CANCELADO"
+            ]
+          },
+          "valorBruto": {
+            "type": "number",
+            "format": "double"
+          },
+          "valorDesconto": {
+            "type": "number",
+            "format": "double"
+          },
+          "valorLiquido": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "title": "OrcamentoRetornoAPI"
+      },
+      "OrigemPacienteApiForm": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "OrigemPacienteApiForm"
+      },
+      "OrigemPacienteRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "OrigemPacienteRetornoAPI"
+      },
+      "PacienteConvenioAlteracaoForm": {
+        "type": "object",
+        "properties": {
+          "carteirinha": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          },
+          "dataValidade": {
+            "type": "string"
+          }
+        },
+        "title": "PacienteConvenioAlteracaoForm"
+      },
+      "PacienteConvenioRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "carteirinha": {
+            "type": "string"
+          },
+          "dataValidade": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConvenio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nomeTipoConvenio": {
+            "type": "string"
+          }
+        },
+        "title": "PacienteConvenioRetornoAPI"
+      },
+      "PacienteForm": {
+        "type": "object",
+        "required": [
+          "dataNascimento",
+          "nome"
+        ],
+        "properties": {
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "dataNascimento": {
+            "type": "string"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "estrangeiro": {
+            "type": "boolean"
+          },
+          "genero": {
+            "type": "string",
+            "enum": [
+              "MASCULINO",
+              "FEMININO",
+              "SEM_GENERO",
+              "NEUTRO",
+              "TRANSGENERO",
+              "INTERSEX",
+              "OUTROS"
+            ]
+          },
+          "idNacionalidade": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idOrigem": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "nomeSocial": {
+            "type": "string"
+          },
+          "numeroControle": {
+            "type": "string"
+          },
+          "numeroIdentificacao": {
+            "type": "string"
+          },
+          "sexo": {
+            "type": "string",
+            "enum": [
+              "M",
+              "F"
+            ]
+          }
+        },
+        "title": "PacienteForm"
+      },
+      "PacienteRetornoAPI": {
+        "type": "object",
+        "required": [
+          "dataNascimento",
+          "nome"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "dataNascimento": {
+            "type": "string"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "estrangeiro": {
+            "type": "boolean"
+          },
+          "genero": {
+            "type": "string",
+            "enum": [
+              "MASCULINO",
+              "FEMININO",
+              "SEM_GENERO",
+              "NEUTRO",
+              "TRANSGENERO",
+              "INTERSEX",
+              "OUTROS"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idNacionalidade": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idOrigem": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "nomeSocial": {
+            "type": "string"
+          },
+          "numeroControle": {
+            "type": "string"
+          },
+          "numeroIdentificacao": {
+            "type": "string"
+          },
+          "sexo": {
+            "type": "string",
+            "enum": [
+              "M",
+              "F"
+            ]
+          }
+        },
+        "title": "PacienteRetornoAPI"
+      },
+      "PageAPI«AgendaFormRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/AgendaFormRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«AgendaFormRetornoAPI»"
+      },
+      "PageAPI«AgendaProfissionalRetorno»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/AgendaProfissionalRetorno"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«AgendaProfissionalRetorno»"
+      },
+      "PageAPI«CidadeRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/CidadeRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«CidadeRetornoAPI»"
+      },
+      "PageAPI«EspecialidadeRetorno»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/EspecialidadeRetorno"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«EspecialidadeRetorno»"
+      },
+      "PageAPI«ExecutorAgendaRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ExecutorAgendaRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«ExecutorAgendaRetornoAPI»"
+      },
+      "PageAPI«LocalAgendaRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/LocalAgendaRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«LocalAgendaRetornoAPI»"
+      },
+      "PageAPI«NacionalidadeRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/NacionalidadeRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«NacionalidadeRetornoAPI»"
+      },
+      "PageAPI«OdoPlanoTratamentoRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/OdoPlanoTratamentoRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«OdoPlanoTratamentoRetornoAPI»"
+      },
+      "PageAPI«OrcamentoRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/OrcamentoRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«OrcamentoRetornoAPI»"
+      },
+      "PageAPI«OrigemPacienteRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/OrigemPacienteRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«OrigemPacienteRetornoAPI»"
+      },
+      "PageAPI«PacienteConvenioRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/PacienteConvenioRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«PacienteConvenioRetornoAPI»"
+      },
+      "PageAPI«PacienteRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/PacienteRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«PacienteRetornoAPI»"
+      },
+      "PageAPI«RotuloAgendaFormRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/RotuloAgendaFormRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«RotuloAgendaFormRetornoAPI»"
+      },
+      "PageAPI«TipoConsultaRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/TipoConsultaRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«TipoConsultaRetornoAPI»"
+      },
+      "PageAPI«TipoConvenioRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/TipoConvenioRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«TipoConvenioRetornoAPI»"
+      },
+      "PageAPI«TipoProcedimentoRetornoAPI»": {
+        "type": "object",
+        "properties": {
+          "lista": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/TipoProcedimentoRetornoAPI"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalPaginas": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "title": "PageAPI«TipoProcedimentoRetornoAPI»"
+      },
+      "PeriodoForm": {
+        "type": "object",
+        "properties": {
+          "horarioFinal": {
+            "type": "string"
+          },
+          "horarioInicial": {
+            "type": "string"
+          }
+        },
+        "title": "PeriodoForm"
+      },
+      "PeriodoTrabalhoAPI": {
+        "type": "object",
+        "properties": {
+          "diaSemana": {
+            "type": "string",
+            "enum": [
+              "MONDAY",
+              "TUESDAY",
+              "WEDNESDAY",
+              "THURSDAY",
+              "FRIDAY",
+              "SATURDAY",
+              "SUNDAY"
+            ]
+          },
+          "periodos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/PeriodoTrabalhoHoraAPI"
+            }
+          }
+        },
+        "title": "PeriodoTrabalhoAPI"
+      },
+      "PeriodoTrabalhoHoraAPI": {
+        "type": "object",
+        "properties": {
+          "horaFim": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          }
+        },
+        "title": "PeriodoTrabalhoHoraAPI"
+      },
+      "PessoaRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "genero": {
+            "type": "string",
+            "enum": [
+              "MASCULINO",
+              "FEMININO",
+              "SEM_GENERO",
+              "NEUTRO",
+              "TRANSGENERO",
+              "INTERSEX",
+              "OUTROS"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "nomeSocial": {
+            "type": "string"
+          },
+          "sexo": {
+            "type": "string",
+            "enum": [
+              "M",
+              "F"
+            ]
+          }
+        },
+        "title": "PessoaRetornoAPI"
+      },
+      "ProfissionalSaudeConfiguracaoForm": {
+        "type": "object",
+        "properties": {
+          "atendimento": {
+            "$ref": "#/definitions/AtendimentoForm"
+          },
+          "gruposUsuario": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/GrupoPermissaoBloqueioForm"
+            }
+          },
+          "horariosAcesso": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/HorarioAcessoForm"
+            }
+          }
+        },
+        "title": "ProfissionalSaudeConfiguracaoForm"
+      },
+      "ProfissionalSaudeEscolaAlunoAlteracaoForm": {
+        "type": "object",
+        "required": [
+          "nome"
+        ],
+        "properties": {
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "dataNascimento": {
+            "type": "string"
+          },
+          "duracaoConsulta": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "especialidades": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "nome": {
+            "type": "string"
+          },
+          "odontologista": {
+            "type": "boolean"
+          },
+          "oftalmologista": {
+            "type": "boolean"
+          },
+          "supervisoresEmail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "title": "ProfissionalSaudeEscolaAlunoAlteracaoForm"
+      },
+      "ProfissionalSaudeEscolaAlunoForm": {
+        "type": "object",
+        "required": [
+          "emailLogin",
+          "nome"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "dataNascimento": {
+            "type": "string"
+          },
+          "duracaoConsulta": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "emailLogin": {
+            "type": "string"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "especialidades": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "nome": {
+            "type": "string"
+          },
+          "odontologista": {
+            "type": "boolean"
+          },
+          "oftalmologista": {
+            "type": "boolean"
+          },
+          "supervisoresEmail": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "title": "ProfissionalSaudeEscolaAlunoForm"
+      },
+      "ProfissionalSaudeEscolaRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "emailLogin": {
+            "type": "string"
+          },
+          "idPessoaExecutor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idProfissional": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "ProfissionalSaudeEscolaRetornoAPI"
+      },
+      "ProfissionalSaudeEscolaSupervisorForm": {
+        "type": "object",
+        "required": [
+          "emailLogin",
+          "nome",
+          "numeroConselhoProfissional",
+          "tipoConselhoProfissional",
+          "ufConselhoProfissional"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "contato": {
+            "$ref": "#/definitions/ContatoAPI"
+          },
+          "cpfcnpj": {
+            "type": "string"
+          },
+          "dataNascimento": {
+            "type": "string"
+          },
+          "duracaoConsulta": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "emailLogin": {
+            "type": "string"
+          },
+          "endereco": {
+            "$ref": "#/definitions/EnderecoAPI"
+          },
+          "especialidades": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "nome": {
+            "type": "string"
+          },
+          "numeroConselhoProfissional": {
+            "type": "string"
+          },
+          "odontologista": {
+            "type": "boolean"
+          },
+          "oftalmologista": {
+            "type": "boolean"
+          },
+          "tipoConselhoProfissional": {
+            "type": "string",
+            "enum": [
+              "CRM",
+              "CRESS",
+              "COREN",
+              "CRF",
+              "CREFONO",
+              "CREFITO",
+              "CRN",
+              "CRO",
+              "CRP",
+              "OUTROS",
+              "CRBIO",
+              "CRBM",
+              "CREF",
+              "CRMV",
+              "CRTR"
+            ]
+          },
+          "ufConselhoProfissional": {
+            "type": "string",
+            "enum": [
+              "AC",
+              "AL",
+              "AM",
+              "AP",
+              "BA",
+              "CE",
+              "DF",
+              "ES",
+              "GO",
+              "MA",
+              "MG",
+              "MS",
+              "MT",
+              "PA",
+              "PB",
+              "PE",
+              "PI",
+              "PR",
+              "RJ",
+              "RN",
+              "RO",
+              "RR",
+              "RS",
+              "SC",
+              "SE",
+              "SP",
+              "TO"
+            ]
+          }
+        },
+        "title": "ProfissionalSaudeEscolaSupervisorForm"
+      },
+      "ProfissionalSaudeRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "registroProfissional": {
+            "type": "string"
+          }
+        },
+        "title": "ProfissionalSaudeRetornoAPI"
+      },
+      "ProfissionalSaudeRetornoApi": {
+        "type": "object",
+        "properties": {
+          "cbo": {
+            "$ref": "#/definitions/CboRetorno"
+          },
+          "clinicas": {
+            "type": "string"
+          },
+          "codigo": {
+            "type": "string"
+          },
+          "especialidades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/EspecialidadeRetorno"
+            }
+          },
+          "registroProfissional": {
+            "type": "string"
+          }
+        },
+        "title": "ProfissionalSaudeRetornoApi"
+      },
+      "RotuloAgendaFormRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "corRotulo": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "RotuloAgendaFormRetornoAPI"
+      },
+      "TipoConsultaRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "reconsulta": {
+            "type": "boolean"
+          }
+        },
+        "title": "TipoConsultaRetornoAPI"
+      },
+      "TipoConvenioRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "beneficio": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "particular": {
+            "type": "boolean"
+          }
+        },
+        "title": "TipoConvenioRetornoAPI"
+      },
+      "TipoProcedimentoDetalheRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "especialidades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/EspecialidadeRetorno"
+            }
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "observacao": {
+            "type": "string"
+          },
+          "orientacao": {
+            "type": "string"
+          }
+        },
+        "title": "TipoProcedimentoDetalheRetornoAPI"
+      },
+      "TipoProcedimentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "especialidades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/EspecialidadeRetorno"
+            }
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nome": {
+            "type": "string"
+          }
+        },
+        "title": "TipoProcedimentoRetornoAPI"
+      },
+      "TurmaAlteracaoForm": {
+        "type": "object",
+        "required": [
+          "coordenadorEmail",
+          "nome"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "coordenadorEmail": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "disciplina": {
+            "$ref": "#/definitions/DisciplinaDto"
+          },
+          "nivelEnsino": {
+            "type": "string",
+            "enum": [
+              "GRADUACAO",
+              "POS_GRADUACAO"
+            ]
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "periodoLetivo": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          }
+        },
+        "title": "TurmaAlteracaoForm"
+      },
+      "TurmaForm": {
+        "type": "object",
+        "required": [
+          "codigoTurma",
+          "coordenadorEmail",
+          "nome"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "codigoTurma": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          },
+          "coordenadorEmail": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "disciplina": {
+            "$ref": "#/definitions/DisciplinaDto"
+          },
+          "nivelEnsino": {
+            "type": "string",
+            "enum": [
+              "GRADUACAO",
+              "POS_GRADUACAO"
+            ]
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "periodoLetivo": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          }
+        },
+        "title": "TurmaForm"
+      },
+      "TurmaProfissionaisForm": {
+        "type": "object",
+        "properties": {
+          "profissionais": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/TurmaProfissionalForm"
+            }
+          }
+        },
+        "title": "TurmaProfissionaisForm"
+      },
+      "TurmaProfissionaisRetornoAPI": {
+        "type": "object",
+        "required": [
+          "codigoTurma",
+          "coordenadorEmail",
+          "nome"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "codigoTurma": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          },
+          "coordenadorEmail": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "disciplina": {
+            "$ref": "#/definitions/DisciplinaDto"
+          },
+          "nivelEnsino": {
+            "type": "string",
+            "enum": [
+              "GRADUACAO",
+              "POS_GRADUACAO"
+            ]
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "periodoLetivo": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          },
+          "profissionais": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/TurmaProfissionalForm"
+            }
+          }
+        },
+        "title": "TurmaProfissionaisRetornoAPI"
+      },
+      "TurmaProfissionalForm": {
+        "type": "object",
+        "required": [
+          "email",
+          "tipo"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "ESTAGIARIO",
+              "SUPERVISOR"
+            ]
+          }
+        },
+        "title": "TurmaProfissionalForm"
+      },
+      "TurmaRetornoAPI": {
+        "type": "object",
+        "required": [
+          "codigoTurma",
+          "coordenadorEmail",
+          "nome"
+        ],
+        "properties": {
+          "ativo": {
+            "type": "boolean"
+          },
+          "codigoTurma": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          },
+          "coordenadorEmail": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "disciplina": {
+            "$ref": "#/definitions/DisciplinaDto"
+          },
+          "nivelEnsino": {
+            "type": "string",
+            "enum": [
+              "GRADUACAO",
+              "POS_GRADUACAO"
+            ]
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 255
+          },
+          "periodoLetivo": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 50
+          }
+        },
+        "title": "TurmaRetornoAPI"
+      },
+      "TurmaTipoProfissionalRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "codigoTurma": {
+            "type": "string"
+          },
+          "coordenadorTurma": {
+            "type": "boolean"
+          },
+          "tipoProfissional": {
+            "type": "string",
+            "enum": [
+              "ESTAGIARIO",
+              "SUPERVISOR"
+            ]
+          }
+        },
+        "title": "TurmaTipoProfissionalRetornoAPI"
+      },
+      "ValorProcedimentoRetornoAPI": {
+        "type": "object",
+        "properties": {
+          "dataBase": {
+            "type": "string"
+          },
+          "horaBase": {
+            "type": "string"
+          },
+          "idPromocao": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoConvenio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoProcedimento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tipoValorPromocao": {
+            "type": "string",
+            "enum": [
+              "ABSOLUTO",
+              "RELATIVO"
+            ]
+          },
+          "valorCobrancaConvenio": {
+            "type": "number",
+            "format": "double"
+          },
+          "valorCobrancaPaciente": {
+            "type": "number",
+            "format": "double"
+          },
+          "valorPromocao": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "title": "ValorProcedimentoRetornoAPI"
+      }
+    }
+  }

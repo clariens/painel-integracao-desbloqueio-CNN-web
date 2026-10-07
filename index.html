@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clariens · Pacientes bloqueados</title>
+    <meta name="description" content="Pacientes bloqueados por falta no Clínica nas Nuvens: liberar, bloquear e acompanhar o prazo." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2310140f'/%3E%3Crect x='3' y='3' width='10' height='10' fill='none' stroke='%23c4a056' stroke-width='2'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script>
+      // Tema antes da pintura: o salvo nesta máquina ou o claro (padrão Clariens).
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("clariens.cnn.tema") || "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#lista">Ir para a lista de pacientes</a>
+
+    <dialog class="login" id="login" aria-labelledby="login-title">
+      <form id="login-form" method="dialog">
+        <p class="login__kicker">Acesso interno</p>
+        <h1 id="login-title">Bloqueio por falta</h1>
+        <p class="login__copy">Entre com o seu usuário. Cada liberação e cada bloqueio ficam registrados no seu nome.</p>
+        <label>
+          Usuário
+          <input id="login-user" name="user" autocomplete="username" required />
+        </label>
+        <label>
+          Senha
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
+        <button type="submit">Entrar</button>
+      </form>
+    </dialog>
+
+    <aside class="sidebar" id="sidebar" aria-label="Menu">
+      <div class="sidebar__head">
+        <p class="sidebar__brand">
+          <img class="sidebar__logo" src="/img/clariens-logo.png" alt="Clariens Educação" width="150" height="43" />
+        </p>
+        <button class="sidebar__close" type="button" data-nav-close aria-label="Fechar menu">×</button>
+      </div>
+      <nav class="sidebar__nav" aria-label="Seções do painel">
+        <a href="/pacientes" aria-current="page">Pacientes</a>
+        <a href="/relatorios">Relatórios de faltas</a>
+        <a href="/historico">Histórico de ações</a>
+        <a href="/configuracao">Configuração</a>
+      </nav>
+      <p class="sidebar__user">Usuário: <strong id="usuario-nome">—</strong><button id="sair" type="button">Sair</button></p>
+    </aside>
+    <div class="nav-backdrop" data-nav-close aria-hidden="true"></div>
+    <script src="/js/layout.js"></script>
+
+    <div class="shell">
+      <p class="api-error" id="api-error" hidden role="alert"></p>
+
+      <header class="pagina__head">
+        <h1>Pacientes</h1>
+        <p id="ciclo">—</p>
+      </header>
+
+      <p class="aviso" id="aviso-controle" hidden>
+        A tabela de controle ainda está vazia: nenhum bloqueio foi registrado. Quem está no prazo aparece como
+        "Aguardando bloqueio" até a execução das 01:00 bloquear (ou registrar quem já está inativo no CNN), com o prazo
+        de liberação vencido ou não. Confira o status no CNN pelo detalhe antes de agir.
+      </p>
+
+      <section class="stats" aria-label="Resumo">
+        <button class="stat stat--pendente" type="button" data-filtro-situacao="pendente">
+          <p>Aguardando bloqueio</p>
+          <strong id="kpi-pendentes">—</strong>
+          <small>falta no prazo, sem bloqueio registrado</small>
+        </button>
+        <button class="stat stat--alert" type="button" data-filtro-situacao="bloqueado">
+          <p>Bloqueados no prazo</p>
+          <strong id="kpi-bloqueados">—</strong>
+          <small>prazo da falta correndo</small>
+        </button>
+        <button class="stat stat--brass" type="button" data-filtro-situacao="apto">
+          <p>Aptos a liberar</p>
+          <strong id="kpi-aptos">—</strong>
+          <small>bloqueados com o prazo cumprido</small>
+        </button>
+        <button class="stat stat--steel" type="button" data-filtro-situacao="liberado_antecipado">
+          <p>Liberados antes do prazo</p>
+          <strong id="kpi-antecipados">—</strong>
+          <small>liberação manual</small>
+        </button>
+        <article>
+          <p>Faltas no ciclo</p>
+          <strong id="kpi-faltas-ciclo">—</strong>
+          <small id="kpi-pacientes-ciclo">—</small>
+        </article>
+        <article>
+          <p>Faltas no mês</p>
+          <strong id="kpi-faltas-mes">—</strong>
+          <small id="kpi-coleta">—</small>
+        </article>
+      </section>
+
+      <section class="toolbar" aria-label="Filtros">
+        <label class="grow">
+          Buscar
+          <input id="busca" type="search" placeholder="Nome ou ID do paciente" autocomplete="off" />
+        </label>
+        <div class="campo">
+          Situação
+          <div class="segmented" role="group" aria-label="Situação" id="filtro-situacao">
+            <button type="button" data-situacao="" aria-pressed="true">Todos<span id="cont-todos"></span></button>
+            <button type="button" data-situacao="pendente" aria-pressed="false">Aguardando<span id="cont-pendente"></span></button>
+            <button type="button" data-situacao="bloqueado" aria-pressed="false">Bloqueados<span id="cont-bloqueado"></span></button>
+            <button type="button" data-situacao="apto" aria-pressed="false">Aptos<span id="cont-apto"></span></button>
+            <button type="button" data-situacao="liberado_antecipado" aria-pressed="false">Liberados antes<span id="cont-liberado_antecipado"></span></button>
+            <button type="button" data-situacao="liberado" aria-pressed="false">Liberados<span id="cont-liberado"></span></button>
+          </div>
+        </div>
+        <label>
+          Faltas no ciclo
+          <select id="filtro-faltas">
+            <option value="">Todas</option>
+            <option value="1">1 falta</option>
+            <option value="2">2 faltas</option>
+            <option value="3">3 ou mais</option>
+          </select>
+        </label>
+        <label>
+          Ordenar por
+          <select id="ordem">
+            <option value="fim">Fim do prazo</option>
+            <option value="falta">Falta mais recente</option>
+            <option value="faltas">Mais faltas</option>
+            <option value="nome">Nome</option>
+          </select>
+        </label>
+      </section>
+
+      <main id="lista">
+        <div class="tabela-wrap">
+          <table class="tabela" aria-describedby="lista-resumo">
+            <thead>
+              <tr>
+                <th scope="col">Paciente</th>
+                <th scope="col" class="num">Faltas no ciclo</th>
+                <th scope="col">Falta vigente</th>
+                <th scope="col">Fim do prazo</th>
+                <th scope="col">Situação</th>
+                <th scope="col">Última ação</th>
+                <th scope="col"><span class="sr-only">Ações</span></th>
+              </tr>
+            </thead>
+            <tbody id="linhas"></tbody>
+          </table>
+        </div>
+        <p class="vazio" id="vazio" hidden>Nenhum paciente neste filtro.</p>
+        <div class="rodape-lista">
+          <span id="lista-resumo" aria-live="polite">—</span>
+          <button class="ghost" id="mais" type="button" hidden>Mostrar mais</button>
+        </div>
+      </main>
+    </div>
+
+    <dialog class="gaveta" id="detalhe" aria-labelledby="detalhe-nome">
+      <header class="gaveta__head">
+        <div>
+          <h2 id="detalhe-nome">—</h2>
+          <p id="detalhe-sub">—</p>
+        </div>
+        <button class="sidebar__close" type="button" id="detalhe-fechar" aria-label="Fechar detalhe">×</button>
+      </header>
+      <div class="gaveta__corpo" id="detalhe-corpo" aria-live="polite"></div>
+    </dialog>
+
+    <dialog class="modal" id="acao" aria-labelledby="acao-titulo">
+      <form class="modal__form" id="acao-form" method="dialog">
+        <p class="modal__kicker" id="acao-kicker">Liberar paciente</p>
+        <h2 id="acao-titulo">—</h2>
+        <p class="modal__contexto" id="acao-contexto"></p>
+        <p class="modal__alerta" id="acao-alerta" hidden></p>
+        <label>
+          Motivo (obrigatório)
+          <textarea id="acao-motivo" required minlength="5" maxlength="500" placeholder="Ex.: falta justificada com atestado"></textarea>
+        </label>
+        <span class="modal__contador" id="acao-contador">0/500</span>
+        <p class="modal__erro" id="acao-erro" hidden role="alert"></p>
+        <div class="modal__acoes">
+          <button class="btn" type="button" id="acao-cancelar">Cancelar</button>
+          <button class="btn btn--primario" type="submit" id="acao-confirmar">Confirmar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer class="statusbar" aria-label="Status do painel">
+      <div class="statusbar__left">
+        <button class="nav-toggle" type="button" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Abrir menu">
+          <span class="nav-toggle__bars" aria-hidden="true"></span>
+          Pacientes
+        </button>
+        <p class="statusbar__meta">
+          <span id="clock">—</span>
+          <span class="dot" id="sync-dot" aria-hidden="true"></span>
+          <span id="sync-state" aria-live="polite">aguardando</span>
+        </p>
+      </div>
+      <div class="statusbar__actions">
+        <button class="ghost tema-toggle" type="button" data-tema-toggle>Modo escuro</button>
+        <button class="ghost" id="refresh" type="button">Atualizar agora</button>
+      </div>
+    </footer>
+
+    <script src="/js/pacientes.js" type="module"></script>
+  </body>
+</html>

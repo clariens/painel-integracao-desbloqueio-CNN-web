@@ -1,0 +1,11 @@
+# Sem server.js a Vercel não o trata como ponto de entrada (responderia 404 em tudo).
+server.js
+# Nada abaixo pode virar arquivo público: os workflows levam o header clinicaNasNuvens-cid.
+workflows/
+sql/
+docs/
+scripts/
+apidocs.json
+CHANGELOG.md
+README.md
+.env*
