@@ -79,6 +79,6 @@ A versão em Word fica em [word/](word/). Ela ainda descreve o sistema **antes**
 | [workflows/code/](../workflows/code/) | Código dos nós Code, `_regra.js`, `_sql.js` e `inject.mjs` |
 | [sql/](../sql/) | Scripts de banco (idempotentes) e carga inicial |
 | [scripts/](../scripts/) | `gerar-senha.mjs` (usuários) e `checar.mjs` (`npm run check`) |
-| `server.js` | Servidor local que imita a Vercel (só desenvolvimento) |
+| `dev-server.js` | Servidor local que imita a Vercel (só desenvolvimento) |
 | `vercel.json`, `.vercelignore`, `.env.example` | Rotas, duração das funções, o que não publicar, variáveis |
 | [apidocs.json](../apidocs.json) | Swagger 2.0 da API do CNN (cópia antiga; não tem o `PATCH /paciente/{id}/status`) |

@@ -1,5 +1,5 @@
-# Sem server.js a Vercel não o trata como ponto de entrada (responderia 404 em tudo).
-server.js
+# Servidor só de desenvolvimento local (npm run dev); não vai para a Vercel.
+dev-server.js
 # Nada abaixo pode virar arquivo público: os workflows levam o header clinicaNasNuvens-cid.
 workflows/
 sql/

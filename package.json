@@ -3,11 +3,10 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20.6"
+    "node": "22.x"
   },
   "scripts": {
-    "dev": "node --env-file=.env.local server.js",
-    "start": "node --env-file=.env.local server.js",
+    "dev": "node --env-file=.env.local dev-server.js",
     "inject": "node workflows/code/inject.mjs",
     "senha": "node scripts/gerar-senha.mjs",
     "check": "node scripts/checar.mjs"

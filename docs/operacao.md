@@ -75,8 +75,8 @@ Nunca deixe duas cópias de um workflow ativas: o PATCH sai em dobro.
 ### Desenvolvimento local
 
 - Copie `.env.example` para `.env.local` e preencha (pode apontar para os webhooks reais de Leitura; para Ações, prefira deixar vazio).
-- `npm run dev` sobe [server.js](../server.js) em `http://localhost:3000`: as mesmas páginas, os mesmos rewrites e os mesmos handlers de `api/`.
-- Rota nova em `api/` precisa ser registrada também no `server.js`.
+- `npm run dev` sobe [dev-server.js](../dev-server.js) em `http://localhost:3000`: as mesmas páginas, os mesmos rewrites e os mesmos handlers de `api/`.
+- Rota nova em `api/` precisa ser registrada também no `dev-server.js`.
 
 ## Rotina
 
@@ -97,7 +97,7 @@ Nunca deixe duas cópias de um workflow ativas: o PATCH sai em dobro.
 | Painel: "Authorization data is wrong!" ou 403 | `N8N_WEBHOOK_SECRET` diferente do valor da credencial Header Auth | Igualar os dois e Redeploy |
 | Painel: 404 do webhook | Workflow inativo no n8n | Ativar |
 | Painel: "O n8n não respondeu a tempo" | Ação demorou mais de 55 s (CNN lento, agenda grande) | **Confira o Histórico e o CNN antes de repetir**: a ação pode ter sido concluída |
-| Toda a Vercel responde 404 | `server.js` foi para o deploy | Confira o `.vercelignore` |
+| Build da Vercel falha com "No entrypoint found" | O projeto na Vercel está com um Framework Preset de servidor Node | Em *Settings → Build and Deployment*, deixe o Framework Preset em **Other**. O `vercel.json` já define `"framework": null` |
 | Login sempre recusado | `DASHBOARD_USERS` mal formatado (usuário:salt:hash, separados por vírgula) | Gere de novo com `npm run senha` |
 | Paciente liberado no painel voltou a ser bloqueado | Falta nova no ciclo (a vigente mudou) | Comportamento esperado. Veja o detalhe: a falta vigente é outra |
 | Paciente reativado **direto no CNN** volta a ser bloqueado | O bloqueio das 01:00 bloqueia todo paciente com falta no período que esteja ativo e não tenha sido liberado pelo painel | Libere pelo painel |
