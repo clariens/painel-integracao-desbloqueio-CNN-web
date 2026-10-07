@@ -1557,7 +1557,9 @@ dl.dados dd {
 
 /* ---------- tela de login: tela cheia com fundo animado ---------- */
 /* O diálogo cobre a página inteira: nada do painel aparece por trás. */
-.login[open] {
+/* Sem sessão (marcado no <head>), o login já aparece antes do JS abrir o diálogo. */
+.login[open],
+:root[data-sessao="nao"] .login {
   position: fixed;
   inset: 0;
   width: 100%;
@@ -1569,6 +1571,20 @@ dl.dados dd {
   place-items: center;
   overflow: hidden;
   background: var(--login-bg);
+}
+
+:root[data-sessao="nao"] .login:not([open]) {
+  z-index: 1000;
+}
+
+/* O painel por trás fica escondido até o login dar certo. */
+:root[data-sessao="nao"] body {
+  overflow: hidden;
+  background: var(--login-base);
+}
+
+:root[data-sessao="nao"] body > :not(.login, script) {
+  visibility: hidden;
 }
 
 .login::backdrop {

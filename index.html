@@ -20,6 +20,12 @@
       } catch {
         document.documentElement.dataset.theme = "light";
       }
+      // Sem login nesta aba: a tela de login aparece já na primeira pintura, sem mostrar o painel antes.
+      try {
+        document.documentElement.dataset.sessao = sessionStorage.getItem("clariens.cnn.auth") ? "sim" : "nao";
+      } catch {
+        document.documentElement.dataset.sessao = "nao";
+      }
     </script>
   </head>
   <body>

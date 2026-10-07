@@ -121,6 +121,11 @@ export const iniciarPagina = (carregar) => {
     }
   });
 
+  // Login fechado: o painel volta a aparecer (o CSS o esconde enquanto data-sessao="nao").
+  els.login?.addEventListener("close", () => {
+    document.documentElement.dataset.sessao = "sim";
+  });
+
   // O login não fecha com Esc: sem ele a página não tem o que mostrar.
   els.login?.addEventListener("cancel", (event) => event.preventDefault());
 
