@@ -1,6 +1,6 @@
 import { dataBr, escapeHtml, hojeSp, inicioCiclo, numero } from "./formato.js";
-import { iniciarPagina } from "./pagina.js";
-import { request } from "./session.js";
+import { iniciarPagina, usarCache } from "./pagina.js";
+import { CACHE, lerFiltros, prefetchCache, salvarFiltros } from "./session.js";
 
 const $ = (selector) => document.querySelector(selector);
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -24,6 +24,11 @@ const els = {
   dia: $("#grafico-dia"),
   profissional: $("#grafico-profissional"),
   reincidencia: $("#grafico-reincidencia"),
+  tipo: $("#grafico-tipo"),
+  periodoDia: $("#grafico-periodo"),
+  rotulo: $("#grafico-rotulo"),
+  procedimento: $("#grafico-procedimento"),
+  procCobertura: $("#proc-cobertura"),
   reincidentes: $("#reincidentes"),
   truncado: $("#aviso-truncado"),
 };
@@ -40,7 +45,7 @@ const aplicarAtalho = (atalho) => {
   const inicio = inicioCiclo(hoje);
   const periodos = {
     ciclo: [inicio, hoje],
-    anterior: [`${Number(inicio.slice(0, 4)) - 1}-08-01`, somarDias(inicio, -1)],
+    anterior: [`${Number(inicio.slice(0, 4)) - 1}${inicio.slice(4)}`, somarDias(inicio, -1)],
     mes: [`${hoje.slice(0, 7)}-01`, hoje],
     30: [somarDias(hoje, -29), hoje],
   };
@@ -101,9 +106,9 @@ const colunas = (alvo, pontos) => {
     .join("")}</div>`;
 };
 
-const barras = (alvo, itens) => {
+const barras = (alvo, itens, vazio = "Sem dados no período.") => {
   if (!itens.length) {
-    alvo.innerHTML = '<li class="vazio">Sem dados no período.</li>';
+    alvo.innerHTML = `<li class="vazio">${escapeHtml(vazio)}</li>`;
     return;
   }
   const maximo = Math.max(...itens.map((item) => item.valor), 1);
@@ -163,6 +168,30 @@ const render = () => {
     })),
   );
 
+  // Tipo de consulta, rótulo e procedimento chegam como { nome, faltas, pacientes }.
+  const porNome = (lista = []) =>
+    lista.map((item) => ({
+      rotulo: item.nome,
+      valor: item.faltas,
+      dica: `${item.nome}: ${numero(item.faltas)} faltas · ${numero(item.pacientes)} pacientes`,
+    }));
+  barras(els.tipo, porNome(d.porTipoConsulta));
+  barras(els.rotulo, porNome(d.porRotulo));
+  barras(
+    els.periodoDia,
+    (d.porPeriodo || []).map((item) => ({
+      rotulo: item.periodo,
+      valor: item.faltas,
+      dica: `${item.periodo}: ${numero(item.faltas)} faltas · ${numero(item.pacientes)} pacientes`,
+    })),
+  );
+  // Algumas clínicas não preenchem procedimentos no agendamento: aí o gráfico explica em vez de ficar vazio.
+  barras(els.procedimento, porNome(d.porProcedimento), "Nenhuma falta do período tem procedimento: a clínica não preenche esse campo na agenda.");
+  const comProcedimento = d.total.comProcedimento || 0;
+  els.procCobertura.textContent = d.total.faltas
+    ? `top 30 · ${numero(comProcedimento)} de ${numero(d.total.faltas)} faltas têm procedimento`
+    : "top 30";
+
   barras(
     els.reincidencia,
     d.reincidencia.map((item) => {
@@ -197,9 +226,20 @@ const csvCampo = (valor) => {
 const exportar = () => {
   const d = state.dados;
   if (!d?.linhas.length) return;
-  const cabecalho = ["Data da falta", "Hora", "ID paciente", "Paciente", "Nº da falta no ciclo", "Profissional", "ID agendamento"];
+  const cabecalho = ["Data da falta", "Hora", "ID paciente", "Paciente", "Nº da falta no ciclo", "Tipo de consulta", "Procedimentos", "Profissional", "Rótulo", "ID agendamento"];
   const linhas = d.linhas.map((linha) =>
-    [dataBr(linha.dataFalta), linha.horaInicio || "", linha.idPaciente, linha.nome || "", linha.numeroFalta, linha.profissional || "", linha.idAgenda]
+    [
+      dataBr(linha.dataFalta),
+      linha.horaInicio || "",
+      linha.idPaciente,
+      linha.nome || "",
+      linha.numeroFalta,
+      linha.tipoConsulta || "",
+      linha.procedimentos || "",
+      linha.profissional || "",
+      linha.rotulo || "",
+      linha.idAgenda,
+    ]
       .map(csvCampo)
       .join(";"),
   );
@@ -212,34 +252,53 @@ const exportar = () => {
 };
 
 // ---------- carga ----------
-const carregar = async () => {
+// Um cache por período: voltar a um período já visto não chama a API.
+const carregar = async ({ forcar }) => {
   if (els.de.value && els.ate.value && els.de.value > els.ate.value) {
     throw new Error("A data inicial é depois da final.");
   }
   const params = new URLSearchParams({ de: els.de.value, ate: els.ate.value });
-  state.dados = await request(`/api/faltas?${params}`);
-  render();
+  const chave = `faltas:${els.de.value}:${els.ate.value}`;
+  const entrada = await usarCache(chave, `/api/faltas?${params}`, CACHE.faltas, { forcar }, (dados) => {
+    // Um dado que chega por trás de outro período não sobrescreve o período da tela.
+    if (chave !== `faltas:${els.de.value}:${els.ate.value}`) return;
+    state.dados = dados;
+    render();
+  });
+  salvarFiltros("relatorios", { atalho: state.atalho, de: els.de.value, ate: els.ate.value });
+  prefetchCache("pacientes", "/api/pacientes", CACHE.pacientes);
+  return entrada;
 };
 
-aplicarAtalho("ciclo");
-const recarregar = iniciarPagina(carregar);
+// Período lembrado na aba; atalho "ciclo" é recalculado (o ciclo anda com o dia).
+const salvos = lerFiltros("relatorios");
+if (salvos.atalho || !salvos.de || !salvos.ate) {
+  aplicarAtalho(salvos.atalho || "ciclo");
+} else {
+  els.de.value = salvos.de;
+  els.ate.value = salvos.ate;
+  state.atalho = "";
+  els.atalhos.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", "false"));
+}
+const recarregar = iniciarPagina(carregar, { prazoMs: CACHE.faltas });
 
 els.atalhos.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-atalho]");
   if (!button) return;
   aplicarAtalho(button.dataset.atalho);
-  void recarregar(true).catch(() => {});
+  void recarregar(false).catch(() => {});
 });
 
 [els.de, els.ate].forEach((campo) =>
   campo.addEventListener("change", () => {
+    state.atalho = "";
     els.atalhos.querySelectorAll("button").forEach((button) => button.setAttribute("aria-pressed", "false"));
   }),
 );
 
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
-  void recarregar(true).catch(() => {});
+  void recarregar(false).catch(() => {});
 });
 
 els.exportar.addEventListener("click", exportar);

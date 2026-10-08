@@ -18,7 +18,7 @@ O botão **Bloquear** do painel reutiliza o código deste fluxo (`separar faltas
 
 ## Regra
 
-- **Bloqueia todo paciente com falta no período** (de 1/8 do ciclo até hoje) que esteja **ativo** no CNN, com o prazo de liberação vencido ou não.
+- **Bloqueia todo paciente com falta no período** (de 1/10 do ciclo até hoje) que esteja **ativo** no CNN, com o prazo de liberação vencido ou não.
 - O prazo abaixo **não decide o bloqueio**. Ele diz a partir de quando o paciente pode ser **liberado** pelo painel, e é gravado no controle (`DataFimBloqueio`).
 
 | `NumeroFalta` vigente | Pode ser liberado após |
@@ -27,11 +27,11 @@ O botão **Bloquear** do painel reutiliza o código deste fluxo (`separar faltas
 | 2 | 90 dias |
 | 3 ou mais | 180 dias |
 
-- Falta vigente = a linha com `MAX(NumeroFalta)` do paciente desde 1/8 do ciclo.
+- Falta vigente = a linha com `MAX(NumeroFalta)` do paciente desde 1/10 do ciclo.
 - Início do prazo = `DataFalta` dessa linha. Fim = início + dias.
 - Não bloqueia quem está `LIBERADO` na tabela de controle com `IdAgendaReferencia` igual à falta vigente (liberado ou isento pelo painel).
 - Quem **já está inativo** no CNN não recebe PATCH. Se ainda não há bloqueio registrado para a falta vigente, o paciente entra no laço só para **registrar** (`apenasRegistrar`). O controle passa a espelhar o CNN, e o painel tira o paciente de "Aguardando bloqueio".
-- Ciclo: de agosto a dezembro, 1/8 do ano corrente. De janeiro a julho, 1/8 do ano anterior.
+- Ciclo: de outubro a dezembro, 1/10 do ano corrente. De janeiro a setembro, 1/10 do ano anterior. (Até 08/10/2026 o ciclo começava em 1/8.)
 
 Exemplo: 1ª falta em 2026-08-03 → bloqueado na execução seguinte e liberável a partir de 2026-10-02. Se a 2ª falta vier em 2026-09-10, a vigente passa a ser a 2ª e o paciente só pode ser liberado a partir de 2026-12-09 (90 dias a partir de 2026-09-10). Se ele ainda estiver ativo em 10/10 com essa falta (por exemplo, porque o fluxo não rodou), é bloqueado mesmo assim.
 
@@ -51,13 +51,14 @@ gantt
 
 ```mermaid
 flowchart TD
-    T(["Todo dia 01:00"]) --> A["GET agenda desde 1 ago<br/>paginado, 100 por página"]
+    T(["Todo dia 01:00"]) --> K["5 listas de cadastro<br/>tipo de consulta, executores,<br/>rótulos, locais, especialidades"]
+    K --> A["GET agenda do ciclo<br/>TODAS as páginas, 100 por página"]
     A --> S["separar faltas<br/>status FALTOU, data no ciclo"]
     S --> Q{"sem faltas no periodo?"}
     Q -->|"sim"| Z["sem faltas<br/>SELECT 0 e fim"]
-    Q -->|"não"| P["GET paciente por id<br/>1 chamada por falta"]
-    P --> E["GET executor da agenda<br/>1 chamada por falta"]
-    E --> I["preparar insert SQL<br/>IF NOT EXISTS + INSERT"]
+    Q -->|"não"| U["pacientes únicos<br/>1 item por paciente"]
+    U --> P["GET paciente por id<br/>1 chamada por paciente"]
+    P --> I["preparar insert SQL<br/>uma query: cadastros, faltas,<br/>procedimentos"]
     I --> G["gravar faltas<br/>transação + renumeração"]
     G --> D["ids da consulta<br/>lista de IdPaciente do lote"]
     D --> C["consultar bloqueios<br/>falta vigente de cada paciente<br/>menos liberados no painel"]
@@ -79,14 +80,15 @@ flowchart TD
 | # | Nó | Tipo | O que faz |
 |---|---|---|---|
 | 1 | `Todo dia 01:00` | Schedule Trigger | Dispara com o cron `0 1 * * *` |
-| 2 | `GET agenda desde 1 ago` | HTTP Request | `GET /agenda/lista` de 1/8 do ciclo até hoje, `dataPor=AGENDAMENTO`, 100 por página. Roda uma vez (`executeOnce`). Para quando `lista` volta vazia ou após 100 requisições |
-| 3 | [`separar faltas`](../workflows/code/bloqueio-separar-faltas.js) | Code | Fica com `status === 'FALTOU'`, com `id` e `idPaciente`, e `data` entre 1/8 e hoje. Ordena por data e `id`. Sem nenhuma, devolve um item `{ semFaltas: true }` |
+| 1a | `GET tipos de consulta`, `GET executores`, `GET rótulos`, `GET locais`, `GET especialidades` | HTTP Request | Uma vez cada (`executeOnce`), paginados até `lista` vazia: `/tipo-consulta/lista`, `/executor-agenda/lista`, `/agenda-rotulo/lista`, `/local-agenda/lista`, `/especialidade/lista` (com `somenteAtivos=false` onde existe, para os nomes antigos também). Se um falhar, o bloqueio segue e só aquele nome não é atualizado |
+| 2 | `GET agenda do ciclo` | HTTP Request | `GET /agenda/lista` de 1/10 do ciclo até hoje, `dataPor=AGENDAMENTO`, 100 por página, **todas as páginas**. Roda uma vez (`executeOnce`). Para quando `lista` volta vazia (ou a resposta não é uma página) ou após 1000 requisições. **A paginação não pode ser desligada**: a API devolve no máximo 100 agendamentos por chamada |
+| 3 | [`separar faltas`](../workflows/code/bloqueio-separar-faltas.js) | Code | Fica com `status === 'FALTOU'`, com `id` e `idPaciente`, e `data` entre 1/10 e hoje. Ordena por data e `id`. Sem nenhuma, devolve um item `{ semFaltas: true }` |
 | 4 | `sem faltas no periodo?` | If | `semFaltas = true` vai para o nó `sem faltas`. O resto segue |
 | 5 | `sem faltas` | Microsoft SQL | `SELECT CAST(0 AS int) AS quantidadeFaltas`. Só fecha o ramo |
-| 6 | `GET paciente por id` | HTTP Request | `GET /paciente/{idPaciente}` para cada falta, uma de cada vez |
-| 7 | `GET executor da agenda` | HTTP Request | `GET /executor-agenda/{idPessoaExecutor}` para cada falta. É o profissional do horário |
-| 8 | [`preparar insert SQL`](../workflows/code/bloqueio-preparar-insert.js) | Code | Junta falta, paciente e executor pela posição do item. Monta um `IF NOT EXISTS (… IdAgenda …) INSERT` por falta |
-| 9 | `gravar faltas` | Microsoft SQL | Executa o lote montado em `preparar insert SQL` (`={{ $json.query }}`): inserts numa transação (`SET XACT_ABORT ON`) e renumeração de `NumeroFalta` dos pacientes do lote |
+| 6 | [`pacientes únicos`](../workflows/code/bloqueio-pacientes-unicos.js) | Code | Um item por paciente distinto, para o GET seguinte rodar uma vez por paciente (e não por falta) |
+| 7 | `GET paciente por id` | HTTP Request | `GET /paciente/{idPaciente}`, um paciente de cada vez. Traz nome, CPF, contato e o `ativo` usado no passo 12 |
+| 8 | [`preparar insert SQL`](../workflows/code/bloqueio-preparar-insert.js) | Code | Monta **uma** query (o nó Microsoft SQL só executa a do 1º item): `MERGE` dos cadastros em `CtlCnnCadastro`; todas as faltas lidas numa tabela temporária `#faltas`; `UPDATE` das faltas já gravadas (tipo de consulta, rótulo, profissional, local, horário; dados do paciente só completam o que estiver vazio); `INSERT` das novas; procedimentos apagados e gravados de novo em `CtlCnnFaltaProcedimento`. Paciente e profissional são casados por id (`Map`), não pela posição |
+| 9 | `gravar faltas` | Microsoft SQL | Executa a query de `preparar insert SQL` (`={{ $json.query }}`) numa transação (`SET XACT_ABORT ON`), com a renumeração de `NumeroFalta`. Devolve `faltasLidas`, `faltasNovas` e `cadastrosLidos` |
 | 10 | [`ids da consulta`](../workflows/code/bloqueio-ids-consulta.js) | Code | Monta a consulta de `consultar bloqueios` com a lista de pacientes do lote. Se `preparar insert SQL` não rodou, não devolve nada |
 | 11 | `consultar bloqueios` | Microsoft SQL | Devolve a linha vigente (`MAX(NumeroFalta)` no ciclo) de cada paciente do lote, **menos** quem está `LIBERADO` no controle com essa mesma falta |
 | 12 | [`montar info bloqueio`](../workflows/code/bloqueio-montar-info.js) | Code | Emite um item por paciente com falta no período (sem olhar o prazo; calcula a data a partir da qual pode liberar). Quem o GET trouxe `ativo: false` sai com `apenasRegistrar: true`, ou fica de fora se o controle já tem o bloqueio dessa falta |
@@ -122,17 +124,19 @@ De onde vem cada coluna gravada:
 | `HoraInicio`, `HoraFim` | `horaInicio`, `horaFim` do agendamento |
 | `StatusAgenda` | `status` do agendamento (50) |
 | `IdPessoaExecutor` | `idPessoaExecutor` do agendamento |
-| `IdExecutorAgenda`, `NomeExecutor`, `TipoExecutor` | `id`, `nome` (200), `tipoExecutor` (50) do `GET /executor-agenda` |
-| `IdLocalAgenda`, `IdTipoConsulta` | Do agendamento |
+| `IdExecutorAgenda`, `NomeExecutor`, `TipoExecutor` | `id`, `nome` (200), `tipoExecutor` (50) do executor da `/executor-agenda/lista` cujo **`idpessoa`** é o `idPessoaExecutor` do agendamento |
+| `IdLocalAgenda`, `IdTipoConsulta`, `IdRotulo` | Do agendamento (`idLocalAgenda`, `idTipoConsulta`, `idRotulo`). Os nomes ficam em `CtlCnnCadastro` |
 | `Observacoes` | `observacoes` do agendamento (500) |
-| `NumeroFalta` | `COUNT` das faltas do paciente no ciclo + 1 |
+| `NumeroFalta` | Entra 0 e a renumeração acerta na mesma transação |
 | `DataColeta` | Não é enviada. Default `SYSUTCDATETIME()` da tabela |
 
-Os números entre parênteses são o corte feito por `sqlS`. Se o GET do paciente ou do executor falhar, as colunas que dependem dele ficam `NULL`.
+Os números entre parênteses são o corte feito por `sqlS`. Se o GET do paciente falhar, nome, CPF e contato ficam `NULL` e são completados numa noite seguinte (o `UPDATE` preenche o que estiver vazio).
+
+Os procedimentos (`procedimentos[]` do agendamento) vão para `CtlCnnFaltaProcedimento`, uma linha por tipo de procedimento (quantidades do mesmo tipo somadas). Algumas clínicas não preenchem esse campo: aí a falta fica sem linha lá, e o tipo de consulta é o que diz o que o paciente ia fazer.
 
 ### Renumeração
 
-Depois dos inserts, `gravar faltas` recalcula `NumeroFalta` com `ROW_NUMBER() OVER (PARTITION BY IdPaciente ORDER BY DataFalta, IdAgenda)`. Só para os pacientes do lote e só para `DataFalta >= 1/8 do ciclo`. Só atualiza linhas cujo número mudou.
+Depois dos inserts, `gravar faltas` recalcula `NumeroFalta` com `ROW_NUMBER() OVER (PARTITION BY IdPaciente ORDER BY DataFalta, IdAgenda)`. Só para os pacientes do lote e só para `DataFalta >= 1/10 do ciclo`. Só atualiza linhas cujo número mudou.
 
 Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 
@@ -141,24 +145,24 @@ Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 | | O quê |
 |---|---|
 | Entrada | Agenda do ciclo (`GET /agenda/lista`) |
-| Entrada | Ficha de cada paciente com falta (`GET /paciente/{id}`) |
-| Entrada | Executor de cada agendamento (`GET /executor-agenda/{id}`) |
+| Entrada | Ficha de cada paciente com falta (`GET /paciente/{id}`, uma por paciente) |
+| Entrada | Listas de tipo de consulta, executores, rótulos, locais e especialidades |
 | Entrada | Linhas já gravadas em `dbo.CtlCnnFaltaPaciente` |
-| Saída | Linhas novas em `dbo.CtlCnnFaltaPaciente` e `NumeroFalta` renumerado |
+| Saída | Linhas novas (e atualizadas) em `dbo.CtlCnnFaltaPaciente` e `NumeroFalta` renumerado |
+| Saída | Procedimentos em `dbo.CtlCnnFaltaProcedimento` e nomes em `dbo.CtlCnnCadastro` |
 | Saída | `PATCH /paciente/{id}/status` com `{ "ativo": false }` |
 | Saída | Uma linha por PATCH em `dbo.CtlCnnAcaoPaciente` e a situação `BLOQUEADO` em `dbo.CtlCnnControlePaciente` |
 | Saída | Itens da execução no n8n com `acao: 'BLOQUEAR'`, `dataFimBloqueio` e `mensagem` |
 
 ## Limites conhecidos
 
-- **Relê o ciclo inteiro todo dia.** A agenda vem desde 1/8, então o volume cresce até julho. Máximo de 100 requisições × 100 registros = 10.000 agendamentos de qualquer status. O que passar disso é ignorado sem aviso.
-- **Chama o CNN por falta, não por paciente.** `GET paciente por id` e `GET executor da agenda` rodam para cada falta do ciclo, inclusive as já gravadas.
+- **Relê o ciclo inteiro todo dia.** A agenda vem desde 1/10, todas as páginas, então o volume e o tempo crescem até setembro. Em outubro são ~80 páginas; um ano inteiro fica perto de 500. O teto é 1000 requisições × 100 = 100.000 agendamentos de qualquer status.
+- **Chama o CNN por paciente.** `GET paciente por id` roda uma vez para cada paciente com falta no ciclo, inclusive os já gravados (é dele que sai o `ativo` usado no bloqueio).
 - **Rebloqueia todo dia.** Se alguém reativar um paciente ainda no prazo **direto no CNN**, ele volta a ser bloqueado à 01:00 do dia seguinte. Pelo painel isso não acontece: a liberação fica no controle e é respeitada.
 - **Auditoria depois do PATCH.** Se `registrar bloqueio` falhar, o paciente fica bloqueado no CNN sem linha na auditoria. O erro aparece na saída do nó, na execução do n8n.
 - **Falta desfeita continua contando.** Se o status mudar de `FALTOU` para outro no CNN, a linha não é apagada e segue na contagem.
-- **Nome e contato são fotografia.** São gravados no insert e não são atualizados depois. Se o GET do paciente ou do executor falhou naquele dia, as colunas ficam `NULL` para sempre.
+- **Nome e contato são fotografia.** São gravados no insert e não mudam depois; só são completados se estiverem vazios.
 - **Erros não param o fluxo.** Todos os nós HTTP e SQL usam `onError: continueRegularOutput`. Ver [arquitetura.md](arquitetura.md#tratamento-de-erro).
-- **Pareamento por posição.** `preparar insert SQL` junta falta, paciente e executor pelo índice do item. Depende de cada GET devolver exatamente um item por entrada, o que o `continueRegularOutput` garante.
 - **Paciente sem `ativo` conhecido é bloqueado.** Se o GET do paciente falhou, ele não entra no mapa de `ativo` e o PATCH é enviado mesmo assim.
 - **Formato de data.** O código assume que `data` do agendamento começa com `yyyy-MM-dd`.
 
@@ -167,14 +171,14 @@ Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 | Item | Valor | Nó |
 |---|---|---|
 | Cron | `0 1 * * *` | `Todo dia 01:00` |
-| Página | `registrosPorPagina=100`, `pagina` = `$pageCount` | `GET agenda desde 1 ago` |
-| Fim da paginação | `lista` vazia | `GET agenda desde 1 ago` |
-| Máximo de requisições | `maxRequests: 100` | `GET agenda desde 1 ago` |
-| Intervalo entre páginas | `requestInterval: 200` ms | `GET agenda desde 1 ago` |
-| Lote dos GETs | `batchSize: 1` | `GET paciente por id`, `GET executor da agenda` |
+| Página | `registrosPorPagina=100`, `pagina` = `$pageCount` | `GET agenda do ciclo` |
+| Fim da paginação | `lista` vazia ou resposta sem `lista` | `GET agenda do ciclo` e os 5 nós de cadastro |
+| Máximo de requisições | `maxRequests: 1000` (agenda), `50` (cadastros) | `GET agenda do ciclo`, nós de cadastro |
+| Intervalo entre páginas | `requestInterval: 200` ms | `GET agenda do ciclo` e nós de cadastro |
+| Lote do GET de paciente | `batchSize: 1` | `GET paciente por id` |
 | Lote do PATCH | `batchSize: 1`, `batchInterval: 3000` ms | `PATCH status paciente` |
 | Corpo do PATCH | `={{ { ativo: false } }}` | `PATCH status paciente` |
-| Prazos e ciclo | `REGRA` em [`_regra.js`](../workflows/code/_regra.js) | Nós Code (via `npm run inject`) e URL de `GET agenda desde 1 ago` (1/8 escrito na expressão) |
+| Prazos e ciclo | `REGRA` em [`_regra.js`](../workflows/code/_regra.js) | Nós Code (via `npm run inject`) e URL de `GET agenda do ciclo` (1/10 escrito na expressão) |
 | Credenciais | `API CNN AUTH`, `TST Araguari` | Nós HTTP e SQL |
 
 O corpo do PATCH precisa ser uma expressão inteira. Colocar `{{ }}` no meio de um JSON estático quebra o envio.

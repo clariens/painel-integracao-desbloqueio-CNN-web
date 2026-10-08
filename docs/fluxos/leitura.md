@@ -33,11 +33,13 @@ O SQL recebe sempre **um** item (o do GET ou o do IF) e lê a consulta de `$('Pr
 
 | `action` | Parâmetros | Devolve |
 |---|---|---|
-| `pacientes` | — | `ciclo`, `resumo` (contagens por situação, faltas no ciclo e no mês, última coleta, controle carregado), `items` (uma linha por paciente) |
-| `paciente` | `id` | `nome`, `cpf` mascarado, `cnn` (`ativo` ao vivo), `vigente` (falta, prazo, situação), `controle`, `faltas`, `acoes` (até 200) |
-| `faltas` | `de`, `ate` (padrão: ciclo atual até hoje) | `total`, `porMes`, `porDiaSemana`, `porProfissional` (top 30), `reincidencia`, `reincidentes` (top 20), `linhas` (até 5.000, para o CSV) |
+| `pacientes` | — | `ciclo`, `resumo` (contagens por situação, faltas no ciclo e no mês, última coleta, controle carregado), `items` (uma linha por paciente, com `tipoConsulta`, `procedimentos`, `profissional` e `rotulo` da falta vigente) |
+| `paciente` | `id` | `nome`, `cpf` mascarado, `cnn` (`ativo` ao vivo), `vigente` (falta, prazo, situação, tipo de consulta, procedimentos, profissional), `controle`, `faltas` (cada uma com tipo de consulta, procedimentos, profissional e rótulo), `acoes` (até 200) |
+| `faltas` | `de`, `ate` (padrão: ciclo atual até hoje) | `total` (com `comProcedimento`), `porMes`, `porDiaSemana`, `porProfissional` (top 30), `porTipoConsulta` (top 30), `porProcedimento` (top 30), `porRotulo` (top 20), `porPeriodo` (manhã < 12h, tarde < 18h, noite), `reincidencia`, `reincidentes` (top 20), `linhas` (até 5.000, para o CSV) |
 | `acoes` | `de`, `ate`, `acao`, `origem`, `resultado`, `usuario`, `paciente`, `page` | `contagem`, `items` (50 por página), `usuarios` (para o filtro) |
-| `parametros` | — | `regra` (de `_regra.js`), `ciclo`, `status` (última coleta, último bloqueio automático, última ação no painel, linhas) |
+| `parametros` | — | `regra` (de `_regra.js`), `ciclo`, `status` (última coleta, último bloqueio automático, última ação no painel, linhas), `cadastros` (quantos nomes de cada tipo e quando foram atualizados) |
+
+Nomes de profissional, tipo de consulta e rótulo vêm de `CtlCnnCadastro` (profissional pelo `IdPessoaExecutor`; sem cadastro, cai no `NomeExecutor` gravado). Procedimentos vêm de `CtlCnnFaltaProcedimento`, juntos numa string com `FOR XML PATH` (funciona em qualquer versão do SQL Server). Sem nome ainda, os relatórios mostram "Código …".
 
 Ação desconhecida ou parâmetro inválido → 400. Falha no SQL → 502 com a mensagem. Paciente sem faltas nem controle → 404.
 

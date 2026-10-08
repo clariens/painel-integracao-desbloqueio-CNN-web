@@ -28,7 +28,7 @@ flowchart TD
     B -->|"sim"| AG["GET agenda do paciente<br/>codigoPaciente, ciclo até hoje"]
     AG --> SF["separar faltas<br/>(só este paciente)"]
     SF --> SQ{"sem faltas no periodo?"}
-    SQ -->|"não"| GP["GET paciente por id"] --> GE["GET executor da agenda"] --> PI["preparar insert SQL"] --> GF["gravar faltas"]
+    SQ -->|"não"| PU["pacientes únicos"] --> GP["GET paciente por id"] --> PI["preparar insert SQL"] --> GF["gravar faltas"]
     GF --> CS
     SQ -->|"sim"| CS
     B -->|"não (liberar)"| CS["consultar situação"]

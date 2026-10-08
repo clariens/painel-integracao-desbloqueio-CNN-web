@@ -30,6 +30,13 @@ const iso = (valor) => {
   const data = valor instanceof Date ? valor : new Date(String(valor).includes('T') || String(valor).endsWith('Z') ? valor : `${String(valor).replace(' ', 'T')}Z`);
   return Number.isNaN(data.getTime()) ? String(valor) : data.toISOString();
 };
+// Profissional, tipo de consulta, rótulo e procedimentos da falta (nomes de CtlCnnCadastro / CtlCnnFaltaProcedimento).
+const agendaDe = (linha) => ({
+  profissional: linha.Profissional || linha.NomeExecutor || null,
+  tipoConsulta: linha.TipoConsulta || null,
+  rotulo: linha.Rotulo || null,
+  procedimentos: linha.Procedimentos || null
+});
 const ok = (response) => [{ json: { statusCode: 200, response: { asOf: new Date().toISOString(), ...response } } }];
 
 const mascararCpf = (valor) => {
@@ -65,7 +72,7 @@ if (meta.action === 'pacientes') {
       idAgenda: linha.IdAgenda,
       dataFalta: dataIso(linha.DataFalta),
       numeroFalta: num(linha.NumeroFalta),
-      profissional: linha.NomeExecutor || null,
+      ...agendaDe(linha),
       faltasCiclo: num(linha.FaltasCiclo),
       faltasTotal: num(linha.FaltasTotal),
       diasBloqueio: num(linha.DiasBloqueio),
@@ -141,6 +148,7 @@ if (meta.action === 'paciente') {
       numeroFalta: num(vigenteLinha.NumeroFalta),
       diasBloqueio,
       dataFimBloqueio: base.DataFimBloqueio,
+      ...agendaDe(vigenteLinha),
       noCiclo: noCiclo.length > 0,
       situacao,
       status
@@ -185,7 +193,7 @@ if (meta.action === 'paciente') {
       dataFalta: dataIso(falta.DataFalta),
       horaInicio: falta.HoraInicio || null,
       numeroFalta: num(falta.NumeroFalta),
-      profissional: falta.NomeExecutor || null,
+      ...agendaDe(falta),
       tipoProfissional: falta.TipoExecutor || null,
       noCiclo: dataIso(falta.DataFalta) >= meta.inicio,
       coletadaEm: iso(falta.DataColeta)
@@ -213,10 +221,11 @@ if (meta.action === 'faltas') {
   const total = secao('total')[0] || {};
   const linhas = secao('linha');
   const limite = 5000;
+  const porNome = (nome) => secao(nome).map((linha) => ({ nome: linha.Nome, faltas: num(linha.Faltas), pacientes: num(linha.Pacientes) }));
 
   return ok({
     periodo: { de: meta.de, ate: meta.ate, inicioCiclo: meta.inicio },
-    total: { faltas: num(total.Faltas), pacientes: num(total.Pacientes) },
+    total: { faltas: num(total.Faltas), pacientes: num(total.Pacientes), comProcedimento: num(total.ComProcedimento) },
     porMes: secao('mes')
       .map((linha) => ({ mes: linha.Mes, faltas: num(linha.Faltas), pacientes: num(linha.Pacientes) }))
       .sort((a, b) => a.mes.localeCompare(b.mes)),
@@ -228,6 +237,12 @@ if (meta.action === 'faltas') {
       faltas: num(linha.Faltas),
       pacientes: num(linha.Pacientes)
     })),
+    porTipoConsulta: porNome('tipoConsulta'),
+    porProcedimento: porNome('procedimento'),
+    porRotulo: porNome('rotulo'),
+    porPeriodo: secao('periodo')
+      .sort((a, b) => num(a.Ordem) - num(b.Ordem))
+      .map((linha) => ({ periodo: linha.Periodo, faltas: num(linha.Faltas), pacientes: num(linha.Pacientes) })),
     reincidencia: secao('reincidencia')
       .map((linha) => ({ quantidade: num(linha.Quantidade), pacientes: num(linha.Pacientes) }))
       .sort((a, b) => a.quantidade - b.quantidade),
@@ -246,7 +261,7 @@ if (meta.action === 'faltas') {
       dataFalta: dataIso(linha.DataFalta),
       horaInicio: linha.HoraInicio || null,
       numeroFalta: num(linha.NumeroFalta),
-      profissional: linha.NomeExecutor || null
+      ...agendaDe(linha)
     }))
   });
 }
@@ -305,7 +320,10 @@ if (meta.action === 'parametros') {
       ultimaAcaoPainel: iso(status.UltimaAcaoPainel),
       linhasControle: num(status.LinhasControle),
       linhasFaltas: num(status.LinhasFaltas)
-    }
+    },
+    cadastros: secao('cadastro')
+      .map((linha) => ({ tipo: linha.Tipo, quantidade: num(linha.Quantidade), atualizadoEm: iso(linha.AtualizadoEm) }))
+      .sort((a, b) => String(a.tipo).localeCompare(String(b.tipo)))
   });
 }
 

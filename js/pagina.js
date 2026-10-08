@@ -1,5 +1,6 @@
 // Partes comuns de todas as páginas: login, usuário no menu, relógio, barra de status, erro da API e aviso rápido.
-import { clearAuth, clearCaches, encodeAuth, getAuth, getUsuario, setAuth } from "./session.js";
+import { PERFIL, escapeHtml, hojeSp, inicioCiclo } from "./formato.js";
+import { clearAuth, clearCaches, comCache, getAuth, getUsuario, pode, request, setAuth, temCache, writeCache } from "./session.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -15,7 +16,18 @@ const els = {
   syncState: $("#sync-state"),
   refresh: $("#refresh"),
   usuario: $("#usuario-nome"),
+  perfil: $("#usuario-perfil"),
   sair: $("#sair"),
+  trocarSenha: $("#trocar-senha"),
+  senha: $("#senha"),
+  senhaForm: $("#senha-form"),
+  senhaAviso: $("#senha-aviso"),
+  senhaAtual: $("#senha-atual"),
+  senhaNova: $("#senha-nova"),
+  senhaConfirma: $("#senha-confirma"),
+  senhaErro: $("#senha-erro"),
+  senhaCancelar: $("#senha-cancelar"),
+  senhaSalvar: $("#senha-salvar"),
 };
 
 let toastTimer = null;
@@ -51,7 +63,100 @@ export const avisar = (mensagem, { erro = false } = {}) => {
 };
 
 const atualizarUsuario = () => {
-  if (els.usuario) els.usuario.textContent = getUsuario() || "—";
+  const usuario = getUsuario();
+  if (els.usuario) els.usuario.textContent = usuario?.nome || usuario?.login || "—";
+  if (els.perfil) els.perfil.textContent = PERFIL[usuario?.perfil] || "";
+};
+
+// Troca da própria senha. Obrigatória (sem Cancelar e sem Esc) quando a senha é temporária.
+let senhaObrigatoria = false;
+let aposTrocarSenha = null;
+
+const abrirTrocaSenha = (obrigatoria) => {
+  if (!els.senha || els.senha.open) return;
+  senhaObrigatoria = obrigatoria;
+  els.senhaForm.reset();
+  els.senhaErro.hidden = true;
+  els.senhaAviso.hidden = !obrigatoria;
+  els.senhaCancelar.hidden = obrigatoria;
+  els.senha.showModal();
+  els.senhaAtual.focus();
+};
+
+const horaCurta = (data) =>
+  data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+
+// A tela mostrou o dado novo que chegou em segundo plano.
+export const atualizadoAs = (savedAt) => status("ok", `atualizado às ${horaCurta(new Date(savedAt))}`);
+
+/**
+ * Carrega uma tela pelo cache: dado no prazo aparece sem chamar a API; dado vencido aparece na hora e é
+ * atualizado por trás (aplicar roda de novo quando o novo chega). aplicar(dados) desenha a tela.
+ */
+export const usarCache = async (key, apiPath, prazoMs, { forcar }, aplicar) => {
+  const entrada = await comCache(key, apiPath, prazoMs, {
+    forcar,
+    aoAtualizar: (nova) => {
+      aplicar(nova.data);
+      atualizadoAs(nova.savedAt);
+    },
+  });
+  aplicar(entrada.data);
+  return entrada;
+};
+
+// O que cada tela abre por padrão: mesmas chaves e caminhos que as telas usam (js/pacientes.js, relatorios.js...).
+const telasPadrao = () => {
+  const hoje = hojeSp();
+  const inicio = inicioCiclo(hoje);
+  return [
+    { nome: "Pacientes", key: "pacientes", path: "/api/pacientes" },
+    { nome: "Relatórios", key: `faltas:${inicio}:${hoje}`, path: `/api/faltas?${new URLSearchParams({ de: inicio, ate: hoje })}` },
+    { nome: "Histórico", key: "acoes:page=1", path: "/api/acoes?page=1" },
+    { nome: "Configuração", key: "parametros", path: "/api/parametros" },
+    ...(pode("ADMIN") ? [{ nome: "Usuários", key: "usuarios", path: "/api/usuarios" }] : []),
+  ];
+};
+
+// Ao entrar: busca todas as telas ao mesmo tempo (o tempo de uma busca, não de cinco) com uma tela de espera.
+// Depois disso, trocar de tela não espera o n8n. Falha numa tela não trava as outras: ela busca sozinha ao abrir.
+export const prepararDados = async () => {
+  const telas = telasPadrao();
+  const camada = document.createElement("div");
+  camada.className = "preparo";
+  camada.setAttribute("role", "status");
+  camada.setAttribute("aria-live", "polite");
+  camada.innerHTML = `
+    <div class="preparo__cartao">
+      <div class="preparo__anel" aria-hidden="true"><span></span><span></span><span></span></div>
+      <h2>Preparando os dados…</h2>
+      <p>Buscando todas as telas de uma vez, para a navegação ficar instantânea.</p>
+      <ul class="preparo__lista">${telas
+        .map((tela, i) => `<li data-preparo="${i}"><span class="preparo__marca" aria-hidden="true"></span>${escapeHtml(tela.nome)}</li>`)
+        .join("")}</ul>
+      <div class="preparo__barra" aria-hidden="true"><span></span></div>
+    </div>`;
+  document.body.append(camada);
+  const barra = camada.querySelector(".preparo__barra span");
+  let prontas = 0;
+
+  await Promise.allSettled(
+    telas.map(async (tela, i) => {
+      const item = camada.querySelector(`[data-preparo="${i}"]`);
+      try {
+        writeCache(tela.key, await request(tela.path));
+        item.classList.add("is-ok");
+      } catch {
+        item.classList.add("is-falha");
+      } finally {
+        prontas += 1;
+        barra.style.width = `${Math.round((prontas / telas.length) * 100)}%`;
+      }
+    }),
+  );
+
+  camada.classList.add("is-saindo");
+  window.setTimeout(() => camada.remove(), 350);
 };
 
 const relogio = () => {
@@ -73,20 +178,30 @@ const setLoginBusy = (busy) => {
   button.textContent = busy ? "Entrando…" : "Entrar";
 };
 
+const hora = (data) => data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+
 /**
- * carregar({ forcar }) busca os dados da página e lança erro se falhar.
+ * carregar({ forcar }) busca os dados da página e lança erro se falhar. Se devolver { savedAt } (entrada do cache),
+ * a barra mostra a hora em que o dado foi buscado, e não a hora em que a tela abriu.
+ * prazoMs: refaz a busca quando o cache vence (só com a aba visível e sem diálogo aberto).
  * Devolve uma função para atualizar a página por fora (por exemplo, depois de uma ação).
  */
-export const iniciarPagina = (carregar) => {
+export const iniciarPagina = (carregar, { prazoMs } = {}) => {
   const executar = async (forcar = false) => {
     status("busy", "buscando…");
     mostrarErro("");
     try {
-      await carregar({ forcar });
-      status("ok", `atualizado ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`);
+      const resultado = await carregar({ forcar });
+      // Dado vencido na tela enquanto o novo vem por trás.
+      if (resultado?.velho) status("busy", "atualizando…");
+      else status("ok", `atualizado às ${hora(resultado?.savedAt ? new Date(resultado.savedAt) : new Date())}`);
     } catch (error) {
       if (error.message === "unauthorized") {
         status("error", "sem login");
+        throw error;
+      }
+      if (error.codigo === "TROCAR_SENHA") {
+        status("error", "troque a senha");
         throw error;
       }
       status("error", "falha");
@@ -95,31 +210,104 @@ export const iniciarPagina = (carregar) => {
     }
   };
 
+  // Prepara todas as telas e abre esta já com o dado guardado.
+  const entrarComDados = async () => {
+    await prepararDados();
+    await executar(false).catch(() => {});
+  };
+  aposTrocarSenha = () => entrarComDados();
+
   els.loginForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (els.loginForm.querySelector("button[type='submit']").disabled) return;
-    const usuario = els.loginUser.value.trim();
-    setAuth(encodeAuth(usuario, els.loginPassword.value), usuario);
     els.loginError.hidden = true;
     setLoginBusy(true);
 
+    let sessao;
     try {
-      await executar(true);
-      els.loginPassword.value = "";
-      els.login.close();
-      atualizarUsuario();
+      sessao = await request("/api/sessao", {
+        method: "POST",
+        body: JSON.stringify({ usuario: els.loginUser.value.trim(), senha: els.loginPassword.value }),
+      });
     } catch (error) {
       els.loginError.textContent =
         error.message === "unauthorized" ? "Usuário ou senha inválidos." : error.message || "Falha ao falar com o servidor.";
       els.loginError.hidden = false;
-      if (error.message !== "unauthorized") {
-        els.login.close();
-        atualizarUsuario();
-      }
-    } finally {
       setLoginBusy(false);
+      return;
+    }
+
+    setAuth(sessao.token, sessao.usuario);
+    document.documentElement.dataset.sessao = "sim";
+    els.loginPassword.value = "";
+    setLoginBusy(false);
+    els.login.close();
+    atualizarUsuario();
+
+    // Outra pessoa pode ter usado a aba antes: nada do cache dela serve.
+    clearCaches();
+    if (sessao.trocarSenha) {
+      abrirTrocaSenha(true);
+      return;
+    }
+    void entrarComDados();
+  });
+
+  els.senhaForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (els.senhaSalvar.disabled) return;
+    const mostrar = (mensagem) => {
+      els.senhaErro.textContent = mensagem;
+      els.senhaErro.hidden = false;
+    };
+    // Mesma regra de validarSenha (lib/auth.js); a API confere de novo.
+    const nova = els.senhaNova.value;
+    if (nova.length < 6) {
+      mostrar("A nova senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (!/\d/.test(nova)) {
+      mostrar("A nova senha precisa ter pelo menos um número.");
+      return;
+    }
+    if (!/[^\p{L}\p{N}\s]/u.test(nova)) {
+      mostrar("A nova senha precisa ter pelo menos um caractere especial (ex.: ! @ # $ % * -).");
+      return;
+    }
+    if (els.senhaNova.value !== els.senhaConfirma.value) {
+      mostrar("A confirmação não é igual à nova senha.");
+      return;
+    }
+
+    els.senhaSalvar.disabled = true;
+    els.senhaSalvar.textContent = "Salvando…";
+    try {
+      const sessao = await request("/api/senha", {
+        method: "POST",
+        body: JSON.stringify({ atual: els.senhaAtual.value, nova: els.senhaNova.value }),
+      });
+      setAuth(sessao.token, sessao.usuario);
+      const eraObrigatoria = senhaObrigatoria;
+      senhaObrigatoria = false;
+      els.senha.close();
+      avisar("Senha alterada.");
+      if (eraObrigatoria) aposTrocarSenha?.();
+    } catch (error) {
+      if (error.message !== "unauthorized") mostrar(error.message || "Falha ao trocar a senha.");
+      else els.senha.close();
+    } finally {
+      els.senhaSalvar.disabled = false;
+      els.senhaSalvar.textContent = "Salvar senha";
     }
   });
+
+  els.senha?.addEventListener("cancel", (event) => {
+    if (senhaObrigatoria) event.preventDefault();
+  });
+  els.senhaCancelar?.addEventListener("click", () => els.senha.close());
+  els.trocarSenha?.addEventListener("click", () => abrirTrocaSenha(false));
+  // A API respondeu TROCAR_SENHA (senha temporária ainda não trocada): abre a troca obrigatória.
+  document.addEventListener("cnn:trocar-senha", () => abrirTrocaSenha(true));
 
   // Login fechado: o painel volta a aparecer (o CSS o esconde enquanto data-sessao="nao").
   els.login?.addEventListener("close", () => {
@@ -143,10 +331,22 @@ export const iniciarPagina = (carregar) => {
   window.setInterval(relogio, 30_000);
   atualizarUsuario();
 
+  if (prazoMs) {
+    window.setInterval(() => {
+      if (getAuth() && document.visibilityState === "visible" && !document.querySelector("dialog[open]")) {
+        void executar(false).catch(() => {});
+      }
+    }, prazoMs);
+  }
+
   if (getAuth()) {
-    void executar(false).catch(() => {
-      if (!getAuth() && !els.login.open) els.login.showModal();
-    });
+    // Aba já logada mas sem nada guardado (ex.: recarregou depois de limpar): prepara tudo de uma vez.
+    const abrir = temCache() ? Promise.resolve() : prepararDados();
+    void abrir.then(() =>
+      executar(false).catch(() => {
+        if (!getAuth() && !els.login.open) els.login.showModal();
+      }),
+    );
   } else {
     els.login.showModal();
   }

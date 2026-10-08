@@ -10,7 +10,8 @@
     { "source": "/pacientes", "destination": "/index.html" },
     { "source": "/relatorios", "destination": "/relatorios.html" },
     { "source": "/historico", "destination": "/historico.html" },
-    { "source": "/configuracao", "destination": "/configuracao.html" }
+    { "source": "/configuracao", "destination": "/configuracao.html" },
+    { "source": "/usuarios", "destination": "/usuarios.html" }
   ],
   "headers": [
     {

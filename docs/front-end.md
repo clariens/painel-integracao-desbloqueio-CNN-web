@@ -12,16 +12,17 @@ O painel é HTML estático com módulos JS, publicado na Vercel. Ele só fala co
 | `/relatorios` | `relatorios.html` + `js/relatorios.js` | Faltas por período: mês, dia da semana, profissional, reincidência, CSV |
 | `/historico` | `historico.html` + `js/historico.js` | Auditoria de cada PATCH (automático e painel), com filtros |
 | `/configuracao` | `configuracao.html` + `js/configuracao.js` | Prazos, ciclo e horário em uso (só leitura) |
+| `/usuarios` | `usuarios.html` + `js/usuarios.js` | Usuários, perfis e eventos (só admin) |
 
-Partes comuns: `js/session.js` (login na aba, `request()`, cache), `js/pagina.js` (diálogo de login, barra de status, erro, aviso), `js/layout.js` (menu lateral), `js/formato.js` (datas e selos).
+Partes comuns: `js/session.js` (sessão na aba, `request()`, `pode(perfil)`, cache), `js/pagina.js` (login, troca de senha, barra de status, erro, aviso), `js/layout.js` (menu lateral), `js/formato.js` (datas e selos).
 
 ### Pacientes
 
 - **Números do topo:** bloqueados no prazo, aptos a liberar, liberados antes do prazo, faltas no ciclo e no mês. Clicar num dos três primeiros filtra a lista.
-- **Lista:** uma linha por paciente com falta no ciclo, mais os que continuam bloqueados por falta de ciclo anterior. Mostra faltas no ciclo, a falta vigente, o fim do prazo ("faltam N dias" / "venceu há N dias"), a situação, a última ação e o botão.
-- **Filtros** (no navegador, sem nova consulta): busca por nome ou ID, situação, número de faltas, ordenação.
-- **Detalhe** (clique no nome): a falta vigente e o prazo, o **status ao vivo no CNN** (ativo / inativo), todas as faltas do paciente e o histórico de ações. O CPF aparece mascarado.
-- A lista fica em cache por 60 s na aba e é recarregada a cada 5 minutos e depois de cada ação.
+- **Lista:** uma linha por paciente com falta no ciclo, mais os que continuam bloqueados por falta de ciclo anterior. Mostra o nome com o número de faltas no ciclo (selo; vermelho com 3 ou mais), a falta vigente com o **procedimento em vermelho ao lado da data** (sem procedimento, o tipo de consulta; mais de um, o primeiro e "+N") e o profissional embaixo, o fim do prazo ("faltam N dias" / "venceu há N dias"), a situação, a última ação e o botão.
+- **Filtros** (no navegador, sem nova consulta): busca por nome ou ID, situação, número de faltas, tipo de consulta (com a quantidade de cada um), ordenação.
+- **Detalhe** (clique no nome): a falta vigente (o que o paciente ia fazer e com qual profissional) e o prazo, o **status ao vivo no CNN** (ativo / inativo), todas as faltas do paciente e o histórico de ações. O CPF aparece mascarado.
+- A lista fica em cache por 2 minutos na aba (ver [Cache e filtros](#cache-e-filtros)) e é recarregada depois de cada ação.
 
 ### Situação do paciente
 
@@ -64,9 +65,9 @@ O botão **Bloquear** do painel vale para paciente com falta no ciclo atual, com
 
 ### Relatórios
 
-Período por atalho (ciclo atual, ciclo anterior, mês atual, 30 dias) ou datas. Mostra totais, faltas por mês, por dia da semana, por profissional (top 30), pacientes por quantidade de faltas e os 20 que mais faltaram. Passe o mouse (ou o foco) numa barra para ver o valor.
+Período por atalho (ciclo atual, ciclo anterior, mês atual, 30 dias) ou datas. Mostra totais, faltas por mês, por dia da semana, por profissional (top 30), por tipo de consulta, por período do dia (manhã, tarde, noite), por rótulo da agenda, procedimentos com mais faltas (com quantas faltas têm procedimento; se a clínica não preenche, o gráfico avisa), pacientes por quantidade de faltas e os 20 que mais faltaram. Passe o mouse (ou o foco) numa barra para ver o valor.
 
-**Exportar CSV:** uma linha por falta (data, hora, paciente, nº da falta, profissional, agendamento), separado por `;`, com BOM para o Excel. Sem CPF, e-mail ou telefone. Limite de 5.000 linhas (as mais recentes).
+**Exportar CSV:** uma linha por falta (data, hora, paciente, nº da falta, tipo de consulta, procedimentos, profissional, rótulo, agendamento), separado por `;`, com BOM para o Excel. Sem CPF, e-mail ou telefone. Limite de 5.000 linhas (as mais recentes).
 
 ### Histórico
 
@@ -74,14 +75,45 @@ Uma linha por PATCH: quando, paciente, ação, quem (usuário do painel ou "Auto
 
 ### Configuração
 
-Só leitura. Mostra os prazos, o início do ciclo, o fuso, o horário do bloqueio, se a liberação automática está ligada e a data da última coleta, do último bloqueio automático e da última ação no painel. Para mudar, veja [operacao.md](operacao.md#como-publicar-cada-tipo-de-mudança).
+Só leitura. Mostra os prazos, o início do ciclo, o fuso, o horário do bloqueio, se a liberação automática está ligada, a data da última coleta, do último bloqueio automático e da última ação no painel, e os cadastros do CNN carregados (quantos nomes de cada tipo e quando foram atualizados). Para mudar, veja [operacao.md](operacao.md#como-publicar-cada-tipo-de-mudança).
 
-## Login
+### Usuários (só admin)
 
-- Cada pessoa tem um usuário próprio em `DASHBOARD_USERS` (Vercel). Ver [operacao.md](operacao.md#usuários-do-painel).
-- O diálogo de login guarda `usuário:senha` em base64 no `sessionStorage` da aba e manda em toda chamada como `Authorization: Basic …`. Fechou a aba, o login some. **Sair** limpa o login e o cache.
-- Um 401 reabre o diálogo. A API não manda `WWW-Authenticate`, para o navegador não abrir a caixa nativa de login por cima.
-- O nome do usuário vai para o n8n e para a auditoria em toda ação.
+- **Tabela:** nome e login, perfil, situação (ativo, desativado, login bloqueado, senha temporária ainda não trocada), último acesso e quem criou.
+- **Novo usuário:** login, nome e perfil. Ao salvar, aparece a **senha temporária uma vez**, com botão copiar. Repasse por um canal seguro; no primeiro acesso a pessoa define a própria senha.
+- **Por linha:** Editar (nome e perfil), Redefinir senha (gera outra temporária e encerra a sessão aberta da pessoa), Desativar ou Reativar. Ninguém é excluído: o nome continua no histórico.
+- O admin não muda o próprio perfil nem se desativa por aqui, e o banco não deixa sobrar zero admins ativos.
+- **Eventos recentes:** criação, mudança de perfil ou nome, desativação, senha trocada ou redefinida e senhas erradas.
+
+## Cache e filtros
+
+Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no prazo. Tudo fica no `sessionStorage`: some ao fechar a aba, e o login, o 401 e o Sair limpam. Funções em `js/session.js`: `comCache` ("cache primeiro"), `prefetchCache`, `clearCache`, `clearCaches(prefixo)`, `lerFiltros`/`salvarFiltros`.
+
+| Tela | Chave | Prazo |
+|---|---|---|
+| Pacientes | `pacientes` | 2 min |
+| Detalhe do paciente | `paciente:<id>` | 1 min (tem o status ao vivo no CNN) |
+| Relatórios | `faltas:<de>:<ate>` (um por período) | 10 min |
+| Histórico | `acoes:<filtros e página>` | 2 min |
+| Configuração | `parametros` | 30 min |
+| Usuários | `usuarios` | 2 min |
+
+- **Ao entrar** (login ou aba sem nada guardado), a tela **"Preparando os dados…"** busca Pacientes, Relatórios (ciclo atual), Histórico, Configuração e, para admin, Usuários **ao mesmo tempo**. Depois disso, trocar de tela é instantâneo. Uma busca que falha não trava as outras: aquela tela busca sozinha ao abrir.
+- **Dado vencido aparece na hora** (até 12 h) e é atualizado em segundo plano: a barra mostra "atualizando…" e, quando chega, a tela se redesenha e mostra "atualizado às HH:MM". Só o detalhe do paciente espera a busca, por causa do status ao vivo no CNN.
+- **Atualizar agora** ignora o cache e regrava. Quando o prazo vence (aba visível, sem diálogo aberto), a tela busca de novo sozinha. A barra mostra "atualizado às HH:MM" com a hora do dado.
+- **Pré-carga:** Pacientes deixa prontos Relatórios (ciclo atual) e Configuração; Relatórios, Histórico e Configuração deixam Pacientes pronto.
+- **Filtros lembrados na aba** (`clariens.cnn.filtros:<tela>`): Pacientes (busca, situação, faltas, tipo de consulta, ordem; filtra no navegador), Relatórios (período) e Histórico (filtros e página; cada combinação tem seu cache).
+- **Depois de uma ação** (liberar, bloquear, isentar, registrar): apaga `pacientes`, o `paciente:<id>`, `acoes:*` e `faltas:*` e recarrega da API. Depois de criar ou alterar usuário, a tela Usuários busca de novo.
+
+## Login e perfis
+
+- Cada pessoa tem um usuário próprio, guardado no banco. Ver [operacao.md](operacao.md#usuários-do-painel).
+- O login chama `POST /api/sessao` e recebe um token assinado (8 h). A aba guarda o token e `{ login, nome, perfil }` no `sessionStorage`; a senha não fica guardada. Fechou a aba, o login some. **Sair** limpa a sessão e o cache.
+- Com senha temporária, o painel abre **Trocar senha** logo depois do login e não deixa fechar. **Trocar senha** também fica no menu, para qualquer um. A senha nova precisa ter pelo menos 6 caracteres, um número e um caractere especial.
+- 5 senhas erradas seguidas bloqueiam o login daquele usuário por 15 minutos.
+- O perfil é marcado no `<html data-perfil>` antes da pintura: o **Leitor** não vê Liberar, Bloquear, Isentar nem Registrar; só o **Admin** vê o menu Usuários. Quem decide é a API (403 `SEM_PERMISSAO`).
+- Um 401 reabre o login (sessão vencida, ou acesso alterado pelo admin desde o login). A API não manda `WWW-Authenticate`, para o navegador não abrir a caixa nativa de login por cima.
+- O login do usuário vai para o n8n e para a auditoria em toda ação.
 
 ## Dados pessoais
 

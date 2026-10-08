@@ -4,11 +4,12 @@ Voltar ao [índice](README.md).
 
 | Script | Para quê | Quando |
 |---|---|---|
-| [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql) | Cria ou migra `dbo.CtlCnnFaltaPaciente` | Instalação e sempre que mudar |
+| [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql) | Cria ou migra `dbo.CtlCnnFaltaPaciente`, `dbo.CtlCnnFaltaProcedimento` e `dbo.CtlCnnCadastro` | Instalação e sempre que mudar |
 | [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) | Cria `dbo.CtlCnnControlePaciente`, `dbo.CtlCnnAcaoPaciente` e os índices do painel | Implantação do painel e sempre que mudar |
+| [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) | Cria `dbo.CtlCnnUsuario` e `dbo.CtlCnnUsuarioEvento` (usuários do painel) | Implantação da gestão de usuários e sempre que mudar. Depois, o `INSERT` do primeiro admin (`npm run admin`) |
 | [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) | Preenche o controle com a situação deixada pela automação | **Uma vez**, no corte da liberação automática |
 
-Os três rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
+Os quatro rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
 
 ## criar_tabelas_bloqueio.sql
 
@@ -68,6 +69,7 @@ flowchart TD
 | 5 | [65–74](../sql/criar_tabelas_bloqueio.sql#L65-L74) | Torna `NumeroFalta` `NOT NULL` |
 | 6 | [76–90](../sql/criar_tabelas_bloqueio.sql#L76-L90) | Remove `IX_CtlCnnFaltaPaciente_IdPaciente_DataAgenda` e `IX_CtlCnnFaltaPaciente_IdPaciente_DataFalta`, se existirem |
 | 7 | [92–105](../sql/criar_tabelas_bloqueio.sql#L92-L105) | Cria `IX_CtlCnnFaltaPaciente_IdPaciente_NumeroFalta` se não existir |
+| 7a | — | Adiciona `IdRotulo BIGINT NULL` em `CtlCnnFaltaPaciente`; cria `dbo.CtlCnnFaltaProcedimento` (chave `IdAgenda, IdTipoProcedimento`) e `dbo.CtlCnnCadastro` (chave `Tipo, Id`, CHECK em `Tipo`), se não existirem. Comentário com os `GRANT` (procedimentos precisa de `DELETE`) |
 | 8 | [107–111](../sql/criar_tabelas_bloqueio.sql#L107-L111) | **Apaga** `dbo.CtlCnnBloqueioPaciente` e `dbo.CtlCnnRegraBloqueioFalta`, se existirem |
 | 9 | [113–124](../sql/criar_tabelas_bloqueio.sql#L113-L124) | Mostra banco, esquema, tabela, número de colunas e `COL_LENGTH` de `NumeroFalta` |
 
@@ -106,13 +108,26 @@ Cria as duas tabelas do painel. Pode rodar mais de uma vez: cada passo confere a
 
 Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnncontrolepaciente).
 
+## criar_tabelas_usuarios.sql
+
+Cria as tabelas de usuários. Pode rodar mais de uma vez e **nada é apagado**.
+
+| # | O que faz |
+|---|---|
+| 1 | Cria `dbo.CtlCnnUsuario` (`IdUsuario IDENTITY`, `Login` único, CHECK em `Perfil`, defaults de `Ativo`, `TrocarSenha`, `VersaoSessao`, `TentativasFalhas`, `CriadoEm`) |
+| 2 | Cria `dbo.CtlCnnUsuarioEvento` (`Id IDENTITY`, CHECK em `Evento`) e o índice `IX_CtlCnnUsuarioEvento_CriadoEm` |
+| 3 | Comentário com os `GRANT` para o usuário da credencial `TST Araguari` |
+| 4 | `SELECT` de conferência: as duas tabelas e o número de colunas (usuário = 16, evento = 6) |
+
+O script não cria usuário nenhum. O primeiro admin sai de `npm run admin` ([scripts/criar-admin.mjs](../scripts/criar-admin.mjs)): senha aleatória impressa uma vez e um `INSERT` para colar no SSMS. Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnnusuario).
+
 ## carga_inicial_controle.sql
 
 Roda no corte da liberação automática, **depois** da última execução manual dela ([operacao.md](operacao.md#corte-da-liberação-automática)).
 
 > **Só rode se a automação antiga realmente bloqueou** (o PATCH rodou). O script supõe que todo paciente com prazo correndo está inativo no CNN. Se as faltas foram gravadas sem PATCH (fluxo cortado antes do laço, por exemplo), **não rode**: os pacientes ficariam "Bloqueado" no painel sem estar bloqueados. Sem a carga, eles aparecem como "Aguardando bloqueio", e a execução das 01:00 bloqueia quem está ativo e registra quem já está inativo.
 
-- Calcula hoje em São Paulo (`SYSUTCDATETIME()` − 3 h) e o início do ciclo (1/8).
+- Calcula hoje em São Paulo (`SYSUTCDATETIME()` − 3 h) e o início do ciclo (1/10).
 - Para cada paciente com falta no ciclo, pega a falta vigente (maior `NumeroFalta`) e o prazo 60/90/180.
 - Prazo correndo → `BLOQUEADO`; vencido → `LIBERADO`. `OrigemUltimaAcao = CARGA_INICIAL`, `UltimaAcaoPor = carga-inicial`.
 - Só insere quem ainda não tem linha no controle. Não grava auditoria (não houve PATCH).

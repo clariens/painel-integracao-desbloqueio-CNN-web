@@ -19,6 +19,7 @@ Além do painel, o bloqueio das 01:00 continua como workflow agendado.
 | Workflow de bloqueio (01:00) | n8n | [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json) |
 | Workflow CNN Painel - Leitura | n8n (webhook) | [workflows/cnn-painel-leitura.json](../workflows/cnn-painel-leitura.json) |
 | Workflow CNN Painel - Ações | n8n (webhook) | [workflows/cnn-painel-acoes.json](../workflows/cnn-painel-acoes.json) |
+| Workflow CNN Painel - Usuários | n8n (webhook) | [workflows/cnn-painel-usuarios.json](../workflows/cnn-painel-usuarios.json) |
 | Workflow de liberação | n8n, **inativo** | [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json) |
 | Código dos nós Code | Copiado para os JSON por `npm run inject` | [workflows/code/](../workflows/code/) |
 | Tabelas | SQL Server, banco `INTEGRACAO`, schema `dbo` | [sql/](../sql/) |
@@ -34,25 +35,29 @@ flowchart LR
         UI["HTML + JS"]
     end
     subgraph Vercel
-        API["/api/*<br/>requireAuth (DASHBOARD_USERS)<br/>validação"]
+        API["/api/*<br/>requireAuth (sessão + perfil)<br/>validação"]
     end
     subgraph n8n["Instância n8n"]
         direction TB
         L["CNN Painel - Leitura"]
         A["CNN Painel - Ações"]
+        US["CNN Painel - Usuários"]
         B["Bloqueio 01:00"]
         HK[["Header Auth<br/>X-Monitor-Key"]]
         C1[["API CNN AUTH (Basic)"]]
         C2[["TST Araguari (Microsoft SQL)"]]
     end
     CNN["API CNN"]
-    DB[("INTEGRACAO.dbo<br/>CtlCnnFaltaPaciente<br/>CtlCnnControlePaciente<br/>CtlCnnAcaoPaciente")]
+    DB[("INTEGRACAO.dbo<br/>CtlCnnFaltaPaciente<br/>CtlCnnControlePaciente<br/>CtlCnnAcaoPaciente<br/>CtlCnnUsuario · CtlCnnUsuarioEvento")]
 
-    UI -- "Authorization: Basic" --> API
+    UI -- "Authorization: Bearer" --> API
     API -- "POST { action } + X-Monitor-Key" --> L
     API -- "POST { action } + X-Monitor-Key" --> A
+    API -- "POST { action } + X-Monitor-Key" --> US
     HK -.-> L
     HK -.-> A
+    HK -.-> US
+    US -- "SELECT, INSERT, UPDATE usuários" --> DB
     L -- "SELECT" --> DB
     L -. "GET /paciente (detalhe)" .-> CNN
     A -- "GET agenda, GET paciente, PATCH" --> CNN
@@ -64,6 +69,7 @@ flowchart LR
     C2 -.-> L
     C2 -.-> A
     C2 -.-> B
+    C2 -.-> US
 ```
 
 Regras de convivência:
@@ -75,17 +81,22 @@ Regras de convivência:
 
 ## Rotas do painel (Vercel)
 
-| Método | Rota | Workflow / action | Valida |
+| Método | Rota | Workflow / action | Perfil e validação |
 |---|---|---|---|
+| POST | `/api/sessao` | Usuários `login-buscar`, `login-resultado` | público; login, senha |
+| POST | `/api/senha` | Usuários `login-buscar`, `trocar-senha` | qualquer perfil (inclusive com senha temporária); senha atual; nova com 6+ caracteres, um número e um caractere especial |
+| GET | `/api/usuarios` | Usuários `listar` | ADMIN |
+| POST | `/api/usuarios` | Usuários `sessao`, `criar` | ADMIN; login, nome, perfil |
+| PATCH | `/api/usuarios/:login` | Usuários `sessao`, `alterar` ou `redefinir-senha` | ADMIN; não mexe no próprio perfil nem se desativa |
 | GET | `/api/pacientes` | Leitura `pacientes` | login |
 | GET | `/api/pacientes/:id` | Leitura `paciente` | login, id inteiro |
-| POST | `/api/pacientes/:id/liberar` | Ações `liberar` | login, id, motivo (5 a 500), corpo JSON |
-| POST | `/api/pacientes/:id/bloquear` | Ações `bloquear` | login, id, motivo, corpo JSON |
+| POST | `/api/pacientes/:id/liberar` | Usuários `sessao`, Ações `liberar` | EDITOR; id, motivo (5 a 500), corpo JSON |
+| POST | `/api/pacientes/:id/bloquear` | Usuários `sessao`, Ações `bloquear` | EDITOR; id, motivo, corpo JSON |
 | GET | `/api/faltas?de&ate` | Leitura `faltas` | login, datas |
 | GET | `/api/acoes?de&ate&acao&origem&resultado&usuario&paciente&page` | Leitura `acoes` | login, valores permitidos |
 | GET | `/api/parametros` | Leitura `parametros` | login |
 
-Todas respondem com `Cache-Control: no-store`. Respostas: 400 (entrada), 401 (login), 405 (método), o status que o n8n devolver (404, 409, 502…), 502 (n8n inalcançável), 504 (n8n demorou mais de 55 s), 500 (variável de ambiente ausente, com o nome dela).
+Todas respondem com `Cache-Control: no-store`. As rotas marcadas "login" aceitam qualquer perfil (LEITOR ou acima). Respostas: 400 (entrada), 401 (sem sessão, sessão vencida ou acesso alterado desde o login), 403 (`SEM_PERMISSAO` ou `TROCAR_SENHA`), 429 (login bloqueado por tentativas), 405 (método), o status que o n8n devolver (404, 409, 502…), 502 (n8n inalcançável), 504 (n8n demorou mais de 55 s), 500 (variável de ambiente ausente, com o nome dela).
 
 Contrato com o n8n:
 
@@ -153,7 +164,7 @@ sequenceDiagram
 
     Cron->>WB: dispara
     loop página a página (máx. 100)
-        WB->>API: GET /agenda/lista (1/8 do ciclo até hoje)
+        WB->>API: GET /agenda/lista (1/10 do ciclo até hoje)
     end
     WB->>WB: separar faltas (FALTOU, no ciclo)
     loop uma vez por falta
@@ -179,8 +190,8 @@ sequenceDiagram
 
 | Camada | Como é protegida | Cuidados |
 |---|---|---|
-| Navegador | Login individual. A senha fica em base64 no `sessionStorage` da aba e some ao fechar | Use HTTPS (padrão da Vercel). Não compartilhe usuários: a auditoria grava o nome |
-| Vercel | `DASHBOARD_USERS` com hash scrypt; comparação em tempo constante. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`) ficam fora do deploy (`.vercelignore`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
+| Navegador | Login individual. A aba guarda só o token da sessão (8 h) no `sessionStorage`, nunca a senha. Fechou a aba, saiu | Use HTTPS (padrão da Vercel). Não compartilhe usuários: a auditoria grava o nome |
+| Vercel | Senha conferida com scrypt e comparação em tempo constante; sessão assinada com `SESSION_SECRET` (HMAC-SHA256); perfil conferido em cada rota; escritas revalidam o usuário no banco (ativo, perfil, `VersaoSessao`); 5 senhas erradas bloqueiam o login por 15 min. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`) ficam fora do deploy (`.vercelignore`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
 | Webhooks n8n | Credencial Header Auth (`X-Monitor-Key`), path UUID. O n8n valida a entrada de novo | Segredo novo, sem reaproveitar o do monitoramento |
 | API CNN | Credencial `API CNN AUTH` e header `clinicaNasNuvens-cid` | O `clinicaNasNuvens-cid` está escrito nos nós e, por isso, nos JSON do repositório. Repositório interno |
 | SQL Server | Credencial `TST Araguari`. SQL montado por texto com `sqlN`/`sqlS`/`sqlDate` ([`_sql.js`](../workflows/code/_sql.js)); listas de IDs só com números | Permissões: `SELECT/INSERT/UPDATE` nas tabelas do sistema |
@@ -192,8 +203,8 @@ sequenceDiagram
 |---|---|
 | Prazos 60/90/180, início do ciclo, fuso | [`workflows/code/_regra.js`](../workflows/code/_regra.js) → `npm run inject` |
 | Horário do bloqueio | Nó `Todo dia 01:00` (cron `0 1 * * *`); fuso da instância n8n = `America/Sao_Paulo` |
-| Usuários do painel | `DASHBOARD_USERS` (Vercel) |
-| Webhooks | `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_WEBHOOK_SECRET` (Vercel) |
+| Usuários do painel | Tabela `dbo.CtlCnnUsuario`, pela tela Usuários (admin). Sessão: `SESSION_SECRET` (Vercel) |
+| Webhooks | `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_WEBHOOK_SECRET` (Vercel) |
 | Duração das funções | `vercel.json` → `maxDuration: 60` |
 | Credenciais | n8n: `API CNN AUTH`, `TST Araguari`, Header Auth do painel |
 

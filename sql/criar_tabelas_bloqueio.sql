@@ -104,6 +104,47 @@ BEGIN
     ');
 END;
 
+-- Rótulo do agendamento (idRotulo da agenda), para os relatórios.
+IF COL_LENGTH(N'dbo.CtlCnnFaltaPaciente', N'IdRotulo') IS NULL
+BEGIN
+    ALTER TABLE dbo.CtlCnnFaltaPaciente ADD IdRotulo BIGINT NULL;
+END;
+
+-- Procedimentos de cada falta (procedimentos[] da agenda). Algumas clínicas não preenchem: aí a falta fica sem linha aqui.
+IF OBJECT_ID(N'dbo.CtlCnnFaltaProcedimento', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CtlCnnFaltaProcedimento (
+        IdAgenda            BIGINT NOT NULL,
+        IdTipoProcedimento  BIGINT NOT NULL,
+        NomeProcedimento    NVARCHAR(200) NULL,
+        IdEspecialidade     BIGINT NULL,
+        Quantidade          INT NULL,
+        CONSTRAINT PK_CtlCnnFaltaProcedimento PRIMARY KEY CLUSTERED (IdAgenda, IdTipoProcedimento)
+    );
+END;
+
+-- Nomes das listas da API do CNN, gravados pelo bloqueio (01:00). Executor: Id = idpessoa (o idPessoaExecutor da agenda).
+IF OBJECT_ID(N'dbo.CtlCnnCadastro', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.CtlCnnCadastro (
+        Tipo                NVARCHAR(20) NOT NULL,
+        Id                  BIGINT NOT NULL,
+        Nome                NVARCHAR(200) NULL,
+        Extra               NVARCHAR(100) NULL,
+        AtualizadoEm        DATETIME2(0) NOT NULL
+            CONSTRAINT DF_CtlCnnCadastro_AtualizadoEm DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_CtlCnnCadastro PRIMARY KEY CLUSTERED (Tipo, Id),
+        CONSTRAINT CK_CtlCnnCadastro_Tipo CHECK (Tipo IN (N'TIPO_CONSULTA', N'EXECUTOR', N'ROTULO', N'LOCAL_AGENDA', N'ESPECIALIDADE'))
+    );
+END;
+
+/*
+  Permissões do login usado pela credencial "TST Araguari" no n8n (troque o nome do usuário do banco):
+
+  GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.CtlCnnFaltaProcedimento TO [usuario_n8n];
+  GRANT SELECT, INSERT, UPDATE ON dbo.CtlCnnCadastro TO [usuario_n8n];
+*/
+
 IF OBJECT_ID(N'dbo.CtlCnnBloqueioPaciente', N'U') IS NOT NULL
     DROP TABLE dbo.CtlCnnBloqueioPaciente;
 
@@ -121,4 +162,8 @@ SELECT
     ) AS QuantidadeColunas,
     COL_LENGTH(N'dbo.CtlCnnFaltaPaciente', N'NumeroFalta') AS BytesNumeroFalta
 FROM sys.tables t
-WHERE t.object_id = OBJECT_ID(N'dbo.CtlCnnFaltaPaciente');
+WHERE t.object_id IN (
+    OBJECT_ID(N'dbo.CtlCnnFaltaPaciente'),
+    OBJECT_ID(N'dbo.CtlCnnFaltaProcedimento'),
+    OBJECT_ID(N'dbo.CtlCnnCadastro')
+);

@@ -4,7 +4,7 @@
 :root {
   --font: "IBM Plex Sans", "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
-  --nav-w: 260px;
+  --nav-w: 220px;
   --bar-h: 44px;
 }
 
@@ -20,6 +20,7 @@
   /* Bloqueio em roxo (o vermelho fica só para erro); apto em azul; liberado antes em verde-azulado. */
   --bloq: #7b1fe4;
   --pendente: #c25e00;
+  --proc: #c62828;
   --btn-bloquear: #c62828;
   --apto: #1c1fc8;
   --antecipado: #0b7a86;
@@ -73,6 +74,7 @@
   --stat-mix: 22%;
   --bloq: #ff6a45;
   --pendente: #f0a04b;
+  --proc: #ff6b6b;
   --btn-bloquear: #ff6a45;
   --apto: #e8b95a;
   --antecipado: #86b4d4;
@@ -1667,6 +1669,315 @@ dl.dados dd {
 
 @media (prefers-reduced-motion: reduce) {
   .login__fundo span {
+    animation: none;
+  }
+}
+
+/* ---------- perfis de acesso ---------- */
+/* data-perfil é marcado no <head> antes da pintura; a API recusa o que o perfil não pode, isto só esconde. */
+:root:not([data-perfil="ADMIN"]) [data-requer="admin"],
+:root:not([data-perfil="EDITOR"]):not([data-perfil="ADMIN"]) [data-requer="editor"] {
+  display: none !important;
+}
+
+.sidebar__user p {
+  margin: 0;
+}
+
+.sidebar__user p + p {
+  margin-top: 6px;
+}
+
+.sidebar__user p + p button:first-child {
+  margin-left: 0;
+}
+
+.sidebar__perfil {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar__perfil:empty {
+  display: none;
+}
+
+.selo--perfil-admin {
+  --cor: var(--brass);
+}
+
+.selo--perfil-editor {
+  --cor: var(--steel);
+}
+
+.selo--perfil-leitor {
+  --cor: var(--muted);
+}
+
+/* ---------- tela de usuários ---------- */
+.pagina__head--acao {
+  align-items: center;
+}
+
+.pagina__head--acao h1 + p {
+  margin-top: 4px;
+}
+
+.secao__titulo {
+  margin: 0;
+  padding: 26px 28px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tabela .linha--inativa td {
+  color: var(--muted);
+}
+
+.tabela .acoes-cel .btn + .btn {
+  margin-left: 6px;
+}
+
+.sub-inline {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.senha-temp {
+  display: block;
+  padding: 14px 16px;
+  border: 1px dashed var(--brass);
+  background: var(--tint-brass);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  user-select: all;
+}
+
+/* Tipo de consulta, procedimentos e profissional embaixo da falta vigente: quebra a linha em vez de alargar a coluna. */
+.tabela .sub--agenda {
+  max-width: 300px;
+  white-space: normal;
+  font-family: var(--font);
+}
+
+/* ---------- lista de pacientes: procedimento ao lado da data ---------- */
+.tabela .falta-cel {
+  min-width: 260px;
+}
+
+.falta-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+
+.falta-linha .mono {
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* O que o paciente ia fazer: vermelho, para saltar aos olhos na lista. */
+.falta-proc {
+  color: var(--proc);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.tabela td:first-child {
+  min-width: 190px;
+}
+
+.faltas-selo {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.faltas-selo--alta {
+  border-color: color-mix(in srgb, var(--proc) 55%, transparent);
+  color: var(--proc);
+}
+
+/* ---------- preparando os dados (ao entrar: busca todas as telas de uma vez) ---------- */
+.preparo {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(6px);
+  animation: preparo-entra 0.25s ease both;
+}
+
+.preparo.is-saindo {
+  animation: preparo-sai 0.35s ease both;
+}
+
+.preparo__cartao {
+  width: min(380px, calc(100vw - 32px));
+  padding: 28px 28px 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+
+.preparo__cartao h2 {
+  margin: 14px 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.preparo__cartao p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Três arcos girando em velocidades diferentes. */
+.preparo__anel {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+}
+
+.preparo__anel span {
+  position: absolute;
+  inset: 0;
+  border: 3px solid transparent;
+  border-radius: 50%;
+}
+
+.preparo__anel span:nth-child(1) {
+  border-top-color: var(--brass);
+  animation: preparo-gira 1.1s linear infinite;
+}
+
+.preparo__anel span:nth-child(2) {
+  inset: 8px;
+  border-right-color: var(--steel);
+  animation: preparo-gira 1.6s linear infinite reverse;
+}
+
+.preparo__anel span:nth-child(3) {
+  inset: 16px;
+  border-bottom-color: var(--ok-strong);
+  animation: preparo-gira 2.2s linear infinite;
+}
+
+.preparo__lista {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  font-size: 13px;
+}
+
+.preparo__lista li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.preparo__lista li.is-ok,
+.preparo__lista li.is-falha {
+  color: var(--text);
+}
+
+/* Bolinha girando enquanto busca; vira ✓ ou ✗ quando termina. */
+.preparo__marca {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--brass);
+  border-radius: 50%;
+  animation: preparo-gira 0.8s linear infinite;
+}
+
+.is-ok .preparo__marca,
+.is-falha .preparo__marca {
+  border: 0;
+  animation: none;
+  font-size: 13px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.is-ok .preparo__marca::before {
+  content: "✓";
+  color: var(--ok-strong);
+  font-weight: 700;
+}
+
+.is-falha .preparo__marca::before {
+  content: "✗";
+  color: var(--alert-strong);
+  font-weight: 700;
+}
+
+.preparo__barra {
+  height: 4px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 2px;
+}
+
+.preparo__barra span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--brass);
+  transition: width 0.3s ease;
+}
+
+@keyframes preparo-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes preparo-entra {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes preparo-sai {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preparo,
+  .preparo.is-saindo,
+  .preparo__anel span,
+  .preparo__marca {
     animation: none;
   }
 }

@@ -1,6 +1,6 @@
 # Banco de dados
 
-Voltar ao [índice](README.md). Scripts: [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql), [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) e [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) (detalhes em [script-sql.md](script-sql.md)).
+Voltar ao [índice](README.md). Scripts: [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql), [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) , [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) e [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) (detalhes em [script-sql.md](script-sql.md)).
 
 SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credencial `TST Araguari` do n8n.
 
@@ -11,6 +11,10 @@ SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credenci
 | `dbo.CtlCnnFaltaPaciente` | Uma linha por agendamento `FALTOU` (`IdAgenda` único), com a ordem da falta no ciclo | [Bloqueio](bloqueio.md) (`gravar faltas`) e [Ações](fluxos/acoes.md) no bloquear (mesmo código) | Bloqueio, [Leitura](fluxos/leitura.md), Ações | Sem prazo. Nenhum fluxo apaga linhas |
 | `dbo.CtlCnnControlePaciente` | **Tabela de controle**: uma linha por paciente com a situação atual (`BLOQUEADO`/`LIBERADO`), a falta de referência e a última ação | Bloqueio (`registrar bloqueio`), Ações (`registrar ação`), carga inicial | Bloqueio (`consultar bloqueios`), Leitura, Ações | Sem prazo. `MERGE` por paciente |
 | `dbo.CtlCnnAcaoPaciente` | **Auditoria**: uma linha por PATCH no CNN, automático ou pelo painel, com quem, motivo e resposta da API | Bloqueio (`registrar bloqueio`), Ações (`registrar ação`) | Leitura (histórico, detalhe) | Sem prazo. Só `INSERT` |
+| `dbo.CtlCnnFaltaProcedimento` | Procedimentos de cada falta (`procedimentos[]` do agendamento), uma linha por tipo | Bloqueio e Ações (`gravar faltas`): apaga e grava de novo os das faltas lidas | Leitura (lista, detalhe, relatórios) | Acompanha a falta |
+| `dbo.CtlCnnCadastro` | Nomes das listas do CNN: tipo de consulta, profissional (por `idpessoa`), rótulo, local, especialidade | Bloqueio (`gravar faltas`, `MERGE`); Ações só os profissionais | Leitura | Sem prazo. `MERGE` por `(Tipo, Id)` |
+| `dbo.CtlCnnUsuario` | Usuários do painel: perfil, ativo, hash da senha, tentativas de login | [Usuários](fluxos/usuarios.md); o primeiro admin, à mão (`npm run admin`) | Usuários | Sem prazo. Ninguém é excluído, só desativado |
+| `dbo.CtlCnnUsuarioEvento` | Eventos de usuário: criação, perfil, senha, falhas de login | Usuários | Usuários (tela) | Sem prazo. Só `INSERT` |
 
 Tabelas que **não** existem mais (`criar_tabelas_bloqueio.sql` apaga se encontrar): `dbo.CtlCnnBloqueioPaciente` e `dbo.CtlCnnRegraBloqueioFalta`. Não há tabela de regra: os prazos e o ciclo ficam em [`workflows/code/_regra.js`](../workflows/code/_regra.js).
 
@@ -112,11 +116,12 @@ erDiagram
 | `StatusAgenda` | `NVARCHAR(50)` | Não | `status` no momento da gravação. Sempre `FALTOU`, porque só essas linhas são gravadas |
 | `NumeroFalta` | `INT` | Não | Ordem da falta do paciente no ciclo (1, 2, 3…). Define o prazo quando é a maior do ciclo |
 | `IdPessoaExecutor` | `BIGINT` | Sim | `idPessoaExecutor` do agendamento |
-| `IdExecutorAgenda` | `BIGINT` | Sim | `id` do `GET /executor-agenda/{id}` |
-| `NomeExecutor` | `NVARCHAR(200)` | Sim | Nome do profissional do horário |
+| `IdExecutorAgenda` | `BIGINT` | Sim | `id` do executor na `/executor-agenda/lista` (casado por `idpessoa`) |
+| `NomeExecutor` | `NVARCHAR(200)` | Sim | Nome do profissional do horário. A Leitura prefere o nome de `CtlCnnCadastro` (`EXECUTOR`) |
 | `TipoExecutor` | `NVARCHAR(50)` | Sim | `PROFISSIONAL` ou `CLIENTE_FORNECEDOR` |
 | `IdLocalAgenda` | `BIGINT` | Sim | `idLocalAgenda` do agendamento |
-| `IdTipoConsulta` | `BIGINT` | Sim | `idTipoConsulta` do agendamento |
+| `IdTipoConsulta` | `BIGINT` | Sim | `idTipoConsulta` do agendamento. Nome em `CtlCnnCadastro` (`TIPO_CONSULTA`) |
+| `IdRotulo` | `BIGINT` | Sim | `idRotulo` do agendamento. Nome em `CtlCnnCadastro` (`ROTULO`) |
 | `Observacoes` | `NVARCHAR(500)` | Sim | `observacoes` do agendamento |
 | `DataColeta` | `DATETIME2(0)` | Não | Quando a linha foi gravada. Default `SYSUTCDATETIME()`, em UTC |
 
@@ -130,6 +135,30 @@ erDiagram
 | `DF_CtlCnnFaltaPaciente_DataColeta` | Default | `DataColeta = SYSUTCDATETIME()` |
 
 Índices antigos que o script remove: `IX_CtlCnnFaltaPaciente_IdPaciente_DataAgenda` e `IX_CtlCnnFaltaPaciente_IdPaciente_DataFalta`.
+
+### `dbo.CtlCnnFaltaProcedimento`
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `IdAgenda` | `BIGINT` | Não | Falta (`CtlCnnFaltaPaciente.IdAgenda`) |
+| `IdTipoProcedimento` | `BIGINT` | Não | `idTipoProcedimento` do procedimento |
+| `NomeProcedimento` | `NVARCHAR(200)` | Sim | `nome` do procedimento, como veio na agenda |
+| `IdEspecialidade` | `BIGINT` | Sim | `idEspecialidade` (nome em `CtlCnnCadastro`, `ESPECIALIDADE`) |
+| `Quantidade` | `INT` | Sim | Soma das quantidades do mesmo tipo |
+
+Chave: `(IdAgenda, IdTipoProcedimento)`. Falta sem procedimento não tem linha aqui (algumas clínicas não preenchem o campo).
+
+### `dbo.CtlCnnCadastro`
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `Tipo` | `NVARCHAR(20)` | Não | `TIPO_CONSULTA`, `EXECUTOR`, `ROTULO`, `LOCAL_AGENDA` ou `ESPECIALIDADE` |
+| `Id` | `BIGINT` | Não | Id no CNN. Para `EXECUTOR`, é o **`idpessoa`** (o `idPessoaExecutor` da agenda) |
+| `Nome` | `NVARCHAR(200)` | Sim | Nome no CNN |
+| `Extra` | `NVARCHAR(100)` | Sim | `RECONSULTA` (tipo de consulta), `tipoExecutor` (executor), cor (rótulo) |
+| `AtualizadoEm` | `DATETIME2(0)` | Não | UTC. Muda quando o nome muda |
+
+Chave: `(Tipo, Id)`.
 
 ### `dbo.CtlCnnControlePaciente`
 
@@ -170,6 +199,32 @@ Só muda quando o PATCH dá certo.
 
 Índices: `IX_CtlCnnAcaoPaciente_IdPaciente_CriadoEm`, `IX_CtlCnnAcaoPaciente_CriadoEm` e, no controle, `IX_CtlCnnControlePaciente_Situacao`. Em `CtlCnnFaltaPaciente` entra `IX_CtlCnnFaltaPaciente_DataFalta` para os relatórios por período.
 
+### `dbo.CtlCnnUsuario`
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `IdUsuario` | `INT IDENTITY` | Não | Chave |
+| `Login` | `NVARCHAR(50)` | Não | Único. Letras, números, `.`, `_` ou `-` |
+| `Nome` | `NVARCHAR(100)` | Não | Nome exibido |
+| `Perfil` | `NVARCHAR(10)` | Não | `LEITOR`, `EDITOR` ou `ADMIN` |
+| `Ativo` | `BIT` | Não | Desativado não entra. Default 1 |
+| `SenhaSalt`, `SenhaHash` | `CHAR(32)`, `CHAR(128)` | Não | scrypt em hex. A senha em texto nunca é gravada |
+| `TrocarSenha` | `BIT` | Não | 1 = senha temporária; o painel obriga a troca no próximo acesso |
+| `VersaoSessao` | `INT` | Não | Sobe ao mudar perfil, desativar ou trocar/redefinir a senha. Sessões abertas com a versão antiga perdem as ações |
+| `TentativasFalhas`, `BloqueadoAte` | `INT`, `DATETIME2(0)` | Não, Sim | 5 erros seguidos bloqueiam por 15 min (UTC) |
+| `UltimoAcessoEm`, `CriadoEm`, `CriadoPor`, `AlteradoEm`, `AlteradoPor` | | | UTC |
+
+### `dbo.CtlCnnUsuarioEvento`
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `Id` | `BIGINT IDENTITY` | Chave |
+| `Login` | `NVARCHAR(50)` | Usuário afetado |
+| `Evento` | `NVARCHAR(30)` | `CRIADO`, `PERFIL_ALTERADO`, `NOME_ALTERADO`, `DESATIVADO`, `REATIVADO`, `SENHA_REDEFINIDA`, `SENHA_TROCADA`, `LOGIN_FALHA`, `LOGIN_BLOQUEADO` |
+| `Detalhe` | `NVARCHAR(500)` | Ex.: `LEITOR → EDITOR` |
+| `Por` | `NVARCHAR(50)` | Quem fez (o admin; o próprio usuário na troca de senha; vazio nas falhas de login) |
+| `CriadoEm` | `DATETIME2(0)` | UTC |
+
 ### Situação do paciente no painel
 
 Calculada pelo workflow [Leitura](fluxos/leitura.md#situação-de-cada-paciente):
@@ -185,14 +240,14 @@ Calculada pelo workflow [Leitura](fluxos/leitura.md#situação-de-cada-paciente)
 
 | Campo | Cálculo | Onde |
 |---|---|---|
-| Falta vigente | Linha com `MAX(NumeroFalta)` do paciente e `DataFalta >= 1/8 do ciclo` | `consultar bloqueios`, `consultar vencidos` |
+| Falta vigente | Linha com `MAX(NumeroFalta)` do paciente e `DataFalta >= 1/10 do ciclo` | `consultar bloqueios`, `consultar vencidos` |
 | `DiasBloqueio` | `NumeroFalta >= 3` → 180, `= 2` → 90, senão 60 | `montar info bloqueio` (JS), `consultar vencidos` (SQL) |
 | `DataFimBloqueio` | `DataFalta` + `DiasBloqueio` | Idem |
 | `nivelBloqueio` | `Math.min(NumeroFalta, 3)` | `montar info bloqueio` |
 
 ### Como `NumeroFalta` é mantido
 
-1. No insert: número de linhas do paciente com `DataFalta >= 1/8 do ciclo`, mais 1.
+1. No insert: número de linhas do paciente com `DataFalta >= 1/10 do ciclo`, mais 1.
 2. Logo depois, na mesma transação: `ROW_NUMBER()` por paciente, ordenado por `DataFalta, IdAgenda`, só dentro do ciclo e só para os pacientes do lote.
 3. Linhas de ciclos anteriores ficam com o último número que receberam.
 
@@ -220,7 +275,7 @@ O painel está descrito em [front-end.md](front-end.md). Abaixo, o que aparece n
 
 ## Consultas úteis
 
-Todas rodam em `INTEGRACAO`. Troque as datas de exemplo. `@inicio` é 1/8 do ciclo e `@hoje` é a data de hoje em São Paulo.
+Todas rodam em `INTEGRACAO`. Troque as datas de exemplo. `@inicio` é 1/10 do ciclo e `@hoje` é a data de hoje em São Paulo.
 
 ### Histórico de um paciente
 
@@ -236,7 +291,7 @@ ORDER BY DataFalta, IdAgenda;
 ### Situação de cada paciente no ciclo
 
 ```sql
-DECLARE @inicio DATE = '2026-08-01';
+DECLARE @inicio DATE = '2026-10-01';
 DECLARE @hoje   DATE = '2026-09-30';
 
 ;WITH Vigente AS (
@@ -268,7 +323,7 @@ ORDER BY DataFimBloqueio;
 Pacientes cuja última falta é do ciclo anterior, cujo prazo não tinha vencido até 31/07 e que não têm falta no ciclo atual. O bloqueio das 01:00 não os vê mais; o painel os lista com "ciclo anterior" enquanto estiverem `BLOQUEADO` no controle (ver [operacao.md](operacao.md#rotina)).
 
 ```sql
-DECLARE @inicio DATE = '2026-08-01';
+DECLARE @inicio DATE = '2026-10-01';
 DECLARE @inicioAnterior DATE = DATEADD(year, -1, @inicio);
 
 ;WITH CicloAnterior AS (
@@ -312,7 +367,7 @@ O bloqueio roda à 01:00 de São Paulo, que em UTC já é o mesmo dia. Uma data 
 Deve voltar vazio. Qualquer linha indica `NumeroFalta` repetido ou fora da ordem por data.
 
 ```sql
-DECLARE @inicio DATE = '2026-08-01';
+DECLARE @inicio DATE = '2026-10-01';
 
 ;WITH Esperado AS (
     SELECT Id, IdPaciente, DataFalta, IdAgenda, NumeroFalta,

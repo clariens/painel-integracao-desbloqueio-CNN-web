@@ -10,6 +10,10 @@ import bloquearPaciente from "./api/pacientes/[id]/bloquear.js";
 import faltas from "./api/faltas.js";
 import acoes from "./api/acoes.js";
 import parametros from "./api/parametros.js";
+import sessao from "./api/sessao.js";
+import senha from "./api/senha.js";
+import usuarios from "./api/usuarios/index.js";
+import alterarUsuario from "./api/usuarios/[login].js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -32,6 +36,7 @@ const pages = {
   "/relatorios": "relatorios.html",
   "/historico": "historico.html",
   "/configuracao": "configuracao.html",
+  "/usuarios": "usuarios.html",
 };
 
 const routes = [
@@ -42,6 +47,10 @@ const routes = [
   [/^\/api\/faltas$/, faltas],
   [/^\/api\/acoes$/, acoes],
   [/^\/api\/parametros$/, parametros],
+  [/^\/api\/sessao$/, sessao],
+  [/^\/api\/senha$/, senha],
+  [/^\/api\/usuarios$/, usuarios],
+  [/^\/api\/usuarios\/([^/]+)$/, alterarUsuario, "login"],
 ];
 
 const readBody = (req) =>
@@ -92,11 +101,12 @@ const server = createServer(async (req, res) => {
     req.query = Object.fromEntries(url.searchParams);
     req.body = await readBody(req);
 
-    for (const [pattern, handler] of routes) {
+    // O trecho dinâmico vira req.query.<param>, como a Vercel faz com [id].js e [login].js.
+    for (const [pattern, handler, param = "id"] of routes) {
       const match = url.pathname.match(pattern);
       if (match) {
         if (match[1] !== undefined) {
-          req.query.id = decodeURIComponent(match[1]);
+          req.query[param] = decodeURIComponent(match[1]);
         }
         await handler(req, res);
         return;
@@ -123,4 +133,6 @@ server.listen(port, () => {
   console.log(`Painel em http://localhost:${port}/pacientes`);
   console.log(`Leitura: ${process.env.N8N_LEITURA_URL ? "configurada" : "(N8N_LEITURA_URL vazio)"}`);
   console.log(`Ações:   ${process.env.N8N_ACOES_URL ? "configurada" : "(N8N_ACOES_URL vazio)"}`);
+  console.log(`Usuários: ${process.env.N8N_USUARIOS_URL ? "configurada" : "(N8N_USUARIOS_URL vazio)"}`);
+  if (!process.env.SESSION_SECRET) console.log("Atenção: SESSION_SECRET vazio, ninguém consegue entrar.");
 });

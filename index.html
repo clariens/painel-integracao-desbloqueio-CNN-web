@@ -21,8 +21,10 @@
         document.documentElement.dataset.theme = "light";
       }
       // Sem login nesta aba: a tela de login aparece já na primeira pintura, sem mostrar o painel antes.
+      // O perfil também vem antes da pintura, para os botões que ele não pode usar nem aparecerem.
       try {
         document.documentElement.dataset.sessao = sessionStorage.getItem("clariens.cnn.auth") ? "sim" : "nao";
+        document.documentElement.dataset.perfil = (JSON.parse(sessionStorage.getItem("clariens.cnn.usuario") || "null") || {}).perfil || "";
       } catch {
         document.documentElement.dataset.sessao = "nao";
       }
@@ -50,6 +52,31 @@
       </form>
     </dialog>
 
+    <dialog class="modal" id="senha" aria-labelledby="senha-titulo">
+      <form class="modal__form" id="senha-form" method="dialog">
+        <p class="modal__kicker">Sua conta</p>
+        <h2 id="senha-titulo">Trocar senha</h2>
+        <p class="modal__alerta" id="senha-aviso" hidden>Você entrou com uma senha temporária. Defina a sua senha para continuar.</p>
+        <label>
+          Senha atual
+          <input id="senha-atual" type="password" autocomplete="current-password" required />
+        </label>
+        <label>
+          Nova senha (mínimo 6 caracteres, com um número e um caractere especial)
+          <input id="senha-nova" type="password" autocomplete="new-password" minlength="6" maxlength="200" required />
+        </label>
+        <label>
+          Repita a nova senha
+          <input id="senha-confirma" type="password" autocomplete="new-password" minlength="6" maxlength="200" required />
+        </label>
+        <p class="modal__erro" id="senha-erro" hidden role="alert"></p>
+        <div class="modal__acoes">
+          <button class="btn" type="button" id="senha-cancelar">Cancelar</button>
+          <button class="btn btn--primario" type="submit" id="senha-salvar">Salvar senha</button>
+        </div>
+      </form>
+    </dialog>
+
     <aside class="sidebar" id="sidebar" aria-label="Menu">
       <div class="sidebar__head">
         <p class="sidebar__brand">
@@ -62,8 +89,12 @@
         <a href="/relatorios">Relatórios de faltas</a>
         <a href="/historico">Histórico de ações</a>
         <a href="/configuracao">Configuração</a>
+        <a href="/usuarios" data-requer="admin">Usuários</a>
       </nav>
-      <p class="sidebar__user">Usuário: <strong id="usuario-nome">—</strong><button id="sair" type="button">Sair</button></p>
+      <div class="sidebar__user">
+        <p><strong id="usuario-nome">—</strong> <span class="sidebar__perfil" id="usuario-perfil"></span></p>
+        <p><button id="trocar-senha" type="button">Trocar senha</button><button id="sair" type="button">Sair</button></p>
+      </div>
     </aside>
     <div class="nav-backdrop" data-nav-close aria-hidden="true"></div>
     <script src="/js/layout.js"></script>
@@ -141,6 +172,12 @@
           </select>
         </label>
         <label>
+          Tipo de consulta
+          <select id="filtro-tipo">
+            <option value="">Todos</option>
+          </select>
+        </label>
+        <label>
           Ordenar por
           <select id="ordem">
             <option value="fim">Fim do prazo</option>
@@ -157,8 +194,7 @@
             <thead>
               <tr>
                 <th scope="col">Paciente</th>
-                <th scope="col" class="num">Faltas no ciclo</th>
-                <th scope="col">Falta vigente</th>
+                <th scope="col">Falta vigente · procedimento</th>
                 <th scope="col">Fim do prazo</th>
                 <th scope="col">Situação</th>
                 <th scope="col">Última ação</th>

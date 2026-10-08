@@ -2,6 +2,55 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-08 — Ciclo em 1º de outubro, procedimento na lista e cache entre telas
+
+### Alterado
+
+- **O ciclo passa a começar em 1º de outubro** (antes, 1º de agosto): `_regra.js`, URL do nó de agenda (renomeado para `GET agenda do ciclo`), atalhos dos Relatórios e `sql/carga_inicial_controle.sql`. Colar de novo bloqueio, Leitura e Ações no n8n.
+- **Pacientes:** o procedimento aparece em vermelho ao lado da data da falta (sem procedimento, o tipo de consulta); "faltas no ciclo" vira um selo ao lado do nome; menu lateral mais estreito.
+
+### Adicionado
+
+- **Tela "Preparando os dados…" ao entrar:** busca todas as telas em paralelo; depois, a navegação não espera o n8n. Dado vencido aparece na hora e é atualizado em segundo plano.
+- **Cache entre telas** (sessionStorage, por aba): trocar de tela não chama a API dentro do prazo (Pacientes 2 min, detalhe 1 min, Relatórios 10 min por período, Histórico 2 min, Configuração 30 min, Usuários 2 min). Pré-carga das telas mais usadas, filtros lembrados por tela, "Atualizar agora" força a busca e uma ação limpa só o que ela muda.
+
+## 2026-10-08 — Agenda completa, profissional, tipo de consulta e procedimentos
+
+### Corrigido
+
+- **Bloqueio (01:00) lê todas as páginas da agenda.** A API devolve no máximo 100 agendamentos por chamada; com a paginação desligada no n8n só a 1ª página era lida (só faltas de um dia). O teto sobe de 100 para 1000 páginas, e a paginação para também quando a resposta não é uma página (erro).
+- **Nome do profissional vinha sempre vazio.** O fluxo chamava `/executor-agenda/{idPessoaExecutor}`, mas esse endpoint espera outro id. Agora lê `/executor-agenda/lista` uma vez e casa pelo `idpessoa`. As faltas já gravadas ganham o nome pela Leitura, sem reprocessar.
+
+### Adicionado
+
+- Gravação do **tipo de consulta** (nome), do **rótulo** da agenda e dos **procedimentos** de cada falta (`CtlCnnFaltaProcedimento`), e dos nomes das listas do CNN em `CtlCnnCadastro` (tipo de consulta, profissional, rótulo, local, especialidade).
+- **Pacientes:** tipo de consulta, procedimentos e profissional embaixo da falta vigente; filtro por tipo de consulta; no detalhe, o que o paciente ia fazer em cada falta.
+- **Relatórios:** faltas por tipo de consulta, por período do dia, por rótulo e procedimentos com mais faltas; o CSV ganha tipo de consulta, procedimentos e rótulo.
+- **Configuração:** quantos cadastros do CNN estão carregados e quando foram atualizados.
+
+### Alterado
+
+- `GET paciente por id` roda uma vez por paciente (nó `pacientes únicos`), e não uma vez por falta.
+- `gravar faltas` vira uma query só (tabela temporária + `UPDATE`/`INSERT` em conjunto): falta já gravada passa a ser atualizada (tipo de consulta, rótulo, profissional, horário) e nome/contato vazios são completados.
+- Banco: rodar de novo `sql/criar_tabelas_bloqueio.sql` (coluna `IdRotulo` e as duas tabelas novas).
+
+## 2026-10-07 — Usuários e perfis
+
+### Adicionado
+
+- **Perfis de acesso:** Leitor (só visualiza), Editor (libera, bloqueia, isenta e registra) e Admin (também gerencia usuários). A API confere o perfil em cada rota; o painel esconde o que o perfil não pode usar.
+- **Tela Usuários** (`/usuarios`, só admin): criar com senha temporária exibida uma vez, editar nome e perfil, redefinir senha, desativar e reativar, e a lista de eventos.
+- **Trocar senha** no menu, para qualquer usuário. Quem entra com senha temporária é obrigado a trocar antes de usar o painel. A senha nova precisa ter pelo menos 6 caracteres, um número e um caractere especial.
+- Workflow **CNN Painel - Usuários** e tabelas `dbo.CtlCnnUsuario` e `dbo.CtlCnnUsuarioEvento` (`sql/criar_tabelas_usuarios.sql`).
+- `npm run admin`: gera a senha aleatória e o `INSERT` do primeiro admin.
+- 5 senhas erradas seguidas bloqueiam o login daquele usuário por 15 minutos.
+
+### Alterado
+
+- Os usuários saem da variável `DASHBOARD_USERS` e passam para o banco. Novas variáveis na Vercel: `SESSION_SECRET` e `N8N_USUARIOS_URL`. `DASHBOARD_USERS` e `npm run senha` deixam de existir.
+- O login vira uma sessão assinada de 8 horas (`Authorization: Bearer`); a aba não guarda mais a senha.
+- Liberar, bloquear e as ações de usuário conferem no banco se o usuário continua ativo e com o mesmo perfil: desativar ou rebaixar alguém vale na hora para as ações.
+
 ## 2026-10-06 — Bloqueio de todo o período
 
 ### Corrigido

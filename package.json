@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "node --env-file=.env.local dev-server.js",
     "inject": "node workflows/code/inject.mjs",
-    "senha": "node scripts/gerar-senha.mjs",
+    "admin": "node scripts/criar-admin.mjs",
     "check": "node scripts/checar.mjs"
   }
 }

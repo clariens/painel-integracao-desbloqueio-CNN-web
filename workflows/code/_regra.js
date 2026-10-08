@@ -5,8 +5,9 @@ const REGRA = {
   // Prazo (dias) a partir da falta vigente do ciclo para o paciente poder ser LIBERADO. A maior chave vale para
   // "essa ou mais". Não decide o bloqueio: toda falta do período (ciclo) bloqueia quem está ativo no CNN.
   prazosDias: { 1: 60, 2: 90, 3: 180 },
-  // Início do ciclo: de agosto a dezembro, 1/8 do ano corrente; de janeiro a julho, 1/8 do ano anterior.
-  cicloInicio: { mes: 8, dia: 1 },
+  // Início do ciclo: de outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.
+  // Mudou de 1/8 para 1/10 em 2026-10-08. Mudar aqui exige mudar também a URL do nó "GET agenda do ciclo".
+  cicloInicio: { mes: 10, dia: 1 },
   fuso: 'America/Sao_Paulo',
   // Só informativos (o cron fica no nó "Todo dia 01:00" do workflow de bloqueio).
   horarioBloqueio: '01:00',

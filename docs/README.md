@@ -6,8 +6,9 @@
 - **Bloqueio:** automático, num workflow n8n às 01:00. Grava as faltas em `INTEGRACAO.dbo.CtlCnnFaltaPaciente` e manda `{ "ativo": false }`.
 - **Liberação:** **manual**, pelo painel web, com motivo obrigatório. Pode ser antes do fim do prazo. A liberação automática das 02:00 foi desativada.
 - **Bloquear pelo painel:** roda o fluxo de bloqueio só para um paciente (busca a agenda dele, grava as faltas novas e bloqueia pelo prazo da falta vigente).
+- **Usuários:** cada pessoa tem login próprio, com perfil Leitor (só vê), Editor (libera e bloqueia) ou Admin (também gerencia usuários). Os usuários ficam em `dbo.CtlCnnUsuario`; o admin cuida deles pela tela Usuários.
 - **Rastreabilidade:** cada PATCH no CNN, automático ou pelo painel, vira uma linha em `dbo.CtlCnnAcaoPaciente` (quem, quando, motivo, resposta da API). A situação atual de cada paciente fica em `dbo.CtlCnnControlePaciente`.
-- **Ciclo:** começa em 1º de agosto. De agosto a dezembro, 1/8 do ano corrente; de janeiro a julho, 1/8 do ano anterior.
+- **Ciclo:** começa em 1º de outubro. De outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.
 - **Onde fica a regra:** [`workflows/code/_regra.js`](../workflows/code/_regra.js), copiada para todos os workflows por `npm run inject`. A tela Configuração mostra os valores em uso.
 
 ## Fluxograma geral
@@ -15,24 +16,27 @@
 ```mermaid
 flowchart LR
     subgraph Navegador
-        UI["Painel<br/>Pacientes · Relatórios<br/>Histórico · Configuração"]
+        UI["Painel<br/>Pacientes · Relatórios<br/>Histórico · Configuração · Usuários"]
     end
     subgraph Vercel
-        API["/api/*<br/>login individual<br/>validação"]
+        API["/api/*<br/>sessão assinada + perfil<br/>validação"]
     end
     subgraph N8N["n8n"]
         B["Bloqueio<br/>01:00"]
         L["CNN Painel - Leitura<br/>(webhook)"]
         A["CNN Painel - Ações<br/>(webhook)"]
+        US["CNN Painel - Usuários<br/>(webhook)"]
     end
     subgraph CNN["API Clínica nas Nuvens"]
         AG["GET /agenda/lista"]
         PAC["GET /paciente/{id}"]
         ST["PATCH /paciente/{id}/status"]
     end
-    DB[("SQL Server INTEGRACAO<br/>faltas · controle · auditoria")]
+    DB[("SQL Server INTEGRACAO<br/>faltas · controle · auditoria · usuários")]
 
-    UI -- "fetch + Basic Auth" --> API
+    UI -- "fetch + Bearer" --> API
+    API -- "{ action } + X-Monitor-Key" --> US
+    US --> DB
     API -- "{ action } + X-Monitor-Key" --> L
     API -- "{ action } + X-Monitor-Key" --> A
     B --> AG
@@ -56,6 +60,7 @@ flowchart LR
 | [bloqueio.md](bloqueio.md) | Quem mantém ou opera | Workflow de bloqueio (01:00), nó a nó |
 | [fluxos/leitura.md](fluxos/leitura.md) | Quem mantém | Workflow CNN Painel - Leitura (consultas do painel) |
 | [fluxos/acoes.md](fluxos/acoes.md) | Quem mantém | Workflow CNN Painel - Ações (liberar e bloquear pelo painel) |
+| [fluxos/usuarios.md](fluxos/usuarios.md) | Quem mantém | Workflow CNN Painel - Usuários (login, perfis, gestão de usuários) |
 | [liberacao.md](liberacao.md) | Quem mantém | Workflow de liberação automática (**desativado**) |
 | [api-cnn.md](api-cnn.md) | Quem mantém | Integração com a API do CNN: endpoints, campos, autenticação, paginação |
 | [banco-de-dados.md](banco-de-dados.md) | Quem mantém ou opera | Tabelas, colunas, índices, consultas úteis |
@@ -71,14 +76,14 @@ A versão em Word fica em [word/](word/). Ela ainda descreve o sistema **antes**
 | Caminho | O que é |
 |---|---|
 | [README.md](../README.md), [CHANGELOG.md](../CHANGELOG.md) | Resumo e histórico de mudanças |
-| `index.html`, `relatorios.html`, `historico.html`, `configuracao.html` | Páginas do painel (`/pacientes`, `/relatorios`, `/historico`, `/configuracao`) |
+| `index.html`, `relatorios.html`, `historico.html`, `configuracao.html`, `usuarios.html` | Páginas do painel (`/pacientes`, `/relatorios`, `/historico`, `/configuracao`, `/usuarios`) |
 | [css/app.css](../css/app.css), [js/](../js/) | Estilo e módulos do navegador (`session.js`, `pagina.js`, um `.js` por página) |
 | [api/](../api/) | Funções da Vercel, uma por rota |
-| [lib/](../lib/) | Código do servidor: login (`auth.js`), chamada ao n8n (`n8n.js`), liberar/bloquear (`acao.js`) |
-| [workflows/](../workflows/) | Os quatro workflows n8n exportados (JSON) |
+| [lib/](../lib/) | Código do servidor: sessão, senha e perfis (`auth.js`), chamada ao n8n (`n8n.js`), revalidação da sessão (`usuarios.js`), liberar/bloquear (`acao.js`) |
+| [workflows/](../workflows/) | Os cinco workflows n8n exportados (JSON) |
 | [workflows/code/](../workflows/code/) | Código dos nós Code, `_regra.js`, `_sql.js` e `inject.mjs` |
 | [sql/](../sql/) | Scripts de banco (idempotentes) e carga inicial |
-| [scripts/](../scripts/) | `gerar-senha.mjs` (usuários) e `checar.mjs` (`npm run check`) |
+| [scripts/](../scripts/) | `criar-admin.mjs` (`npm run admin`, primeiro admin) e `checar.mjs` (`npm run check`) |
 | `dev-server.js` | Servidor local que imita a Vercel (só desenvolvimento) |
 | `vercel.json`, `.vercelignore`, `.env.example` | Rotas, duração das funções, o que não publicar, variáveis |
 | [apidocs.json](../apidocs.json) | Swagger 2.0 da API do CNN (cópia antiga; não tem o `PATCH /paciente/{id}/status`) |

@@ -1,6 +1,6 @@
 import { ACAO, ORIGEM, dataBr, dataHoraBr, escapeHtml, numero, selo } from "./formato.js";
-import { iniciarPagina } from "./pagina.js";
-import { request } from "./session.js";
+import { iniciarPagina, usarCache } from "./pagina.js";
+import { CACHE, lerFiltros, prefetchCache, salvarFiltros } from "./session.js";
 
 const $ = (selector) => document.querySelector(selector);
 const CAMPOS = ["de", "ate", "acao", "origem", "usuario", "resultado", "paciente"];
@@ -83,15 +83,24 @@ const render = () => {
   preencherUsuarios(dados.usuarios || []);
 };
 
-const carregar = async () => {
+// Um cache por combinação de filtros e página.
+const carregar = async ({ forcar }) => {
   const params = filtros();
   history.replaceState(null, "", `?${params}`);
-  state.dados = await request(`/api/acoes?${params}`);
-  render();
+  const chave = `acoes:${params}`;
+  const entrada = await usarCache(chave, `/api/acoes?${params}`, CACHE.acoes, { forcar }, (dados) => {
+    // Um dado que chega por trás de outro filtro ou página não sobrescreve a tela.
+    if (chave !== `acoes:${filtros()}`) return;
+    state.dados = dados;
+    render();
+  });
+  salvarFiltros("historico", { busca: params.toString() });
+  prefetchCache("pacientes", "/api/pacientes", CACHE.pacientes);
+  return entrada;
 };
 
-// Filtros vindos da URL (ex.: link do detalhe do paciente).
-const daUrl = new URLSearchParams(window.location.search);
+// Filtros vindos da URL (ex.: link do detalhe do paciente); sem eles, os últimos usados nesta aba.
+const daUrl = new URLSearchParams(window.location.search.length > 1 ? window.location.search : lerFiltros("historico").busca || "");
 CAMPOS.forEach((campo) => {
   const valor = daUrl.get(campo);
   if (!valor) return;
@@ -103,12 +112,12 @@ CAMPOS.forEach((campo) => {
 });
 state.page = Math.max(1, Number.parseInt(daUrl.get("page") || "1", 10) || 1);
 
-const recarregar = iniciarPagina(carregar);
+const recarregar = iniciarPagina(carregar, { prazoMs: CACHE.acoes });
 
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
   state.page = 1;
-  void recarregar(true).catch(() => {});
+  void recarregar(false).catch(() => {});
 });
 
 els.limpar.addEventListener("click", () => {
@@ -116,15 +125,15 @@ els.limpar.addEventListener("click", () => {
     document.getElementById(campo).value = "";
   });
   state.page = 1;
-  void recarregar(true).catch(() => {});
+  void recarregar(false).catch(() => {});
 });
 
 els.anterior.addEventListener("click", () => {
   state.page = Math.max(1, state.page - 1);
-  void recarregar(true).catch(() => {});
+  void recarregar(false).catch(() => {});
 });
 
 els.proxima.addEventListener("click", () => {
   state.page += 1;
-  void recarregar(true).catch(() => {});
+  void recarregar(false).catch(() => {});
 });

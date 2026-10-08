@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clariens · Usuários</title>
+    <meta name="description" content="Usuários do painel de bloqueio CNN: perfis de acesso, senhas temporárias e eventos." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/img/logo-clariens-C-preto.png" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script>
+      // Tema antes da pintura: o salvo nesta máquina ou o claro (padrão Clariens).
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("clariens.cnn.tema") || "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+      // Sem login nesta aba: a tela de login aparece já na primeira pintura, sem mostrar o painel antes.
+      // O perfil também vem antes da pintura, para os botões que ele não pode usar nem aparecerem.
+      try {
+        document.documentElement.dataset.sessao = sessionStorage.getItem("clariens.cnn.auth") ? "sim" : "nao";
+        document.documentElement.dataset.perfil = (JSON.parse(sessionStorage.getItem("clariens.cnn.usuario") || "null") || {}).perfil || "";
+      } catch {
+        document.documentElement.dataset.sessao = "nao";
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#usuarios">Ir para a lista de usuários</a>
+
+    <dialog class="login" id="login" aria-labelledby="login-title">
+      <div class="login__fundo" aria-hidden="true"><span></span><span></span><span></span></div>
+      <form id="login-form" method="dialog">
+        <img class="login__logo login__logo--preta" src="/img/logo-clariens-preto.png" alt="Clariens Educação" width="180" height="66" />
+        <img class="login__logo login__logo--branca" src="/img/clariens-logo.png" alt="Clariens Educação" width="180" height="52" />
+        <h1 id="login-title">Bloqueio por faltas CNN</h1>
+        <label>
+          Usuário
+          <input id="login-user" name="user" autocomplete="username" required />
+        </label>
+        <label>
+          Senha
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
+        <button type="submit">Entrar</button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="senha" aria-labelledby="senha-titulo">
+      <form class="modal__form" id="senha-form" method="dialog">
+        <p class="modal__kicker">Sua conta</p>
+        <h2 id="senha-titulo">Trocar senha</h2>
+        <p class="modal__alerta" id="senha-aviso" hidden>Você entrou com uma senha temporária. Defina a sua senha para continuar.</p>
+        <label>
+          Senha atual
+          <input id="senha-atual" type="password" autocomplete="current-password" required />
+        </label>
+        <label>
+          Nova senha (mínimo 6 caracteres, com um número e um caractere especial)
+          <input id="senha-nova" type="password" autocomplete="new-password" minlength="6" maxlength="200" required />
+        </label>
+        <label>
+          Repita a nova senha
+          <input id="senha-confirma" type="password" autocomplete="new-password" minlength="6" maxlength="200" required />
+        </label>
+        <p class="modal__erro" id="senha-erro" hidden role="alert"></p>
+        <div class="modal__acoes">
+          <button class="btn" type="button" id="senha-cancelar">Cancelar</button>
+          <button class="btn btn--primario" type="submit" id="senha-salvar">Salvar senha</button>
+        </div>
+      </form>
+    </dialog>
+
+    <aside class="sidebar" id="sidebar" aria-label="Menu">
+      <div class="sidebar__head">
+        <p class="sidebar__brand">
+          <img class="sidebar__logo" src="/img/clariens-logo.png" alt="Clariens Educação" width="150" height="43" />
+        </p>
+        <button class="sidebar__close" type="button" data-nav-close aria-label="Fechar menu">×</button>
+      </div>
+      <nav class="sidebar__nav" aria-label="Seções do painel">
+        <a href="/pacientes">Pacientes</a>
+        <a href="/relatorios">Relatórios de faltas</a>
+        <a href="/historico">Histórico de ações</a>
+        <a href="/configuracao">Configuração</a>
+        <a href="/usuarios" data-requer="admin" aria-current="page">Usuários</a>
+      </nav>
+      <div class="sidebar__user">
+        <p><strong id="usuario-nome">—</strong> <span class="sidebar__perfil" id="usuario-perfil"></span></p>
+        <p><button id="trocar-senha" type="button">Trocar senha</button><button id="sair" type="button">Sair</button></p>
+      </div>
+    </aside>
+    <div class="nav-backdrop" data-nav-close aria-hidden="true"></div>
+    <script src="/js/layout.js"></script>
+
+    <div class="shell">
+      <p class="api-error" id="api-error" hidden role="alert"></p>
+
+      <header class="pagina__head pagina__head--acao">
+        <div>
+          <h1>Usuários</h1>
+          <p>Quem acessa o painel e o que cada um pode fazer</p>
+        </div>
+        <button class="btn btn--primario" id="novo" type="button">Novo usuário</button>
+      </header>
+
+      <section class="stats stats--4" aria-label="Resumo">
+        <article class="stat--ok"><p>Ativos</p><strong id="kpi-ativos">—</strong><small id="kpi-inativos">—</small></article>
+        <article class="stat--alert"><p>Admins</p><strong id="kpi-admins">—</strong><small>gerenciam usuários</small></article>
+        <article class="stat--brass"><p>Editores</p><strong id="kpi-editores">—</strong><small>liberam e bloqueiam</small></article>
+        <article class="stat--steel"><p>Leitores</p><strong id="kpi-leitores">—</strong><small>só visualizam</small></article>
+      </section>
+
+      <main id="usuarios">
+        <div class="tabela-wrap">
+          <table class="tabela">
+            <thead>
+              <tr>
+                <th scope="col">Usuário</th>
+                <th scope="col">Perfil</th>
+                <th scope="col">Situação</th>
+                <th scope="col">Último acesso</th>
+                <th scope="col">Criado</th>
+                <th scope="col"><span class="sr-only">Ações</span></th>
+              </tr>
+            </thead>
+            <tbody id="linhas"></tbody>
+          </table>
+        </div>
+        <p class="vazio" id="vazio" hidden>Nenhum usuário cadastrado.</p>
+
+        <h2 class="secao__titulo" id="eventos-titulo">Eventos recentes</h2>
+        <div class="tabela-wrap">
+          <table class="tabela" aria-labelledby="eventos-titulo">
+            <thead>
+              <tr>
+                <th scope="col">Quando</th>
+                <th scope="col">Usuário</th>
+                <th scope="col">Evento</th>
+                <th scope="col">Detalhe</th>
+                <th scope="col">Por</th>
+              </tr>
+            </thead>
+            <tbody id="eventos"></tbody>
+          </table>
+        </div>
+        <p class="vazio" id="eventos-vazio" hidden>Nenhum evento ainda.</p>
+      </main>
+    </div>
+
+    <dialog class="modal" id="usuario-dialog" aria-labelledby="usuario-titulo">
+      <form class="modal__form" id="usuario-form" method="dialog">
+        <p class="modal__kicker" id="usuario-kicker">Novo usuário</p>
+        <h2 id="usuario-titulo">Novo usuário</h2>
+        <label>
+          Login
+          <input id="usuario-login" autocomplete="off" required minlength="2" maxlength="50" pattern="[A-Za-z0-9._\-]+" placeholder="ex.: maria.souza" />
+        </label>
+        <label>
+          Nome
+          <input id="usuario-nome-campo" autocomplete="off" required minlength="2" maxlength="100" placeholder="Nome para exibir" />
+        </label>
+        <label>
+          Perfil
+          <select id="usuario-perfil-campo">
+            <option value="LEITOR">Leitor · só visualiza</option>
+            <option value="EDITOR">Editor · libera e bloqueia</option>
+            <option value="ADMIN">Admin · também gerencia usuários</option>
+          </select>
+        </label>
+        <p class="modal__contexto" id="usuario-dica">Uma senha temporária é gerada ao salvar. A pessoa define a própria senha no primeiro acesso.</p>
+        <p class="modal__erro" id="usuario-erro" hidden role="alert"></p>
+        <div class="modal__acoes">
+          <button class="btn" type="button" id="usuario-cancelar">Cancelar</button>
+          <button class="btn btn--primario" type="submit" id="usuario-salvar">Salvar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="senha-temp" aria-labelledby="senha-temp-titulo">
+      <form class="modal__form" method="dialog">
+        <p class="modal__kicker">Senha temporária</p>
+        <h2 id="senha-temp-titulo">—</h2>
+        <p class="modal__contexto">Repasse a senha por um canal seguro. Ela <strong>não será exibida de novo</strong>; no primeiro acesso a pessoa define a própria senha.</p>
+        <output class="senha-temp" id="senha-temp-valor">—</output>
+        <div class="modal__acoes">
+          <button class="btn" type="button" id="senha-temp-copiar">Copiar senha</button>
+          <button class="btn btn--primario" type="submit">Fechar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer class="statusbar" aria-label="Status do painel">
+      <div class="statusbar__left">
+        <button class="nav-toggle" type="button" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Abrir menu">
+          <span class="nav-toggle__bars" aria-hidden="true"></span>
+          Usuários
+        </button>
+        <p class="statusbar__meta">
+          <span id="clock">—</span>
+          <span class="dot" id="sync-dot" aria-hidden="true"></span>
+          <span id="sync-state" aria-live="polite">aguardando</span>
+        </p>
+      </div>
+      <div class="statusbar__actions">
+        <button class="ghost tema-toggle" type="button" data-tema-toggle>Modo escuro</button>
+        <button class="ghost" id="refresh" type="button">Atualizar agora</button>
+      </div>
+    </footer>
+
+    <script src="/js/usuarios.js" type="module"></script>
+  </body>
+</html>

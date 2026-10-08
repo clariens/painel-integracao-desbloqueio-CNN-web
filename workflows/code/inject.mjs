@@ -15,6 +15,7 @@ const SQL = "_sql.js";
 export const targets = {
   "bloqueioPacientesFaltas.json": {
     "separar faltas": [REGRA, "bloqueio-separar-faltas.js"],
+    "pacientes únicos": ["bloqueio-pacientes-unicos.js"],
     "preparar insert SQL": [REGRA, SQL, "bloqueio-preparar-insert.js"],
     "ids da consulta": [REGRA, "bloqueio-ids-consulta.js"],
     "montar info bloqueio": [REGRA, SQL, "bloqueio-montar-info.js"],
@@ -24,9 +25,14 @@ export const targets = {
     "Preparar consulta": [REGRA, SQL, "leitura-preparar.js"],
     "Montar resposta": [REGRA, SQL, "leitura-montar-resposta.js"],
   },
+  "cnn-painel-usuarios.json": {
+    Preparar: [SQL, "usuarios-preparar.js"],
+    "Montar resposta": [SQL, "usuarios-montar-resposta.js"],
+  },
   "cnn-painel-acoes.json": {
     Validar: [REGRA, "acoes-validar.js"],
     "separar faltas": [REGRA, "bloqueio-separar-faltas.js"],
+    "pacientes únicos": ["bloqueio-pacientes-unicos.js"],
     "preparar insert SQL": [REGRA, SQL, "bloqueio-preparar-insert.js"],
     "consultar situação": [REGRA, SQL, "acoes-consultar-situacao.js"],
     decidir: [REGRA, SQL, "acoes-decidir.js"],

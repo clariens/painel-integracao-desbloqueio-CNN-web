@@ -1,9 +1,8 @@
-import { ACAO, ORIGEM, STATUS, dataBr, dataHoraBr, escapeHtml, numero, prazoTexto, selo } from "./formato.js";
-import { avisar, iniciarPagina } from "./pagina.js";
-import { PACIENTES_CACHE_KEY, PACIENTES_TTL_MS, clearCaches, getAuth, readCache, request, writeCache } from "./session.js";
+import { ACAO, ORIGEM, STATUS, dataBr, dataHoraBr, escapeHtml, hojeSp, inicioCiclo, numero, prazoTexto, selo } from "./formato.js";
+import { avisar, iniciarPagina, usarCache } from "./pagina.js";
+import { CACHE, clearCache, clearCaches, comCache, getAuth, lerFiltros, pode, prefetchCache, request, salvarFiltros } from "./session.js";
 
 const PAGINA = 100;
-const AUTO_REFRESH_MS = 5 * 60 * 1000;
 const $ = (selector) => document.querySelector(selector);
 
 const state = {
@@ -11,6 +10,7 @@ const state = {
   situacao: "",
   busca: "",
   faltas: "",
+  tipoConsulta: "",
   ordem: "fim",
   limite: PAGINA,
   detalheId: null,
@@ -31,6 +31,7 @@ const els = {
   busca: $("#busca"),
   filtroSituacao: $("#filtro-situacao"),
   filtroFaltas: $("#filtro-faltas"),
+  filtroTipo: $("#filtro-tipo"),
   ordem: $("#ordem"),
   linhas: $("#linhas"),
   vazio: $("#vazio"),
@@ -61,6 +62,35 @@ const normalizar = (texto) =>
     .toLowerCase();
 
 const hoje = () => state.dados?.ciclo?.hoje || "";
+const SEM_TIPO = "(sem tipo de consulta)";
+
+// O que o paciente ia fazer: tipo de consulta e procedimentos, com o profissional.
+// O que o paciente ia fazer: os procedimentos ou, sem eles (clínica que não preenche), o tipo de consulta.
+// Na lista vai em vermelho ao lado da data; com mais de um procedimento, o primeiro e "+N" (todos no title).
+const procedimentoHtml = (falta) => {
+  const lista = String(falta.procedimentos || "").split(", ").filter(Boolean);
+  const texto = lista.length ? lista[0] + (lista.length > 1 ? ` +${lista.length - 1}` : "") : falta.tipoConsulta;
+  if (!texto) return "";
+  const completo = [lista.join(", "), falta.tipoConsulta].filter(Boolean).join(" · ");
+  return `<span class="falta-proc" title="${escapeHtml(completo)}">${escapeHtml(texto)}</span>`;
+};
+
+const faltasSelo = (n) => !n ? "" : `<span class="faltas-selo${n >= 3 ? " faltas-selo--alta" : ""}">${n} falta${n === 1 ? "" : "s"}</span>`;
+
+// Opções do filtro "Tipo de consulta": os tipos que aparecem na lista, do mais comum ao menos.
+const preencherTipos = () => {
+  const contagem = new Map();
+  for (const item of state.dados?.items || []) {
+    const tipo = item.tipoConsulta || SEM_TIPO;
+    contagem.set(tipo, (contagem.get(tipo) || 0) + 1);
+  }
+  const tipos = [...contagem].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"));
+  if (state.tipoConsulta && !contagem.has(state.tipoConsulta)) state.tipoConsulta = "";
+  els.filtroTipo.innerHTML =
+    '<option value="">Todos</option>' +
+    tipos.map(([tipo, n]) => `<option value="${escapeHtml(tipo)}">${escapeHtml(tipo)} (${n})</option>`).join("");
+  els.filtroTipo.value = state.tipoConsulta;
+};
 
 // ---------- lista ----------
 const filtrar = () => {
@@ -71,6 +101,7 @@ const filtrar = () => {
   return items.filter((item) => {
     if (state.situacao && item.status !== state.situacao) return false;
     if (faltas && (faltas >= 3 ? item.faltasCiclo < 3 : item.faltasCiclo !== faltas)) return false;
+    if (state.tipoConsulta && (item.tipoConsulta || SEM_TIPO) !== state.tipoConsulta) return false;
     if (busca && !normalizar(item.nome).includes(busca) && !String(item.idPaciente).includes(busca)) return false;
     return true;
   });
@@ -88,6 +119,8 @@ const ordenar = (items) => {
 };
 
 const botaoAcao = (item) => {
+  // Leitor só visualiza; a API também recusa (403) se alguém chamar a ação direto.
+  if (!pode("EDITOR")) return "";
   // Bloqueado (ou prazo vencido sem registro, que pode ter sido bloqueado pela automação antiga): Liberar.
   if (item.status === "bloqueado" || item.status === "apto") {
     return `<button class="btn btn--sm btn--liberar" type="button" data-acao="liberar" data-id="${item.idPaciente}">Liberar</button>`;
@@ -110,10 +143,12 @@ const linhaHtml = (item) => `
   <tr>
     <td>
       <button class="link-paciente" type="button" data-detalhe="${item.idPaciente}">${escapeHtml(item.nome || "(sem nome)")}</button>
-      <span class="sub">ID ${item.idPaciente}</span>
+      <span class="sub">ID ${item.idPaciente} ${faltasSelo(item.faltasCiclo)}</span>
     </td>
-    <td class="num">${item.faltasCiclo}</td>
-    <td class="mono">${item.numeroFalta}ª · ${dataBr(item.dataFalta)}<span class="sub">${item.foraDoCiclo ? "ciclo anterior" : escapeHtml(item.profissional || "")}</span></td>
+    <td class="falta-cel">
+      <span class="falta-linha"><span class="mono">${item.numeroFalta}ª · ${dataBr(item.dataFalta)}</span>${procedimentoHtml(item)}</span>
+      <span class="sub">${item.foraDoCiclo ? "ciclo anterior · " : ""}${escapeHtml(item.profissional || "")}</span>
+    </td>
     <td class="mono">${dataBr(item.dataFimBloqueio)}<span class="sub">${item.diasBloqueio} dias · ${escapeHtml(prazoTexto(item.dataFimBloqueio, hoje()))}</span></td>
     <td>${selo(item.status)}</td>
     <td>${ultimaAcaoHtml(item.ultimaAcao)}</td>
@@ -156,6 +191,7 @@ const renderLista = () => {
     ? `${numero(visiveis.length)} de ${numero(filtrados.length)} pacientes${filtrados.length !== state.dados.items.length ? ` (total ${numero(state.dados.items.length)})` : ""}`
     : "—";
 
+  guardarFiltros();
   els.filtroSituacao.querySelectorAll("button").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.situacao === state.situacao));
   });
@@ -164,16 +200,32 @@ const renderLista = () => {
   });
 };
 
+// Filtros lembrados na aba: voltar para Pacientes reabre a lista como estava.
+const FILTROS = ["situacao", "busca", "faltas", "tipoConsulta", "ordem"];
+const guardarFiltros = () => salvarFiltros("pacientes", Object.fromEntries(FILTROS.map((campo) => [campo, state[campo]])));
+const restaurarFiltros = () => {
+  const salvos = lerFiltros("pacientes");
+  FILTROS.forEach((campo) => {
+    if (typeof salvos[campo] === "string") state[campo] = salvos[campo];
+  });
+  els.busca.value = state.busca;
+  els.filtroFaltas.value = state.faltas;
+  els.ordem.value = state.ordem;
+};
+
 const carregar = async ({ forcar }) => {
-  const cache = forcar ? null : readCache(PACIENTES_CACHE_KEY, PACIENTES_TTL_MS);
-  if (cache) {
-    state.dados = cache.data;
-  } else {
-    state.dados = await request("/api/pacientes");
-    writeCache(PACIENTES_CACHE_KEY, state.dados);
-  }
-  renderResumo();
-  renderLista();
+  const entrada = await usarCache("pacientes", "/api/pacientes", CACHE.pacientes, { forcar }, (dados) => {
+    state.dados = dados;
+    renderResumo();
+    preencherTipos();
+    renderLista();
+  });
+  // Deixa Relatórios e Configuração prontos em segundo plano.
+  const hojeRel = hojeSp();
+  const inicioRel = inicioCiclo(hojeRel);
+  prefetchCache(`faltas:${inicioRel}:${hojeRel}`, `/api/faltas?${new URLSearchParams({ de: inicioRel, ate: hojeRel })}`, CACHE.faltas);
+  prefetchCache("parametros", "/api/parametros", CACHE.parametros);
+  return entrada;
 };
 
 // ---------- detalhe ----------
@@ -215,7 +267,7 @@ const renderDetalhe = (p) => {
   const divergeInativo = noPeriodo && ["LIBERADO", "PENDENTE"].includes(v.situacao) && p.cnn?.ativo === false;
   // Aguardando bloqueio e ainda ativo no CNN: nada divergiu, o bloqueio só não aconteceu ainda.
   const aguardando = noPeriodo && v.situacao === "PENDENTE" && p.cnn?.ativo !== false;
-  const botoes = [
+  const botoes = !pode("EDITOR") ? "" : [
     podeLiberar ? `<button class="btn btn--liberar" type="button" data-acao="liberar" data-id="${p.idPaciente}">Liberar no CNN</button>` : "",
     podeBloquear ? `<button class="btn btn--bloquear" type="button" data-acao="bloquear" data-id="${p.idPaciente}">Bloquear no CNN</button>` : "",
     aguardando ? `<button class="btn" type="button" data-acao="liberar" data-registrar="NAO_BLOQUEADO" data-id="${p.idPaciente}">Isentar esta falta</button>` : "",
@@ -235,6 +287,8 @@ const renderDetalhe = (p) => {
         <div class="cartao__linha">${selo(v.status)} ${cnnTexto(p.cnn)}</div>
         <dl class="dados">
           <dt>Falta vigente</dt><dd>${v.numeroFalta}ª · ${dataBr(v.dataFalta)}${v.noCiclo ? "" : " (ciclo anterior)"}</dd>
+          ${v.tipoConsulta || v.procedimentos ? `<dt>Ia fazer</dt><dd><span class="falta-proc">${escapeHtml([v.procedimentos, v.tipoConsulta].filter(Boolean).join(" · "))}</span></dd>` : ""}
+          ${v.profissional ? `<dt>Profissional</dt><dd>${escapeHtml(v.profissional)}</dd>` : ""}
           <dt>Prazo</dt><dd>${v.diasBloqueio} dias · até ${dataBr(v.dataFimBloqueio)} (${escapeHtml(prazoTexto(v.dataFimBloqueio, p.ciclo.hoje))})</dd>
           ${p.controle ? `<dt>Controle</dt><dd>${escapeHtml(p.controle.situacao)} · ${escapeHtml(ACAO[p.controle.ultimaAcao] || "")} por ${escapeHtml(p.controle.origem === "PAINEL" ? p.controle.usuario : ORIGEM[p.controle.origem] || "")} em ${escapeHtml(dataHoraBr(p.controle.em))}</dd>` : ""}
         </dl>
@@ -245,14 +299,14 @@ const renderDetalhe = (p) => {
 
   const faltasHtml = p.faltas.length
     ? `<table class="tabela tabela--compacta">
-        <thead><tr><th>Data</th><th class="num">Nº</th><th>Profissional</th><th>Coletada em</th></tr></thead>
+        <thead><tr><th>Data</th><th class="num">Nº</th><th>Consulta / procedimentos</th><th>Profissional</th></tr></thead>
         <tbody>${p.faltas
           .map(
             (f) => `<tr>
               <td class="mono">${dataBr(f.dataFalta)}${f.horaInicio ? ` ${escapeHtml(f.horaInicio)}` : ""}${f.noCiclo ? "" : '<span class="sub">ciclo anterior</span>'}</td>
               <td class="num">${f.numeroFalta}</td>
+              <td>${f.procedimentos ? `<span class="falta-proc">${escapeHtml(f.procedimentos)}</span><span class="sub">${escapeHtml(f.tipoConsulta || "")}</span>` : `<span class="falta-proc">${escapeHtml(f.tipoConsulta || "—")}</span>`}${f.rotulo ? `<span class="sub">rótulo: ${escapeHtml(f.rotulo)}</span>` : ""}</td>
               <td>${escapeHtml(f.profissional || "—")}</td>
-              <td class="mono">${escapeHtml(dataHoraBr(f.coletadaEm))}</td>
             </tr>`,
           )
           .join("")}</tbody>
@@ -281,8 +335,8 @@ const abrirDetalhe = async (id) => {
   if (!els.detalhe.open) els.detalhe.showModal();
 
   try {
-    const dados = await request(`/api/pacientes/${id}`);
-    if (state.detalheId === id) renderDetalhe(dados);
+    const { data } = await comCache(`paciente:${id}`, `/api/pacientes/${id}`, CACHE.paciente);
+    if (state.detalheId === id) renderDetalhe(data);
   } catch (error) {
     if (state.detalheId === id) {
       els.detalheCorpo.innerHTML = `<p class="modal__erro">${escapeHtml(error.message === "unauthorized" ? "Sessão expirada. Entre de novo." : error.message)}</p>`;
@@ -407,7 +461,10 @@ const confirmarAcao = async (event) => {
     avisar(resultado.avisoAuditoria ? `${resultado.mensagem} ${resultado.avisoAuditoria}` : resultado.mensagem || "Feito.", {
       erro: Boolean(resultado.avisoAuditoria),
     });
-    clearCaches();
+    // A ação mudou o paciente: lista, detalhe, histórico e relatórios em cache ficaram velhos.
+    clearCache("pacientes");
+    clearCache(`paciente:${id}`);
+    clearCaches("acoes:", "faltas:");
     await recarregar(true).catch(() => {});
     if (els.detalhe.open && state.detalheId === id) await abrirDetalhe(id);
   } catch (error) {
@@ -472,6 +529,12 @@ els.filtroFaltas.addEventListener("change", () => {
   renderLista();
 });
 
+els.filtroTipo.addEventListener("change", () => {
+  state.tipoConsulta = els.filtroTipo.value;
+  state.limite = PAGINA;
+  renderLista();
+});
+
 els.ordem.addEventListener("change", () => {
   state.ordem = els.ordem.value;
   renderLista();
@@ -499,13 +562,8 @@ els.acaoMotivo.addEventListener("input", () => {
   els.acaoContador.textContent = `${els.acaoMotivo.value.length}/500`;
 });
 
-const recarregar = iniciarPagina(carregar);
-
-window.setInterval(() => {
-  if (!document.querySelector("dialog[open]") && document.visibilityState === "visible") {
-    void recarregar(true).catch(() => {});
-  }
-}, AUTO_REFRESH_MS);
+restaurarFiltros();
+const recarregar = iniciarPagina(carregar, { prazoMs: CACHE.pacientes });
 
 const pacienteUrl = Number(new URLSearchParams(window.location.search).get("paciente"));
 if (getAuth() && Number.isSafeInteger(pacienteUrl) && pacienteUrl > 0) {

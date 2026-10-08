@@ -56,13 +56,30 @@ export const selo = (status, texto = STATUS[status] || status) =>
   `<span class="selo selo--${escapeHtml(status)}">${escapeHtml(texto)}</span>`;
 
 export const ACAO = { BLOQUEIO: "Bloqueio", LIBERACAO: "Liberação" };
+
+export const PERFIL = { LEITOR: "Leitor", EDITOR: "Editor", ADMIN: "Admin" };
+export const seloPerfil = (perfil) =>
+  `<span class="selo selo--perfil-${escapeHtml(String(perfil).toLowerCase())}">${escapeHtml(PERFIL[perfil] || perfil)}</span>`;
+
+export const EVENTO_USUARIO = {
+  CRIADO: "Criado",
+  PERFIL_ALTERADO: "Perfil alterado",
+  NOME_ALTERADO: "Nome alterado",
+  DESATIVADO: "Desativado",
+  REATIVADO: "Reativado",
+  SENHA_REDEFINIDA: "Senha redefinida",
+  SENHA_TROCADA: "Senha trocada",
+  LOGIN_FALHA: "Senha errada",
+  LOGIN_BLOQUEADO: "Login bloqueado",
+};
 export const ORIGEM = { AUTOMATICO: "Automático (01:00)", PAINEL: "Painel", CARGA_INICIAL: "Carga inicial" };
 
 export const hojeSp = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
-// Mesma regra do ciclo de workflows/code/_regra.js (início em 1/8), usada só nos atalhos de período.
+// Mesma regra do ciclo de workflows/code/_regra.js (início em 1/10), usada só nos atalhos de período.
+export const CICLO_MES = 10;
 export const inicioCiclo = (hoje = hojeSp()) => {
   const [ano, mes] = hoje.split("-").map(Number);
-  return `${mes >= 8 ? ano : ano - 1}-08-01`;
+  return `${mes >= CICLO_MES ? ano : ano - 1}-${String(CICLO_MES).padStart(2, "0")}-01`;
 };

@@ -4,3 +4,7 @@ node_modules/
 .env.local
 .env.*.local
 *.log
+
+# Saídas de execução do n8n coladas para análise: têm dados de pacientes (LGPD). Nunca versionar.
+*result*.json
+*resultado*.json

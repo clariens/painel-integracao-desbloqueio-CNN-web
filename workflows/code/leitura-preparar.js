@@ -25,6 +25,23 @@ const escolha = (valor, permitidos) => (permitidos.includes(String(valor || ''))
 const inicio = inicioCiclo();
 const hoje = hojeSp();
 const dias = (coluna) => sqlDiasCase(coluna);
+
+// Nomes gravados pelo bloqueio (01:00) a partir das listas da API. Executor: Id = idpessoa da agenda.
+const nomeCadastro = (tipo, coluna) =>
+  `(SELECT TOP (1) cad.Nome FROM dbo.CtlCnnCadastro cad WHERE cad.Tipo = N'${tipo}' AND cad.Id = ${coluna})`;
+const profissionalDe = (alias) => `COALESCE(${nomeCadastro('EXECUTOR', `${alias}.IdPessoaExecutor`)}, ${alias}.NomeExecutor)`;
+// Procedimentos da falta numa string ("Retorno, Exame"). FOR XML PATH funciona em qualquer versão (STRING_AGG só a partir de 2017).
+const procedimentosDe = (colunaAgenda) => `STUFF((
+        SELECT N', ' + ISNULL(fp.NomeProcedimento, N'Procedimento ' + CAST(fp.IdTipoProcedimento AS nvarchar(20)))
+        FROM dbo.CtlCnnFaltaProcedimento fp
+        WHERE fp.IdAgenda = ${colunaAgenda}
+        ORDER BY fp.NomeProcedimento
+        FOR XML PATH(''), TYPE
+    ).value('.', 'nvarchar(max)'), 1, 2, N'')`;
+const camposAgenda = (alias) => `${profissionalDe(alias)} AS Profissional,
+    ${nomeCadastro('TIPO_CONSULTA', `${alias}.IdTipoConsulta`)} AS TipoConsulta,
+    ${nomeCadastro('ROTULO', `${alias}.IdRotulo`)} AS Rotulo,
+    ${procedimentosDe(`${alias}.IdAgenda`)} AS Procedimentos`;
 const cabecalho = `USE INTEGRACAO;
 SET NOCOUNT ON;
 DECLARE @inicio DATE = ${sqlDate(inicio)};
@@ -47,6 +64,9 @@ Faltas AS (
         f.DataFalta,
         f.NumeroFalta,
         f.NomeExecutor,
+        f.IdPessoaExecutor,
+        f.IdTipoConsulta,
+        f.IdRotulo,
         ROW_NUMBER() OVER (
             PARTITION BY f.IdPaciente
             ORDER BY CASE WHEN f.DataFalta >= @inicio THEN 0 ELSE 1 END, f.NumeroFalta DESC, f.DataFalta DESC, f.IdAgenda DESC
@@ -64,7 +84,7 @@ SELECT
     v.IdAgenda,
     CONVERT(char(10), v.DataFalta, 23) AS DataFalta,
     v.NumeroFalta,
-    v.NomeExecutor,
+    ${camposAgenda('v')},
     v.FaltasCiclo,
     v.FaltasTotal,
     ${dias('v.NumeroFalta')} AS DiasBloqueio,
@@ -108,11 +128,11 @@ SELECT
     CONVERT(char(10), DataFalta, 23) AS DataFalta,
     CONVERT(char(5), HoraInicio, 108) AS HoraInicio,
     NumeroFalta,
-    NomeExecutor,
+    ${camposAgenda('f')},
     TipoExecutor,
     StatusAgenda,
     DataColeta
-FROM dbo.CtlCnnFaltaPaciente
+FROM dbo.CtlCnnFaltaPaciente f
 WHERE IdPaciente = @id
 ORDER BY DataFalta DESC, IdAgenda DESC;
 
@@ -162,12 +182,28 @@ if (action === 'faltas') {
   }
 
   const filtro = `DataFalta >= @de AND DataFalta <= @ate`;
+  const filtroF = `f.DataFalta >= @de AND f.DataFalta <= @ate`;
+  // Agrupa por um cadastro: nome do CNN, ou "(sem ...)" quando a falta não tem o campo, ou o id quando o nome ainda não veio.
+  const porCadastro = (secao, tipo, coluna, vazio, top) => `SELECT TOP (${top}) N'${secao}' AS _secao,
+       CASE WHEN f.${coluna} IS NULL THEN N'${vazio}' ELSE ISNULL(cad.Nome, N'Código ' + CAST(f.${coluna} AS nvarchar(20))) END AS Nome,
+       COUNT(*) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
+FROM dbo.CtlCnnFaltaPaciente f
+LEFT JOIN dbo.CtlCnnCadastro cad
+    ON cad.Tipo = N'${tipo}' AND cad.Id = f.${coluna}
+WHERE ${filtroF}
+GROUP BY f.${coluna}, cad.Nome
+ORDER BY COUNT(*) DESC;`;
   // 1900-01-01 foi segunda-feira: (dias desde então) % 7 dá 0 = segunda ... 6 = domingo, sem depender de DATEFIRST.
   const query = `${cabecalho}
 DECLARE @de DATE = ${sqlDate(de)};
 DECLARE @ate DATE = ${sqlDate(ate)};
 
-SELECT N'total' AS _secao, COUNT(*) AS Faltas, COUNT(DISTINCT IdPaciente) AS Pacientes
+-- ComProcedimento é uma subconsulta à parte: o SQL Server não aceita EXISTS dentro de SUM().
+SELECT N'total' AS _secao, COUNT(*) AS Faltas, COUNT(DISTINCT IdPaciente) AS Pacientes,
+       (SELECT COUNT(*)
+        FROM dbo.CtlCnnFaltaPaciente fc
+        WHERE fc.DataFalta >= @de AND fc.DataFalta <= @ate
+          AND EXISTS (SELECT 1 FROM dbo.CtlCnnFaltaProcedimento fp WHERE fp.IdAgenda = fc.IdAgenda)) AS ComProcedimento
 FROM dbo.CtlCnnFaltaPaciente
 WHERE ${filtro};
 
@@ -181,12 +217,48 @@ FROM dbo.CtlCnnFaltaPaciente
 WHERE ${filtro}
 GROUP BY DATEDIFF(DAY, '19000101', DataFalta) % 7;
 
-SELECT TOP (30) N'profissional' AS _secao, ISNULL(NomeExecutor, N'(sem profissional)') AS Profissional,
-       COUNT(*) AS Faltas, COUNT(DISTINCT IdPaciente) AS Pacientes
-FROM dbo.CtlCnnFaltaPaciente
-WHERE ${filtro}
-GROUP BY ISNULL(NomeExecutor, N'(sem profissional)')
+SELECT TOP (30) N'profissional' AS _secao, Profissional, COUNT(*) AS Faltas, COUNT(DISTINCT IdPaciente) AS Pacientes
+FROM (
+    SELECT f.IdPaciente,
+           CASE WHEN f.IdPessoaExecutor IS NULL AND f.NomeExecutor IS NULL THEN N'(sem profissional)'
+                ELSE COALESCE(cad.Nome, f.NomeExecutor, N'Código ' + CAST(f.IdPessoaExecutor AS nvarchar(20))) END AS Profissional
+    FROM dbo.CtlCnnFaltaPaciente f
+    LEFT JOIN dbo.CtlCnnCadastro cad
+        ON cad.Tipo = N'EXECUTOR' AND cad.Id = f.IdPessoaExecutor
+    WHERE ${filtroF}
+) porProfissional
+GROUP BY Profissional
 ORDER BY COUNT(*) DESC;
+
+${porCadastro('tipoConsulta', 'TIPO_CONSULTA', 'IdTipoConsulta', '(sem tipo de consulta)', 30)}
+
+${porCadastro('rotulo', 'ROTULO', 'IdRotulo', '(sem rótulo)', 20)}
+
+SELECT TOP (30) N'procedimento' AS _secao,
+       ISNULL(MAX(fp.NomeProcedimento), N'Procedimento ' + CAST(fp.IdTipoProcedimento AS nvarchar(20))) AS Nome,
+       COUNT(DISTINCT f.IdAgenda) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
+FROM dbo.CtlCnnFaltaProcedimento fp
+INNER JOIN dbo.CtlCnnFaltaPaciente f
+    ON f.IdAgenda = fp.IdAgenda
+WHERE ${filtroF}
+GROUP BY fp.IdTipoProcedimento
+ORDER BY COUNT(DISTINCT f.IdAgenda) DESC;
+
+SELECT N'periodo' AS _secao, Periodo, Ordem, COUNT(*) AS Faltas, COUNT(DISTINCT IdPaciente) AS Pacientes
+FROM (
+    SELECT IdPaciente,
+           CASE WHEN HoraInicio IS NULL THEN N'Sem horário'
+                WHEN HoraInicio < '12:00' THEN N'Manhã'
+                WHEN HoraInicio < '18:00' THEN N'Tarde'
+                ELSE N'Noite' END AS Periodo,
+           CASE WHEN HoraInicio IS NULL THEN 4
+                WHEN HoraInicio < '12:00' THEN 1
+                WHEN HoraInicio < '18:00' THEN 2
+                ELSE 3 END AS Ordem
+    FROM dbo.CtlCnnFaltaPaciente
+    WHERE ${filtro}
+) porPeriodo
+GROUP BY Periodo, Ordem;
 
 SELECT N'reincidencia' AS _secao, Quantidade, COUNT(*) AS Pacientes
 FROM (
@@ -205,11 +277,12 @@ GROUP BY IdPaciente
 HAVING COUNT(*) >= 2
 ORDER BY COUNT(*) DESC, MAX(DataFalta) DESC;
 
-SELECT TOP (5001) N'linha' AS _secao, IdAgenda, IdPaciente, NomePaciente,
-       CONVERT(char(10), DataFalta, 23) AS DataFalta, CONVERT(char(5), HoraInicio, 108) AS HoraInicio,
-       NumeroFalta, NomeExecutor
-FROM dbo.CtlCnnFaltaPaciente
-WHERE ${filtro}
+SELECT TOP (5001) N'linha' AS _secao, f.IdAgenda, f.IdPaciente, f.NomePaciente,
+       CONVERT(char(10), f.DataFalta, 23) AS DataFalta, CONVERT(char(5), f.HoraInicio, 108) AS HoraInicio,
+       f.NumeroFalta,
+       ${camposAgenda('f')}
+FROM dbo.CtlCnnFaltaPaciente f
+WHERE ${filtroF}
 ORDER BY DataFalta DESC, IdAgenda DESC;`;
 
   return [{ json: { action, query, de, ate, inicio, hoje } }];
@@ -295,7 +368,11 @@ SELECT
     (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO') AS UltimoBloqueioAutomatico,
     (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'PAINEL') AS UltimaAcaoPainel,
     (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente) AS LinhasControle,
-    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente) AS LinhasFaltas;`;
+    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente) AS LinhasFaltas;
+
+SELECT N'cadastro' AS _secao, Tipo, COUNT(*) AS Quantidade, MAX(AtualizadoEm) AS AtualizadoEm
+FROM dbo.CtlCnnCadastro
+GROUP BY Tipo;`;
 
   return [{ json: { action, query, inicio, hoje } }];
 }

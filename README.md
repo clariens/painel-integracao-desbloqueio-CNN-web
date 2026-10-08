@@ -8,14 +8,17 @@ Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e deixa a **liberaç
 | Painel | Vercel (HTML estático + `api/`) | Lista os bloqueados, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
 | CNN Painel - Leitura | n8n, `workflows/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
 | CNN Painel - Ações | n8n, `workflows/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
+| CNN Painel - Usuários | n8n, `workflows/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |
 | Liberação automática | n8n, `workflows/liberacaoPacientesFaltas.json` | **Desativada.** Substituída pela liberação manual |
-| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria) |
+| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários) |
 
 ```mermaid
 flowchart LR
-    U["Navegador"] -- "Basic Auth (usuário próprio)" --> V["Vercel /api"]
+    U["Navegador"] -- "Bearer (sessão assinada)" --> V["Vercel /api"]
     V -- "POST { action } + X-Monitor-Key" --> L["n8n Leitura"]
     V -- "POST { action } + X-Monitor-Key" --> A["n8n Ações"]
+    V -- "POST { action } + X-Monitor-Key" --> US["n8n Usuários"]
+    US --> DB
     B["n8n Bloqueio 01:00"] --> CNN["API CNN"]
     A --> CNN
     L --> DB[("SQL Server")]
@@ -35,7 +38,7 @@ flowchart LR
 | 2ª | 90 dias |
 | 3ª ou mais | 180 dias |
 
-Ciclo: começa em 1º de agosto. Fonte única: [`workflows/code/_regra.js`](workflows/code/_regra.js). A liberação pelo painel pode ser antes do prazo, com motivo obrigatório; o bloqueio das 01:00 respeita essa liberação até surgir uma falta nova.
+Ciclo: começa em 1º de outubro. Fonte única: [`workflows/code/_regra.js`](workflows/code/_regra.js). A liberação pelo painel pode ser antes do prazo, com motivo obrigatório; o bloqueio das 01:00 respeita essa liberação até surgir uma falta nova.
 
 ## Comandos
 
@@ -43,10 +46,20 @@ Ciclo: começa em 1º de agosto. Fonte única: [`workflows/code/_regra.js`](work
 npm run dev       # servidor local em http://localhost:3000 (lê .env.local)
 npm run inject    # copia workflows/code/*.js para dentro dos JSON dos workflows
 npm run check     # confere os workflows (compila o código dos nós, referências, inject em dia)
-npm run senha -- joao   # gera a entrada de um usuário para DASHBOARD_USERS
+npm run admin    # gera senha aleatória e o INSERT do primeiro admin (colar no SSMS)
 ```
 
 Sem dependências de npm: Node 20.6 ou mais novo.
+
+## Usuários e perfis
+
+| Perfil | Pode |
+|---|---|
+| Leitor | Ver pacientes, relatórios, histórico e configuração |
+| Editor | Tudo do leitor, mais liberar, bloquear, isentar e registrar |
+| Admin | Tudo do editor, mais a tela **Usuários** (criar, mudar perfil, desativar, redefinir senha) |
+
+Os usuários ficam no banco (`CtlCnnUsuario`), não em variável de ambiente. O primeiro admin é inserido à mão (`npm run admin`); os demais, pela tela. Ver [docs/operacao.md](docs/operacao.md#usuários-do-painel).
 
 ## Documentação
 

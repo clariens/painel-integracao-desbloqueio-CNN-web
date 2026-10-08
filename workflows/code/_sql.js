@@ -155,4 +155,59 @@ COMMIT TRANSACTION;
 
 SELECT @IdAcao AS IdAcao, CAST(${sqlBit(Boolean(acao.sucesso))} AS bit) AS Sucesso;`;
 };
+// Junta os itens de um nó HTTP paginado da API do CNN: cada página chega como { lista: [...] }.
+// Página com erro (onError = continueRegularOutput) é ignorada.
+const listaDaApi = (itens) => {
+  const lista = [];
+
+  for (const item of itens || []) {
+    const pagina = item?.json ?? {};
+    if (Array.isArray(pagina.lista)) {
+      lista.push(...pagina.lista);
+    }
+  }
+
+  return lista;
+};
+
+// Itens de um nó que pode não existir (ou não ter rodado) neste workflow: lista vazia em vez de erro.
+const itensDoNo = (nome) => {
+  try {
+    return $(nome).all();
+  } catch (erro) {
+    return [];
+  }
+};
+
+// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra }. Blocos de 500 (VALUES aceita até 1000 linhas).
+const sqlCadastros = (linhas) => {
+  const validas = [];
+  const vistos = new Set();
+
+  for (const linha of linhas) {
+    const id = Number(linha.id);
+    const chave = `${linha.tipo}:${id}`;
+    if (!linha.tipo || !Number.isFinite(id) || vistos.has(chave)) {
+      continue;
+    }
+    vistos.add(chave);
+    validas.push(`(${sqlS(linha.tipo, 20)}, ${sqlN(id)}, ${sqlS(linha.nome, 200)}, ${sqlS(linha.extra, 100)})`);
+  }
+
+  const blocos = [];
+  for (let i = 0; i < validas.length; i += 500) {
+    blocos.push(`
+MERGE dbo.CtlCnnCadastro WITH (HOLDLOCK) AS destino
+USING (VALUES
+    ${validas.slice(i, i + 500).join(',\n    ')}
+) AS origem (Tipo, Id, Nome, Extra)
+    ON destino.Tipo = origem.Tipo AND destino.Id = origem.Id
+WHEN MATCHED AND (ISNULL(destino.Nome, N'') <> ISNULL(origem.Nome, N'') OR ISNULL(destino.Extra, N'') <> ISNULL(origem.Extra, N'')) THEN
+    UPDATE SET Nome = origem.Nome, Extra = origem.Extra, AtualizadoEm = SYSUTCDATETIME()
+WHEN NOT MATCHED THEN
+    INSERT (Tipo, Id, Nome, Extra) VALUES (origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);
+  }
+
+  return blocos.join('\n');
+};
 // ===== fim dos helpers de SQL =====
