@@ -9,3 +9,9 @@ apidocs.json
 CHANGELOG.md
 README.md
 .env*
+# Saídas de execução do n8n coladas para análise: têm dados de pacientes (LGPD). Nunca publicar.
+*result*.json
+*resultado*.json
+*.log
+node_modules/
+.vercel/
