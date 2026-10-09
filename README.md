@@ -9,8 +9,8 @@ Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e deixa a **liberaç
 | CNN Painel - Leitura | n8n, `workflows/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
 | CNN Painel - Ações | n8n, `workflows/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
 | CNN Painel - Usuários | n8n, `workflows/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |
-| Liberação automática | n8n, `workflows/liberacaoPacientesFaltas.json` | **Desativada.** Substituída pela liberação manual |
-| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários) |
+| Liberação automática | n8n, `workflows/liberacaoPacientesFaltasautomaticas--Desativado.json` | **Desativada.** Substituída pela liberação manual |
+| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnFaltaProcedimento` (procedimentos), `CtlCnnCadastro` (nomes do CNN), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários) |
 
 ```mermaid
 flowchart LR
@@ -62,5 +62,8 @@ Sem dependências de npm: Node 20.6 ou mais novo.
 Os usuários ficam no banco (`CtlCnnUsuario`), não em variável de ambiente. O primeiro admin é inserido à mão (`npm run admin`); os demais, pela tela. Ver [docs/operacao.md](docs/operacao.md#usuários-do-painel).
 
 ## Documentação
+
+- **Para todos:** [docs/visao-geral.md](docs/visao-geral.md) (sem termos técnicos) e [docs/regras.md](docs/regras.md) (as regras de negócio).
+- **Word:** [docs/word/](docs/word/), gerado com `npm run word`.
 
 [docs/README.md](docs/README.md): índice, arquitetura, banco, painel, um documento por workflow e operação (instalação, corte da liberação automática, deploy).

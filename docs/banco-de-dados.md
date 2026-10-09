@@ -22,7 +22,9 @@ O prazo de bloqueio não é coluna. `DiasBloqueio` e `DataFimBloqueio` são calc
 
 ## Diagrama
 
-As tabelas não têm chave estrangeira (as ligações abaixo são lógicas). As outras entidades abaixo são objetos da API do CNN, não tabelas. Estão no diagrama para mostrar de onde vêm os IDs.
+As tabelas não têm chave estrangeira: as ligações abaixo são lógicas. Para ficar legível, o modelo está em três partes; uma tabela que aparece sem colunas está detalhada em outra parte. Os diagramas mostram só as colunas principais; a lista completa está no dicionário de dados.
+
+### Faltas e cadastros
 
 ```mermaid
 erDiagram
@@ -31,57 +33,51 @@ erDiagram
         bigint IdAgenda UK "id do agendamento CNN"
         bigint IdPaciente "id do paciente CNN"
         nvarchar NomePaciente
-        nvarchar CpfCnpj
-        nvarchar EmailPaciente
-        nvarchar TelefonePaciente
         date DataFalta
         time HoraInicio
-        time HoraFim
-        nvarchar StatusAgenda
         int NumeroFalta "ordem no ciclo"
-        bigint IdPessoaExecutor
-        bigint IdExecutorAgenda
+        bigint IdPessoaExecutor "idpessoa do profissional"
         nvarchar NomeExecutor
-        nvarchar TipoExecutor
-        bigint IdLocalAgenda
         bigint IdTipoConsulta
-        nvarchar Observacoes
+        bigint IdRotulo
+        bigint IdLocalAgenda
         datetime2 DataColeta "UTC"
     }
-    API_CNN_Agenda {
-        int id
-        int idPaciente
-        int idPessoaExecutor
-        string status
-        string data
+    CtlCnnFaltaProcedimento {
+        bigint IdAgenda PK
+        bigint IdTipoProcedimento PK
+        nvarchar NomeProcedimento
+        int Quantidade
     }
-    API_CNN_Paciente {
-        int id
-        string nome
-        boolean ativo
+    CtlCnnCadastro {
+        nvarchar Tipo PK "TIPO_CONSULTA, EXECUTOR..."
+        bigint Id PK
+        nvarchar Nome
+        nvarchar Extra
     }
-    API_CNN_ExecutorAgenda {
-        int id
-        string nome
-        string tipoExecutor
-    }
+    CtlCnnFaltaPaciente ||--o{ CtlCnnFaltaProcedimento : "IdAgenda"
+    CtlCnnCadastro ||--o{ CtlCnnFaltaPaciente : "Id = IdTipoConsulta, IdRotulo, IdPessoaExecutor"
+```
+
+### Bloqueios e liberações
+
+```mermaid
+erDiagram
     CtlCnnControlePaciente {
         bigint IdPaciente PK
         nvarchar Situacao "BLOQUEADO ou LIBERADO"
         bigint IdAgendaReferencia "falta vigente na ação"
-        int NumeroFalta
         date DataFimBloqueio
         nvarchar UltimaAcao
         nvarchar OrigemUltimaAcao
         nvarchar UltimaAcaoPor
         bigint IdUltimaAcao
-        datetime2 UltimaAcaoEm "UTC"
     }
     CtlCnnAcaoPaciente {
         bigint Id PK "IDENTITY"
         bigint IdPaciente
         nvarchar Acao "BLOQUEIO ou LIBERACAO"
-        nvarchar Origem "AUTOMATICO, PAINEL"
+        nvarchar Origem "AUTOMATICO, PAINEL, CARGA_INICIAL"
         nvarchar Usuario
         nvarchar Motivo
         bigint IdAgendaReferencia
@@ -92,9 +88,28 @@ erDiagram
     }
     CtlCnnFaltaPaciente ||--o{ CtlCnnControlePaciente : "IdAgenda = IdAgendaReferencia"
     CtlCnnAcaoPaciente ||--o| CtlCnnControlePaciente : "Id = IdUltimaAcao"
-    API_CNN_Agenda ||--o| CtlCnnFaltaPaciente : "IdAgenda = id"
-    API_CNN_Paciente ||--o{ CtlCnnFaltaPaciente : "IdPaciente = id"
-    API_CNN_ExecutorAgenda ||--o{ CtlCnnFaltaPaciente : "IdExecutorAgenda = id"
+```
+
+### Usuários do painel
+
+```mermaid
+erDiagram
+    CtlCnnUsuario {
+        int IdUsuario PK
+        nvarchar Login UK
+        nvarchar Perfil "LEITOR, EDITOR, ADMIN"
+        bit Ativo
+        bit TrocarSenha
+        int VersaoSessao
+    }
+    CtlCnnUsuarioEvento {
+        bigint Id PK
+        nvarchar Login
+        nvarchar Evento
+        nvarchar Por
+    }
+    CtlCnnUsuario ||--o{ CtlCnnUsuarioEvento : "Login"
+    CtlCnnUsuario ||--o{ CtlCnnAcaoPaciente : "Login = Usuario"
 ```
 
 ## Dicionário de dados
@@ -185,7 +200,7 @@ Só muda quando o PATCH dá certo.
 | `Id` | `BIGINT IDENTITY` | Não | Chave |
 | `IdPaciente`, `NomePaciente` | `BIGINT`, `NVARCHAR(200)` | Não, Sim | Paciente |
 | `Acao` | `NVARCHAR(20)` | Não | `BLOQUEIO` ou `LIBERACAO` |
-| `Origem` | `NVARCHAR(20)` | Não | `AUTOMATICO` (01:00) ou `PAINEL` |
+| `Origem` | `NVARCHAR(20)` | Não | `AUTOMATICO` (01:00), `PAINEL` ou `CARGA_INICIAL` |
 | `Usuario` | `NVARCHAR(100)` | Não | Quem fez (`n8n` no automático) |
 | `Motivo` | `NVARCHAR(500)` | Sim | Motivo digitado (obrigatório no painel) |
 | `IdAgendaReferencia`, `NumeroFalta`, `DataInicioBloqueio`, `DataFimBloqueio` | | Sim | Falta vigente e prazo no momento |
@@ -247,8 +262,8 @@ Calculada pelo workflow [Leitura](fluxos/leitura.md#situação-de-cada-paciente)
 
 ### Como `NumeroFalta` é mantido
 
-1. No insert: número de linhas do paciente com `DataFalta >= 1/10 do ciclo`, mais 1.
-2. Logo depois, na mesma transação: `ROW_NUMBER()` por paciente, ordenado por `DataFalta, IdAgenda`, só dentro do ciclo e só para os pacientes do lote.
+1. No insert: a falta nova entra com `NumeroFalta = 0` (provisório).
+2. Logo depois, na mesma transação: `ROW_NUMBER()` por paciente, ordenado por `DataFalta, IdAgenda`, só dentro do ciclo e só para os pacientes lidos nesta execução.
 3. Linhas de ciclos anteriores ficam com o último número que receberam.
 
 ## Onde cada informação aparece nas execuções do n8n

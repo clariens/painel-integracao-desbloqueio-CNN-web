@@ -49,20 +49,31 @@ gantt
 
 ## Fluxograma
 
+O fluxo tem duas partes: primeiro ele lê a agenda e grava as faltas; depois decide quem bloquear e bloqueia no CNN.
+
+### Parte 1: ler a agenda e gravar as faltas
+
 ```mermaid
 flowchart TD
     T(["Todo dia 01:00"]) --> K["5 listas de cadastro<br/>tipo de consulta, executores,<br/>rótulos, locais, especialidades"]
     K --> A["GET agenda do ciclo<br/>TODAS as páginas, 100 por página"]
     A --> S["separar faltas<br/>status FALTOU, data no ciclo"]
-    S --> Q{"sem faltas no periodo?"}
-    Q -->|"sim"| Z["sem faltas<br/>SELECT 0 e fim"]
+    S --> Q{"sem faltas<br/>no período?"}
+    Q -->|"sim"| Z(["sem faltas<br/>SELECT 0 e fim"])
     Q -->|"não"| U["pacientes únicos<br/>1 item por paciente"]
     U --> P["GET paciente por id<br/>1 chamada por paciente"]
-    P --> I["preparar insert SQL<br/>uma query: cadastros, faltas,<br/>procedimentos"]
+    P --> I["preparar insert SQL<br/>uma query: cadastros,<br/>faltas, procedimentos"]
     I --> G["gravar faltas<br/>transação + renumeração"]
-    G --> D["ids da consulta<br/>lista de IdPaciente do lote"]
-    D --> C["consultar bloqueios<br/>falta vigente de cada paciente<br/>menos liberados no painel"]
-    C --> M{"montar info bloqueio<br/>falta no período, não liberado no painel?"}
+    G --> D(["segue para a parte 2"])
+```
+
+### Parte 2: decidir quem bloquear e bloquear no CNN
+
+```mermaid
+flowchart TD
+    D(["vindo da parte 1"]) --> IDS["ids da consulta<br/>IdPaciente do lote"]
+    IDS --> C["consultar bloqueios<br/>falta vigente de cada paciente,<br/>menos liberados no painel"]
+    C --> M{"montar info bloqueio<br/>falta no período e não<br/>liberado no painel?"}
     M -->|"não"| X(["fica de fora"])
     M -->|"ninguém"| N(["nada a bloquear<br/>item de resumo"])
     M -->|"sim"| L["loop bloqueios"]

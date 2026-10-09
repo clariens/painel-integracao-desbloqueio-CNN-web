@@ -2,6 +2,23 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-08 — Documentação completa e versão em Word
+
+### Adicionado
+
+- **[docs/visao-geral.md](docs/visao-geral.md):** visão geral para quem não é técnico (o que o sistema faz, telas, situações do paciente, perfis, perguntas frequentes e glossário), com diagramas.
+- **[docs/regras.md](docs/regras.md):** todas as regras de negócio numeradas (R1 a R69), cada uma com onde está implementada.
+- **Gerador de Word** em `docs/word/gerador/` (`npm run word`): cada documento vira um `.docx` com capa, sumário, cabeçalho, rodapé, tabelas formatadas e os diagramas como imagens; `00 - Documentação completa.docx` junta todos.
+
+### Alterado
+
+- Documentação atualizada para o estado atual: diagrama do banco com as sete tabelas, sequência do bloqueio (listas de cadastro, todas as páginas, GET por paciente), APIs usadas, camada de cache do painel, checklist de implantação completo, workflow de liberação renomeado e publicação direto na `main`.
+- Diagramas grandes divididos em partes para ficarem legíveis no Word: bloqueio, ações, banco de dados (três partes), arquitetura (caminho da requisição e credenciais) e script SQL.
+
+### Corrigido
+
+- **[docs/script-sql.md](docs/script-sql.md):** `criar_tabelas_bloqueio.sql` descrito com as três tabelas que ele cria (faltas, procedimentos e cadastros), números de linha atualizados e contagem de colunas esperada no `SELECT` de conferência.
+
 ## 2026-10-08 — Ciclo em 1º de outubro, procedimento na lista e cache entre telas
 
 ### Alterado

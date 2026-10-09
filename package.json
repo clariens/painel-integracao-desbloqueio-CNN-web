@@ -9,6 +9,7 @@
     "dev": "node --env-file=.env.local dev-server.js",
     "inject": "node workflows/code/inject.mjs",
     "admin": "node scripts/criar-admin.mjs",
-    "check": "node scripts/checar.mjs"
+    "check": "node scripts/checar.mjs",
+    "word": "node docs/word/gerador/gerar.mjs"
   }
 }

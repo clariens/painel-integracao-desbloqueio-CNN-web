@@ -2,6 +2,21 @@
 
 Voltar ao [índice](README.md).
 
+## Checklist de implantação (estado atual)
+
+Para subir tudo do zero ou conferir um ambiente. Cada item tem o detalhe nas seções abaixo.
+
+| # | Onde | O quê |
+|---|---|---|
+| 1 | SSMS | `sql/criar_tabelas_bloqueio.sql` (faltas, procedimentos, cadastros), `sql/criar_tabelas_painel.sql` (controle e auditoria), `sql/criar_tabelas_usuarios.sql` (usuários) e os `GRANT` do fim de cada script |
+| 2 | Terminal + SSMS | `npm run admin` e o `INSERT` do primeiro admin; guardar a senha temporária |
+| 3 | n8n | Credenciais `API CNN AUTH`, `TST Araguari` e Header Auth `X-Monitor-Key` |
+| 4 | n8n | Importar e ativar **Bloqueio**, **Leitura**, **Ações** e **Usuários**; conferir credenciais, Error workflow e a paginação de `GET agenda do ciclo` |
+| 5 | Vercel | `SESSION_SECRET`, `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_WEBHOOK_SECRET`; Framework Preset **Other** |
+| 6 | Painel | Entrar como `admin`, trocar a senha, criar os usuários |
+| 7 | n8n | 1ª execução do bloqueio pelo editor com o PATCH desconectado; conferir faltas e cadastros no banco; religar |
+| 8 | Painel | Testar Bloquear → Liberar → Bloquear num paciente combinado com a clínica |
+
 ## Implantação do painel (a partir do sistema antigo)
 
 A ordem importa: o painel lê as tabelas novas, e a liberação automática só sai quando a manual está testada.
@@ -36,7 +51,7 @@ flowchart TD
 ### Corte da liberação automática
 
 1. No n8n, abra o workflow de liberação e **execute manualmente uma última vez** (gatilho manual). Assim ninguém com prazo vencido fica bloqueado.
-2. **Desative** o workflow (Active/Publish desligado). Importe por cima o JSON novo de [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json), que já vem com o gatilho `disabled`.
+2. **Desative** o workflow (Active/Publish desligado). Importe por cima o JSON novo de [workflows/liberacaoPacientesFaltasautomaticas--Desativado.json](../workflows/liberacaoPacientesFaltasautomaticas--Desativado.json), que já vem com o gatilho `disabled`.
 3. **Só se a automação antiga bloqueou de verdade:** rode [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) em `INTEGRACAO`. Se as faltas foram carregadas sem PATCH, pule este passo; a execução das 01:00 bloqueia ou registra cada um. Ele grava a situação que a automação deixou (prazo correndo = `BLOQUEADO`, vencido = `LIBERADO`). Rodar de novo não muda nada.
 4. Avise a equipe: a partir daqui, quem vence o prazo aparece em **Aptos a liberar** e só sai com a liberação no painel.
 
@@ -44,7 +59,7 @@ Enquanto a carga inicial não roda, o painel mostra um aviso: quem tem prazo ven
 
 ## Instalação do zero (banco vazio)
 
-Igual à implantação acima, com dois passos antes: rodar [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql) e criar as credenciais `API CNN AUTH` (HTTP Basic Auth) e `TST Araguari` (Microsoft SQL, com `SELECT`, `INSERT` e `UPDATE` nas três tabelas). O fuso da instância n8n precisa ser `America/Sao_Paulo`. Não importe o workflow de liberação (ou deixe-o inativo); a carga inicial é opcional.
+Siga o [checklist](#checklist-de-implantação-estado-atual). Credenciais: `API CNN AUTH` (HTTP Basic Auth) e `TST Araguari` (Microsoft SQL, com `SELECT`, `INSERT` e `UPDATE` nas tabelas do sistema e `DELETE` em `CtlCnnFaltaProcedimento`). O fuso da instância n8n precisa ser `America/Sao_Paulo`. Não importe o workflow de liberação (ou deixe-o inativo); a carga inicial é opcional.
 
 ## Usuários do painel
 
@@ -81,16 +96,16 @@ O admin não muda o próprio perfil nem se desativa: outro admin faz isso. O ban
 
 | Mudança | Onde mexer | Como publicar |
 |---|---|---|
-| Painel (páginas, css, js, `api/`, `lib/`) | Raiz do repo | Branch → PR → merge na `main`. A Vercel publica sozinha. Teste antes com `npm run dev` |
+| Painel (páginas, css, js, `api/`, `lib/`) | Raiz do repo | Commit e push na `main`: a Vercel publica sozinha. Teste antes com `npm run dev` |
 | Lógica de um workflow | `workflows/code/*.js` (nós Code); demais nós, no JSON ou no n8n | Rode `npm run inject` e `npm run check`. No n8n, abra o workflow, **apague os nós e cole o JSON** no canvas: continua o mesmo workflow, com o mesmo id e a mesma URL de webhook. Confira as credenciais e salve. Commit. Se mexeu no n8n, exporte e copie o código de volta para `workflows/code/` |
 | Prazos 60 / 90 / 180 ou início do ciclo | [`workflows/code/_regra.js`](../workflows/code/_regra.js) | `npm run inject`, `npm run check`, publicar **bloqueio, Leitura e Ações**. O início do ciclo também está escrito na URL do nó `GET agenda do ciclo` (1/10) e em `sql/carga_inicial_controle.sql` |
 | Horário do bloqueio | Nó `Todo dia 01:00` e `horarioBloqueio` em `_regra.js` (só exibição) | Os dois juntos |
 | Nome de nó | Qualquer nó citado por `$('…')` ou pelo `inject.mjs` | `npm run check` aponta referência quebrada |
-| Tabela | `sql/criar_tabelas_painel.sql` ou `criar_tabelas_bloqueio.sql` | Mantenha idempotente (`OBJECT_ID`, `COL_LENGTH`, `IF NOT EXISTS`). Rode em `INTEGRACAO` antes de publicar os workflows que usam a coluna |
+| Tabela | `sql/criar_tabelas_bloqueio.sql`, `criar_tabelas_painel.sql` ou `criar_tabelas_usuarios.sql` | Mantenha idempotente (`OBJECT_ID`, `COL_LENGTH`, `IF NOT EXISTS`). Rode em `INTEGRACAO` antes de publicar os workflows que usam a coluna |
 | Variável | Vercel | Redeploy |
 | Usuário | Tela Usuários (admin) | Nada a publicar: vale na hora |
 | Credencial | Só no n8n | Nada no repositório, se o nome continuar o mesmo |
-| Documentação | `docs/*.md`, `CHANGELOG.md` | Commit. Gere de novo os `.docx` de [word/](word/) |
+| Documentação | `docs/*.md`, `CHANGELOG.md` | `npm run word` (gera de novo os `.docx` de [word/](word/)) e commit. Na 1ª vez: `npm --prefix docs/word/gerador install` (na rede da empresa, se der erro de certificado: `NODE_OPTIONS=--use-system-ca`). Precisa do Google Chrome ou do Edge instalado (desenha os diagramas). Ao abrir o `.docx`, o Word pergunta se quer atualizar os campos: **Sim** monta o sumário |
 
 Nunca deixe duas cópias de um workflow ativas: o PATCH sai em dobro.
 

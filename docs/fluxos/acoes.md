@@ -19,6 +19,10 @@ Antes do PATCH confere banco e CNN; depois grava a auditoria **sempre** e a tabe
 
 ## Fluxograma
 
+O fluxo tem duas partes: primeiro valida o pedido e, no bloqueio, grava as faltas novas do paciente; depois confere a situação, fala com o CNN e registra a ação.
+
+### Parte 1: receber o pedido e atualizar as faltas
+
 ```mermaid
 flowchart TD
     W(["Webhook POST"]) --> V["Validar"]
@@ -27,16 +31,23 @@ flowchart TD
     OK -->|"sim"| B{"é bloquear?"}
     B -->|"sim"| AG["GET agenda do paciente<br/>codigoPaciente, ciclo até hoje"]
     AG --> SF["separar faltas<br/>(só este paciente)"]
-    SF --> SQ{"sem faltas no periodo?"}
+    SF --> SQ{"sem faltas<br/>no período?"}
     SQ -->|"não"| PU["pacientes únicos"] --> GP["GET paciente por id"] --> PI["preparar insert SQL"] --> GF["gravar faltas"]
-    GF --> CS
-    SQ -->|"sim"| CS
-    B -->|"não (liberar)"| CS["consultar situação"]
+    GF --> P2(["segue para a parte 2"])
+    SQ -->|"sim"| P2
+    B -->|"não (liberar)"| P2
+```
+
+### Parte 2: decidir, falar com o CNN e registrar
+
+```mermaid
+flowchart TD
+    P1(["vindo da parte 1"]) --> CS["consultar situação"]
     CS --> SS["situação do paciente (SQL)"]
     SS --> GA["GET paciente atual"]
     GA --> D["decidir"]
     D --> SG{"seguir?"}
-    SG -->|"não (404/409/502)"| R
+    SG -->|"não (404/409/502)"| R(["Respond to Webhook"])
     SG -->|"sim"| EC{"enviar ao CNN?"}
     EC -->|"sim"| PT["PATCH status paciente<br/>ativo: true | false"]
     EC -->|"não (só registro)"| MR

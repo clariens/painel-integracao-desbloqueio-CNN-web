@@ -1,6 +1,6 @@
 # Fluxo de liberação após o prazo — DESATIVADO
 
-Voltar ao [índice](README.md). Arquivo: [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json).
+Voltar ao [índice](README.md). Arquivo: [workflows/liberacaoPacientesFaltasautomaticas--Desativado.json](../workflows/liberacaoPacientesFaltasautomaticas--Desativado.json).
 
 > **Desativado em outubro de 2026.** A liberação passou a ser manual, pelo painel ([front-end.md](front-end.md)), com motivo e auditoria. Quem faz o PATCH `{ "ativo": true }` agora é o workflow [CNN Painel - Ações](fluxos/acoes.md).
 >

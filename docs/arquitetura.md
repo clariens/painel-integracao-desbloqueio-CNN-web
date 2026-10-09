@@ -20,7 +20,7 @@ Além do painel, o bloqueio das 01:00 continua como workflow agendado.
 | Workflow CNN Painel - Leitura | n8n (webhook) | [workflows/cnn-painel-leitura.json](../workflows/cnn-painel-leitura.json) |
 | Workflow CNN Painel - Ações | n8n (webhook) | [workflows/cnn-painel-acoes.json](../workflows/cnn-painel-acoes.json) |
 | Workflow CNN Painel - Usuários | n8n (webhook) | [workflows/cnn-painel-usuarios.json](../workflows/cnn-painel-usuarios.json) |
-| Workflow de liberação | n8n, **inativo** | [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json) |
+| Workflow de liberação | n8n, **inativo** | [workflows/liberacaoPacientesFaltasautomaticas--Desativado.json](../workflows/liberacaoPacientesFaltasautomaticas--Desativado.json) |
 | Código dos nós Code | Copiado para os JSON por `npm run inject` | [workflows/code/](../workflows/code/) |
 | Tabelas | SQL Server, banco `INTEGRACAO`, schema `dbo` | [sql/](../sql/) |
 | API do CNN | `https://api.clinicanasnuvens.com.br` | [apidocs.json](../apidocs.json) (Swagger antigo) |
@@ -30,7 +30,7 @@ Os endereços do n8n e do SQL Server não estão no repositório: as URLs dos we
 ## Como as peças se ligam
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Navegador
         UI["HTML + JS"]
     end
@@ -38,32 +38,43 @@ flowchart LR
         API["/api/*<br/>requireAuth (sessão + perfil)<br/>validação"]
     end
     subgraph n8n["Instância n8n"]
-        direction TB
         L["CNN Painel - Leitura"]
         A["CNN Painel - Ações"]
         US["CNN Painel - Usuários"]
         B["Bloqueio 01:00"]
-        HK[["Header Auth<br/>X-Monitor-Key"]]
-        C1[["API CNN AUTH (Basic)"]]
-        C2[["TST Araguari (Microsoft SQL)"]]
     end
     CNN["API CNN"]
-    DB[("INTEGRACAO.dbo<br/>CtlCnnFaltaPaciente<br/>CtlCnnControlePaciente<br/>CtlCnnAcaoPaciente<br/>CtlCnnUsuario · CtlCnnUsuarioEvento")]
+    DB[("INTEGRACAO.dbo<br/>faltas · procedimentos · cadastros<br/>controle · auditoria · usuários")]
 
     UI -- "Authorization: Bearer" --> API
-    API -- "POST { action } + X-Monitor-Key" --> L
-    API -- "POST { action } + X-Monitor-Key" --> A
-    API -- "POST { action } + X-Monitor-Key" --> US
+    API -- "POST + X-Monitor-Key" --> L
+    API --> A
+    API --> US
+    L -- "SELECT" --> DB
+    L -. "detalhe" .-> CNN
+    A -- "GET + PATCH" --> CNN
+    A -- "grava" --> DB
+    B -- "GET + PATCH" --> CNN
+    B -- "grava" --> DB
+    US -- "lê e grava" --> DB
+```
+
+Os três workflows do painel recebem o mesmo `POST { action }` com o cabeçalho `X-Monitor-Key`. O que cada um lê e grava está nas tabelas abaixo.
+
+As credenciais do n8n e os workflows que usam cada uma:
+
+```mermaid
+flowchart LR
+    HK[["Header Auth<br/>X-Monitor-Key"]]
+    C1[["API CNN AUTH<br/>(Basic)"]]
+    C2[["TST Araguari<br/>(Microsoft SQL)"]]
+    L["Leitura"]
+    A["Ações"]
+    US["Usuários"]
+    B["Bloqueio 01:00"]
     HK -.-> L
     HK -.-> A
     HK -.-> US
-    US -- "SELECT, INSERT, UPDATE usuários" --> DB
-    L -- "SELECT" --> DB
-    L -. "GET /paciente (detalhe)" .-> CNN
-    A -- "GET agenda, GET paciente, PATCH" --> CNN
-    A -- "INSERT faltas, auditoria, MERGE controle" --> DB
-    B -- "GET agenda, GET paciente, PATCH false" --> CNN
-    B -- "INSERT faltas, auditoria, MERGE controle" --> DB
     C1 -.-> A
     C1 -.-> B
     C2 -.-> L
@@ -71,6 +82,8 @@ flowchart LR
     C2 -.-> B
     C2 -.-> US
 ```
+
+As tabelas do banco: `CtlCnnFaltaPaciente`, `CtlCnnFaltaProcedimento`, `CtlCnnCadastro`, `CtlCnnControlePaciente`, `CtlCnnAcaoPaciente`, `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (detalhes em [banco-de-dados.md](banco-de-dados.md)).
 
 Regras de convivência:
 
@@ -111,8 +124,9 @@ n8n → Vercel   HTTP <statusCode>  <response>   ex.: 200 { ok: true, ... }  ou 
 | Método | Rota | Quem chama | Para quê |
 |---|---|---|---|
 | GET | `/agenda/lista` | Bloqueio (ciclo inteiro); Ações no bloquear (`codigoPaciente`) | Agendamentos `FALTOU` |
-| GET | `/paciente/{id}` | Bloqueio, Ações, Leitura (detalhe) | Nome, CPF, contato, `ativo` |
-| GET | `/executor-agenda/{id}` | Bloqueio, Ações no bloquear | Profissional do horário |
+| GET | `/paciente/{id}` | Bloqueio (uma vez por paciente), Ações, Leitura (detalhe) | Nome, CPF, contato, `ativo` |
+| GET | `/executor-agenda/lista` | Bloqueio, Ações no bloquear | Profissionais (casados pelo `idpessoa`) |
+| GET | `/tipo-consulta/lista`, `/agenda-rotulo/lista`, `/local-agenda/lista`, `/especialidade/lista` | Bloqueio | Nomes para a lista e os relatórios |
 | PATCH | `/paciente/{id}/status` | Bloqueio (`false`), Ações (`true` ou `false`) | Bloquear / liberar |
 
 Detalhes: [api-cnn.md](api-cnn.md).
@@ -163,20 +177,37 @@ sequenceDiagram
     participant DB as SQL INTEGRACAO
 
     Cron->>WB: dispara
-    loop página a página (máx. 100)
+    WB->>API: 5 listas de cadastro (tipo de consulta, executores, rótulos, locais, especialidades)
+    loop todas as páginas (até 1000)
         WB->>API: GET /agenda/lista (1/10 do ciclo até hoje)
     end
     WB->>WB: separar faltas (FALTOU, no ciclo)
-    loop uma vez por falta
-        WB->>API: GET /paciente/{id} e GET /executor-agenda/{id}
+    loop uma vez por paciente
+        WB->>API: GET /paciente/{id}
     end
-    WB->>DB: INSERT faltas novas + renumeração (transação)
+    WB->>DB: uma transação: cadastros, faltas (novas e atualizadas), procedimentos, renumeração
     WB->>DB: falta vigente de cada paciente, menos liberados no painel
     loop um paciente por vez, 3 s entre chamadas
-        WB->>API: PATCH { ativo: false }
+        WB->>API: PATCH { ativo: false } (ou só registra, se já inativo)
         WB->>DB: INSERT auditoria + MERGE controle
     end
 ```
+
+## O painel no navegador
+
+O painel não espera o servidor a cada tela. Ao entrar, busca **todas as telas em paralelo** e guarda o resultado na aba (`sessionStorage`). Cada tela abre com o dado guardado; quando o prazo dele vence, mostra o guardado na hora e atualiza em segundo plano. Depois de uma ação, o dado afetado é buscado de novo.
+
+```mermaid
+flowchart LR
+    L["Login"] --> P["Preparando os dados<br/>todas as telas em paralelo"]
+    P --> C[("Cache da aba<br/>sessionStorage")]
+    C --> T["Telas abrem na hora"]
+    T -->|"prazo venceu"| BG["Atualiza em segundo plano"]
+    BG --> C
+    T -->|"Liberar / Bloquear"| A["Ação"] --> X["Apaga o dado afetado"] --> BG
+```
+
+Prazos e detalhes em [front-end.md](front-end.md#cache-e-filtros).
 
 ## Tratamento de erro
 
@@ -184,7 +215,7 @@ sequenceDiagram
 - **Vercel:** `callN8n` (em [lib/n8n.js](../lib/n8n.js)) repassa o status e a mensagem do n8n; responde 502 se não alcança o webhook e 504 se passa de 55 s.
 - **n8n (webhooks):** nós HTTP e SQL com `onError: continueRegularOutput`. Os nós Code transformam o erro em `{ statusCode, response }`: o webhook sempre responde. SQL com `alwaysOutputData`.
 - **Bloqueio (01:00):** como antes, um erro não para a execução. Agora o PATCH que falha também fica registrado na auditoria (`Sucesso = 0`).
-- **Error workflow:** configure o Error Handler do painel de monitoramento nos três workflows ativos, para que uma falha apareça lá.
+- **Error workflow:** configure o Error Handler do painel de monitoramento nos quatro workflows ativos (bloqueio, Leitura, Ações e Usuários), para que uma falha apareça lá.
 
 ## Segurança por camada
 
@@ -194,7 +225,7 @@ sequenceDiagram
 | Vercel | Senha conferida com scrypt e comparação em tempo constante; sessão assinada com `SESSION_SECRET` (HMAC-SHA256); perfil conferido em cada rota; escritas revalidam o usuário no banco (ativo, perfil, `VersaoSessao`); 5 senhas erradas bloqueiam o login por 15 min. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`) ficam fora do deploy (`.vercelignore`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
 | Webhooks n8n | Credencial Header Auth (`X-Monitor-Key`), path UUID. O n8n valida a entrada de novo | Segredo novo, sem reaproveitar o do monitoramento |
 | API CNN | Credencial `API CNN AUTH` e header `clinicaNasNuvens-cid` | O `clinicaNasNuvens-cid` está escrito nos nós e, por isso, nos JSON do repositório. Repositório interno |
-| SQL Server | Credencial `TST Araguari`. SQL montado por texto com `sqlN`/`sqlS`/`sqlDate` ([`_sql.js`](../workflows/code/_sql.js)); listas de IDs só com números | Permissões: `SELECT/INSERT/UPDATE` nas tabelas do sistema |
+| SQL Server | Credencial `TST Araguari`. SQL montado por texto com `sqlN`/`sqlS`/`sqlDate` ([`_sql.js`](../workflows/code/_sql.js)); listas de IDs só com números | Permissões: `SELECT/INSERT/UPDATE` nas tabelas do sistema; `DELETE` só em `CtlCnnFaltaProcedimento` |
 | Dados pessoais | CPF mascarado no n8n; e-mail e telefone não saem do banco; CSV sem contato | Dado de saúde (LGPD). Nada de paciente em logs, no repositório ou em tickets |
 
 ## Configuração

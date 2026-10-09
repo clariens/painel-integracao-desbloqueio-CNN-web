@@ -18,7 +18,7 @@ Partes comuns: `js/session.js` (sessão na aba, `request()`, `pode(perfil)`, cac
 
 ### Pacientes
 
-- **Números do topo:** bloqueados no prazo, aptos a liberar, liberados antes do prazo, faltas no ciclo e no mês. Clicar num dos três primeiros filtra a lista.
+- **Números do topo:** aguardando bloqueio, bloqueados no prazo, aptos a liberar, liberados antes do prazo, faltas no ciclo e no mês. Clicar num dos quatro primeiros filtra a lista.
 - **Lista:** uma linha por paciente com falta no ciclo, mais os que continuam bloqueados por falta de ciclo anterior. Mostra o nome com o número de faltas no ciclo (selo; vermelho com 3 ou mais), a falta vigente com o **procedimento em vermelho ao lado da data** (sem procedimento, o tipo de consulta; mais de um, o primeiro e "+N") e o profissional embaixo, o fim do prazo ("faltam N dias" / "venceu há N dias"), a situação, a última ação e o botão.
 - **Filtros** (no navegador, sem nova consulta): busca por nome ou ID, situação, número de faltas, tipo de consulta (com a quantidade de cada um), ordenação.
 - **Detalhe** (clique no nome): a falta vigente (o que o paciente ia fazer e com qual profissional) e o prazo, o **status ao vivo no CNN** (ativo / inativo), todas as faltas do paciente e o histórico de ações. O CPF aparece mascarado.
@@ -119,4 +119,4 @@ Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no pr
 
 - A lista mostra nome e ID. O detalhe mostra o CPF mascarado (`***.456.789-**`), calculado no n8n: o CPF completo não chega ao navegador.
 - E-mail e telefone não são consultados pelo painel.
-- O cache fica só no `sessionStorage` da aba, por 60 s.
+- O cache fica só no `sessionStorage` da aba (somem ao fechá-la), com os prazos de [Cache e filtros](#cache-e-filtros).

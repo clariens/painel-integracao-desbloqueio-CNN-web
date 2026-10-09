@@ -13,85 +13,106 @@ Os quatro rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n 
 
 ## criar_tabelas_bloqueio.sql
 
-## Para que serve
+### Para que serve
 
-Cria `dbo.CtlCnnFaltaPaciente` numa instalação nova. Numa base antiga, leva a tabela ao formato atual e remove as tabelas que não são mais usadas.
+Cria as três tabelas usadas pelo bloqueio das 01:00 numa instalação nova:
+
+- `dbo.CtlCnnFaltaPaciente`: as faltas;
+- `dbo.CtlCnnFaltaProcedimento`: os procedimentos de cada falta;
+- `dbo.CtlCnnCadastro`: os nomes das listas do CNN.
+
+Numa base antiga, leva a tabela de faltas ao formato atual e remove as tabelas que não são mais usadas.
 
 Pode rodar mais de uma vez. Cada passo confere antes de agir.
 
-## Quando roda
+### Quando roda
 
 - Uma vez, na instalação, antes de ativar os workflows.
 - De novo sempre que o script mudar no repositório.
 - Não roda sozinho. Nenhum workflow chama este script.
 
-## Onde rodar
+### Onde rodar
 
 - No SSMS, com o banco `INTEGRACAO` selecionado.
 - Ou num nó Microsoft SQL do n8n com `executeQuery`, colocando `USE INTEGRACAO;` na primeira linha.
 
-O script **não tem** `USE INTEGRACAO`. Sem escolher o banco, a tabela nasce no banco padrão do login.
+O script **não tem** `USE INTEGRACAO`. Sem escolher o banco, as tabelas nascem no banco padrão do login.
 
 O script também não tem `GO`. O driver do n8n não entende `GO`; ele é do SSMS.
 
-## Fluxograma
+### Fluxograma
+
+O script tem duas partes: primeiro acerta a tabela de faltas; depois cria as tabelas novas e limpa as antigas.
+
+#### Parte 1: tabela de faltas
 
 ```mermaid
 flowchart TD
-    A{"Tabela existe?"} -->|"não"| B["CREATE TABLE<br/>CtlCnnFaltaPaciente"]
-    A -->|"sim"| C
-    B --> C{"Existe DataAgenda<br/>e não existe DataFalta?"}
-    C -->|"sim"| D["sp_rename DataAgenda → DataFalta"]
-    C -->|"não"| E
-    D --> E{"Falta NumeroFalta?"}
-    E -->|"sim"| F["ADD NumeroFalta INT NULL"]
-    E -->|"não"| G
-    F --> G["Preenche NumeroFalta NULL<br/>ROW_NUMBER por paciente"]
-    G --> H{"NumeroFalta aceita NULL?"}
-    H -->|"sim"| I["ALTER COLUMN NumeroFalta INT NOT NULL"]
-    H -->|"não"| J
-    I --> J["DROP dos índices antigos<br/>se existirem"]
-    J --> K{"Índice IdPaciente_NumeroFalta existe?"}
-    K -->|"não"| L["CREATE INDEX"]
-    K -->|"sim"| M
-    L --> M["DROP das tabelas antigas<br/>se existirem"]
-    M --> N["SELECT de conferência"]
+    B["CREATE TABLE CtlCnnFaltaPaciente<br/>(se não existir)"]
+    B --> D["sp_rename DataAgenda → DataFalta<br/>(se ainda tiver o nome antigo)"]
+    D --> F["ADD NumeroFalta INT NULL<br/>(se não existir)"]
+    F --> G["Preenche NumeroFalta nulo<br/>ROW_NUMBER por paciente"]
+    G --> H["NumeroFalta passa a NOT NULL<br/>(se ainda aceitar NULL)"]
+    H --> I["Troca os índices antigos por<br/>IdPaciente + NumeroFalta"]
+    I --> P2(["segue para a parte 2"])
 ```
 
-## Passo a passo
+#### Parte 2: tabelas novas e limpeza
+
+```mermaid
+flowchart TD
+    P1(["vindo da parte 1"]) --> R["ADD IdRotulo<br/>(se não existir)"]
+    R --> PR["CREATE TABLE<br/>CtlCnnFaltaProcedimento<br/>(se não existir)"]
+    PR --> CA["CREATE TABLE<br/>CtlCnnCadastro<br/>(se não existir)"]
+    CA --> DR["DROP das tabelas antigas<br/>(se existirem)"]
+    DR --> N(["SELECT de conferência"])
+```
+
+### Passo a passo
 
 | # | Linhas | O que faz |
 |---|---|---|
-| 1 | [7–34](../sql/criar_tabelas_bloqueio.sql#L7-L34) | Cria a tabela se `OBJECT_ID` for `NULL`. Ver colunas em [banco-de-dados.md](banco-de-dados.md#dicionário-de-dados) |
+| 1 | [7–34](../sql/criar_tabelas_bloqueio.sql#L7-L34) | Cria `CtlCnnFaltaPaciente` se `OBJECT_ID` for `NULL`. Ver colunas em [banco-de-dados.md](banco-de-dados.md#dicionário-de-dados) |
 | 2 | [36–40](../sql/criar_tabelas_bloqueio.sql#L36-L40) | Se ainda existe a coluna antiga `DataAgenda` e não existe `DataFalta`, renomeia |
 | 3 | [42–45](../sql/criar_tabelas_bloqueio.sql#L42-L45) | Adiciona `NumeroFalta INT NULL` se não existir |
 | 4 | [47–63](../sql/criar_tabelas_bloqueio.sql#L47-L63) | Preenche só os `NumeroFalta` nulos com `ROW_NUMBER() OVER (PARTITION BY IdPaciente ORDER BY DataFalta, IdAgenda)`. Roda em `EXEC (N'…')` para compilar mesmo quando a coluna acabou de ser criada |
 | 5 | [65–74](../sql/criar_tabelas_bloqueio.sql#L65-L74) | Torna `NumeroFalta` `NOT NULL` |
 | 6 | [76–90](../sql/criar_tabelas_bloqueio.sql#L76-L90) | Remove `IX_CtlCnnFaltaPaciente_IdPaciente_DataAgenda` e `IX_CtlCnnFaltaPaciente_IdPaciente_DataFalta`, se existirem |
 | 7 | [92–105](../sql/criar_tabelas_bloqueio.sql#L92-L105) | Cria `IX_CtlCnnFaltaPaciente_IdPaciente_NumeroFalta` se não existir |
-| 7a | — | Adiciona `IdRotulo BIGINT NULL` em `CtlCnnFaltaPaciente`; cria `dbo.CtlCnnFaltaProcedimento` (chave `IdAgenda, IdTipoProcedimento`) e `dbo.CtlCnnCadastro` (chave `Tipo, Id`, CHECK em `Tipo`), se não existirem. Comentário com os `GRANT` (procedimentos precisa de `DELETE`) |
-| 8 | [107–111](../sql/criar_tabelas_bloqueio.sql#L107-L111) | **Apaga** `dbo.CtlCnnBloqueioPaciente` e `dbo.CtlCnnRegraBloqueioFalta`, se existirem |
-| 9 | [113–124](../sql/criar_tabelas_bloqueio.sql#L113-L124) | Mostra banco, esquema, tabela, número de colunas e `COL_LENGTH` de `NumeroFalta` |
+| 8 | [107–111](../sql/criar_tabelas_bloqueio.sql#L107-L111) | Adiciona `IdRotulo BIGINT NULL` em `CtlCnnFaltaPaciente`, se não existir |
+| 9 | [113–124](../sql/criar_tabelas_bloqueio.sql#L113-L124) | Cria `dbo.CtlCnnFaltaProcedimento` (chave `IdAgenda, IdTipoProcedimento`), se não existir |
+| 10 | [126–139](../sql/criar_tabelas_bloqueio.sql#L126-L139) | Cria `dbo.CtlCnnCadastro` (chave `Tipo, Id`, CHECK em `Tipo`), se não existir |
+| 11 | [141–146](../sql/criar_tabelas_bloqueio.sql#L141-L146) | Comentário com os `GRANT`. A tabela de procedimentos precisa de `DELETE` |
+| 12 | [148–152](../sql/criar_tabelas_bloqueio.sql#L148-L152) | **Apaga** `dbo.CtlCnnBloqueioPaciente` e `dbo.CtlCnnRegraBloqueioFalta`, se existirem |
+| 13 | [154–169](../sql/criar_tabelas_bloqueio.sql#L154-L169) | Mostra banco, esquema, tabela e número de colunas das três tabelas, e o `COL_LENGTH` de `NumeroFalta` |
 
 O passo 4 numera pelo histórico inteiro do paciente, sem ciclo. Os workflows depois renumeram só dentro do ciclo, e só para os pacientes que aparecem na agenda.
 
-O passo 8 apaga dados. Numa base com essas tabelas, faça backup antes se o conteúdo tiver valor.
+O passo 12 apaga dados. Numa base com essas tabelas, faça backup antes se o conteúdo tiver valor.
 
-## Entradas e saídas
+### Entradas e saídas
 
 | | O quê |
 |---|---|
 | Entrada | O banco atual (pode estar vazio ou numa versão antiga) |
-| Saída | `dbo.CtlCnnFaltaPaciente` no formato atual, com o índice novo |
-| Saída | Um resultado com `Banco`, `Esquema`, `Tabela`, `QuantidadeColunas`, `BytesNumeroFalta` |
+| Saída | As três tabelas no formato atual, com o índice novo |
+| Saída | Um resultado com `Banco`, `Esquema`, `Tabela`, `QuantidadeColunas`, `BytesNumeroFalta` (uma linha por tabela) |
 
-Numa instalação nova, espere `Tabela = CtlCnnFaltaPaciente`, `QuantidadeColunas = 20` e `BytesNumeroFalta = 4` (tamanho de um `INT`). Sem linha no resultado, a tabela não existe no banco em que o script rodou.
+Numa instalação nova, espere três linhas:
 
-## Limites conhecidos
+| Tabela | QuantidadeColunas |
+|---|---|
+| `CtlCnnFaltaPaciente` | 21 |
+| `CtlCnnFaltaProcedimento` | 5 |
+| `CtlCnnCadastro` | 5 |
+
+`BytesNumeroFalta = 4` (tamanho de um `INT`). Sem linha no resultado, a tabela não existe no banco em que o script rodou.
+
+### Limites conhecidos
 
 - `CREATE TABLE` não "afeta linhas". No n8n o nó mostra 0 linhas afetadas. O `SELECT` do fim é que confirma.
 - Não há script de volta (rollback).
-- Não cria permissões. O login da credencial `TST Araguari` precisa de `SELECT`, `INSERT` e `UPDATE` na tabela.
+- Não cria permissões. O login da credencial `TST Araguari` precisa de `SELECT`, `INSERT` e `UPDATE` nas três tabelas, e também de `DELETE` em `CtlCnnFaltaProcedimento`.
 
 ## criar_tabelas_painel.sql
 
