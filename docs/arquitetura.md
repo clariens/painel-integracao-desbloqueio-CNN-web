@@ -219,10 +219,12 @@ Prazos e detalhes em [front-end.md](front-end.md#cache-e-filtros).
 
 ## Segurança por camada
 
+Resumo abaixo; o detalhe (segredos, como criar e trocar as chaves, testes e riscos) está em [seguranca.md](seguranca.md).
+
 | Camada | Como é protegida | Cuidados |
 |---|---|---|
 | Navegador | Login individual. A aba guarda só o token da sessão (8 h) no `sessionStorage`, nunca a senha. Fechou a aba, saiu | Use HTTPS (padrão da Vercel). Não compartilhe usuários: a auditoria grava o nome |
-| Vercel | Senha conferida com scrypt e comparação em tempo constante; sessão assinada com `SESSION_SECRET` (HMAC-SHA256); perfil conferido em cada rota; escritas revalidam o usuário no banco (ativo, perfil, `VersaoSessao`); 5 senhas erradas bloqueiam o login por 15 min. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`) ficam fora do deploy (`.vercelignore`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
+| Vercel | Senha conferida com scrypt e comparação em tempo constante; sessão assinada com `SESSION_SECRET` (HMAC-SHA256); perfil conferido em cada rota; escritas revalidam o usuário no banco (ativo, perfil, `VersaoSessao`); 5 senhas erradas bloqueiam o login por 15 min. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`, resultados de execução) ficam fora do deploy (`.vercelignore`). Cabeçalhos de segurança em todas as respostas (`vercel.json`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
 | Webhooks n8n | Credencial Header Auth (`X-Monitor-Key`), path UUID. O n8n valida a entrada de novo | Segredo novo, sem reaproveitar o do monitoramento |
 | API CNN | Credencial `API CNN AUTH` e header `clinicaNasNuvens-cid` | O `clinicaNasNuvens-cid` está escrito nos nós e, por isso, nos JSON do repositório. Repositório interno |
 | SQL Server | Credencial `TST Araguari`. SQL montado por texto com `sqlN`/`sqlS`/`sqlDate` ([`_sql.js`](../workflows/code/_sql.js)); listas de IDs só com números | Permissões: `SELECT/INSERT/UPDATE` nas tabelas do sistema; `DELETE` só em `CtlCnnFaltaProcedimento` |

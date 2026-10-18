@@ -18,6 +18,18 @@ import alterarUsuario from "./api/usuarios/[login].js";
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 3000);
 
+// Os mesmos cabeçalhos do vercel.json (segurança e no-store da API), para o localhost se comportar como a produção.
+const vercel = JSON.parse(await readFile(join(root, "vercel.json"), "utf8"));
+const headerRules = (vercel.headers || []).map(({ source, headers }) => ({
+  pattern: new RegExp(`^${source.replace(/\(\.\*\)/g, ".*")}$`),
+  headers,
+}));
+const applyHeaders = (res, pathname) => {
+  for (const { pattern, headers } of headerRules) {
+    if (pattern.test(pathname)) headers.forEach(({ key, value }) => res.setHeader(key, value));
+  }
+};
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -100,6 +112,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://localhost:${port}`);
     req.query = Object.fromEntries(url.searchParams);
     req.body = await readBody(req);
+    applyHeaders(res, url.pathname);
 
     // O trecho dinâmico vira req.query.<param>, como a Vercel faz com [id].js e [login].js.
     for (const [pattern, handler, param = "id"] of routes) {

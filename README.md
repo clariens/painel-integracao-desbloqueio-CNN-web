@@ -64,6 +64,7 @@ Os usuários ficam no banco (`CtlCnnUsuario`), não em variável de ambiente. O 
 ## Documentação
 
 - **Para todos:** [docs/visao-geral.md](docs/visao-geral.md) (sem termos técnicos) e [docs/regras.md](docs/regras.md) (as regras de negócio).
+- **Segurança:** [docs/seguranca.md](docs/seguranca.md) (segredos, chaves, testes e riscos).
 - **Word:** [docs/word/](docs/word/), gerado com `npm run word`.
 
 [docs/README.md](docs/README.md): índice, arquitetura, banco, painel, um documento por workflow e operação (instalação, corte da liberação automática, deploy).

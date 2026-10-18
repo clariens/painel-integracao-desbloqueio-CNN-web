@@ -63,6 +63,7 @@ flowchart TB
 | [banco-de-dados.md](banco-de-dados.md) | Quem mantém ou opera | Tabelas, colunas, índices, consultas úteis |
 | [script-sql.md](script-sql.md) | Quem instala | Scripts de criação, migração e carga inicial |
 | [operacao.md](operacao.md) | Quem opera | Instalação, corte da liberação automática, rotina, usuários, deploy e problemas conhecidos |
+| [seguranca.md](seguranca.md) | Quem mantém, opera ou audita | Camadas de proteção, login e perfis, onde fica cada segredo, como criar e trocar chaves, como testar, riscos e quem tem acesso a quê |
 | [../CHANGELOG.md](../CHANGELOG.md) | Todos | O que mudou, por data |
 
 As notas do canvas do n8n citam `docs/bloqueio.md` e `docs/liberacao.md`. Por isso esses nomes não devem mudar.

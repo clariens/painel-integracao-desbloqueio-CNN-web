@@ -2,6 +2,13 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-16 — Segurança: cabeçalhos e documentação
+
+### Adicionado
+
+- **Cabeçalhos de segurança** em todas as respostas ([vercel.json](vercel.json)): `X-Frame-Options: DENY`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e `Permissions-Policy`. O servidor local (`npm run dev`) aplica os mesmos cabeçalhos do `vercel.json`.
+- **[docs/seguranca.md](docs/seguranca.md):** camadas, login e perfis, onde fica cada segredo, como criar e trocar as chaves, proteções no código, como testar, riscos conhecidos e quem tem acesso a quê. Também em Word (`14 - Segurança.docx`).
+
 ## 2026-10-08 — Documentação completa e versão em Word
 
 ### Adicionado

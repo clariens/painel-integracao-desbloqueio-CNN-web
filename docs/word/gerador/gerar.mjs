@@ -53,8 +53,9 @@ const DOCUMENTOS = [
   { arquivo: "banco-de-dados.md", titulo: "Banco de dados", saida: "11 - Banco de dados.docx" },
   { arquivo: "script-sql.md", titulo: "Scripts SQL", saida: "12 - Scripts SQL.docx" },
   { arquivo: "operacao.md", titulo: "Operação", saida: "13 - Operação.docx" },
-  { arquivo: "liberacao.md", titulo: "Liberação automática (desativada)", saida: "14 - Liberação automática (desativada).docx" },
-  { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "15 - Histórico de mudanças.docx" },
+  { arquivo: "seguranca.md", titulo: "Segurança", saida: "14 - Segurança.docx" },
+  { arquivo: "liberacao.md", titulo: "Liberação automática (desativada)", saida: "15 - Liberação automática (desativada).docx" },
+  { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "16 - Histórico de mudanças.docx" },
 ];
 const COMPLETO = "00 - Documentação completa.docx";
 
