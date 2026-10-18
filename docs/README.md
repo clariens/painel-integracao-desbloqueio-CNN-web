@@ -46,11 +46,12 @@ flowchart TB
 
 ## Documentos
 
-**Comece por aqui:** [visao-geral.md](visao-geral.md) (sem termos técnicos) e [regras.md](regras.md) (todas as regras de negócio, numeradas).
+**Comece por aqui:** [visao-geral.md](visao-geral.md) (sem termos técnicos), [seguranca-resumo.md](seguranca-resumo.md) (segurança para a liderança) e [regras.md](regras.md) (todas as regras de negócio, numeradas).
 
 | Documento | Para quem | O que tem |
 |---|---|---|
 | [visao-geral.md](visao-geral.md) | Todos, inclusive quem não é técnico | O que o sistema faz, telas, situações do paciente, perfis, perguntas frequentes, glossário |
+| [seguranca-resumo.md](seguranca-resumo.md) | Liderança, gestão | Segurança sem termos técnicos: barreiras, perfis, registro das ações, LGPD, "e se acontecer…", o que está implantado e próximos passos |
 | [regras.md](regras.md) | Todos | As regras de negócio (R1 a R69): faltas, ciclo, prazos, bloqueio, liberação, auditoria, usuários, LGPD, desempenho |
 | [arquitetura.md](arquitetura.md) | Quem mantém | Peças, ligações, rotas, sequências, segurança, configuração e deploy |
 | [front-end.md](front-end.md) | Quem opera e quem mantém | O painel: telas, situações do paciente, liberar e bloquear, login |

@@ -41,21 +41,22 @@ const saida = join(docs, "word");
 // Ordem e nomes dos arquivos gerados.
 const DOCUMENTOS = [
   { arquivo: "visao-geral.md", titulo: "Visão geral do sistema", saida: "01 - Visão geral (não técnica).docx" },
-  { arquivo: "regras.md", titulo: "Regras de negócio", saida: "02 - Regras de negócio.docx" },
-  { arquivo: "README.md", titulo: "Índice e mapa da documentação", saida: "03 - Índice.docx" },
-  { arquivo: "arquitetura.md", titulo: "Arquitetura", saida: "04 - Arquitetura.docx" },
-  { arquivo: "front-end.md", titulo: "Painel (interface)", saida: "05 - Painel (interface).docx" },
-  { arquivo: "bloqueio.md", titulo: "Workflow de bloqueio (01:00)", saida: "06 - Fluxo de bloqueio.docx" },
-  { arquivo: "fluxos/leitura.md", titulo: "Workflow CNN Painel - Leitura", saida: "07 - Fluxo de leitura.docx" },
-  { arquivo: "fluxos/acoes.md", titulo: "Workflow CNN Painel - Ações", saida: "08 - Fluxo de ações (liberar e bloquear).docx" },
-  { arquivo: "fluxos/usuarios.md", titulo: "Workflow CNN Painel - Usuários", saida: "09 - Fluxo de usuários.docx" },
-  { arquivo: "api-cnn.md", titulo: "Integração com a API do CNN", saida: "10 - Integração com a API CNN.docx" },
-  { arquivo: "banco-de-dados.md", titulo: "Banco de dados", saida: "11 - Banco de dados.docx" },
-  { arquivo: "script-sql.md", titulo: "Scripts SQL", saida: "12 - Scripts SQL.docx" },
-  { arquivo: "operacao.md", titulo: "Operação", saida: "13 - Operação.docx" },
-  { arquivo: "seguranca.md", titulo: "Segurança", saida: "14 - Segurança.docx" },
-  { arquivo: "liberacao.md", titulo: "Liberação automática (desativada)", saida: "15 - Liberação automática (desativada).docx" },
-  { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "16 - Histórico de mudanças.docx" },
+  { arquivo: "seguranca-resumo.md", titulo: "Segurança: resumo para a liderança", saida: "02 - Segurança (resumo para a liderança).docx" },
+  { arquivo: "regras.md", titulo: "Regras de negócio", saida: "03 - Regras de negócio.docx" },
+  { arquivo: "README.md", titulo: "Índice e mapa da documentação", saida: "04 - Índice.docx" },
+  { arquivo: "arquitetura.md", titulo: "Arquitetura", saida: "05 - Arquitetura.docx" },
+  { arquivo: "front-end.md", titulo: "Painel (interface)", saida: "06 - Painel (interface).docx" },
+  { arquivo: "bloqueio.md", titulo: "Workflow de bloqueio (01:00)", saida: "07 - Fluxo de bloqueio.docx" },
+  { arquivo: "fluxos/leitura.md", titulo: "Workflow CNN Painel - Leitura", saida: "08 - Fluxo de leitura.docx" },
+  { arquivo: "fluxos/acoes.md", titulo: "Workflow CNN Painel - Ações", saida: "09 - Fluxo de ações (liberar e bloquear).docx" },
+  { arquivo: "fluxos/usuarios.md", titulo: "Workflow CNN Painel - Usuários", saida: "10 - Fluxo de usuários.docx" },
+  { arquivo: "api-cnn.md", titulo: "Integração com a API do CNN", saida: "11 - Integração com a API CNN.docx" },
+  { arquivo: "banco-de-dados.md", titulo: "Banco de dados", saida: "12 - Banco de dados.docx" },
+  { arquivo: "script-sql.md", titulo: "Scripts SQL", saida: "13 - Scripts SQL.docx" },
+  { arquivo: "operacao.md", titulo: "Operação", saida: "14 - Operação.docx" },
+  { arquivo: "seguranca.md", titulo: "Segurança (técnica)", saida: "15 - Segurança (técnica).docx" },
+  { arquivo: "liberacao.md", titulo: "Liberação automática (desativada)", saida: "16 - Liberação automática (desativada).docx" },
+  { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "17 - Histórico de mudanças.docx" },
 ];
 const COMPLETO = "00 - Documentação completa.docx";
 
@@ -225,8 +226,23 @@ const lista = (token, nivel, instancia) => {
   return saida;
 };
 
-const celula = (conteudo, { cabecalho = false, par = false } = {}) =>
+const LARGURA_TEXTO = 9638; // twips: A4 (11906) menos as margens de 2 cm
+
+// Largura de cada coluna proporcional ao texto mais longo dela (com piso e teto),
+// para uma coluna "#" não ocupar o mesmo espaço que uma de descrição.
+const largurasColunas = (token) => {
+  const pesos = token.header.map((h, i) => {
+    const textos = [h.text, ...token.rows.map((linha) => linha[i]?.text ?? "")];
+    const maior = Math.max(...textos.map((t) => Math.min(t.replace(/[*`]/g, "").length, 70)));
+    return Math.max(maior, 6) ** 0.85;
+  });
+  const total = pesos.reduce((a, b) => a + b, 0);
+  return pesos.map((p) => Math.round((p / total) * LARGURA_TEXTO));
+};
+
+const celula = (conteudo, { cabecalho = false, par = false, largura } = {}) =>
   new TableCell({
+    width: largura ? { size: largura, type: WidthType.DXA } : undefined,
     children: [
       new Paragraph({
         children: runsInline(conteudo.tokens ?? [{ type: "text", text: conteudo.text }], cabecalho ? { bold: true, color: "FFFFFF" } : {}),
@@ -238,16 +254,21 @@ const celula = (conteudo, { cabecalho = false, par = false } = {}) =>
   });
 
 const borda = { style: BorderStyle.SINGLE, size: 4, color: "D9D6EA" };
-const tabela = (token) =>
-  new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    layout: TableLayoutType.AUTOFIT,
+const tabela = (token) => {
+  const larguras = largurasColunas(token);
+  return new Table({
+    width: { size: LARGURA_TEXTO, type: WidthType.DXA },
+    columnWidths: larguras,
+    layout: TableLayoutType.FIXED,
     borders: { top: borda, bottom: borda, left: borda, right: borda, insideHorizontal: borda, insideVertical: borda },
     rows: [
-      new TableRow({ tableHeader: true, children: token.header.map((h) => celula(h, { cabecalho: true })) }),
-      ...token.rows.map((linha, i) => new TableRow({ children: linha.map((c) => celula(c, { par: i % 2 === 1 })) })),
+      new TableRow({ tableHeader: true, children: token.header.map((h, j) => celula(h, { cabecalho: true, largura: larguras[j] })) }),
+      ...token.rows.map(
+        (linha, i) => new TableRow({ cantSplit: true, children: linha.map((c, j) => celula(c, { par: i % 2 === 1, largura: larguras[j] })) }),
+      ),
     ],
   });
+};
 
 const pendentes = []; // imagens Mermaid a resolver (async) antes de montar o documento
 const blocos = (tokens) => {

@@ -7,7 +7,12 @@ Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / A
 ### Adicionado
 
 - **Cabeçalhos de segurança** em todas as respostas ([vercel.json](vercel.json)): `X-Frame-Options: DENY`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` e `Permissions-Policy`. O servidor local (`npm run dev`) aplica os mesmos cabeçalhos do `vercel.json`.
-- **[docs/seguranca.md](docs/seguranca.md):** camadas, login e perfis, onde fica cada segredo, como criar e trocar as chaves, proteções no código, como testar, riscos conhecidos e quem tem acesso a quê. Também em Word (`14 - Segurança.docx`).
+- **[docs/seguranca.md](docs/seguranca.md):** camadas, login e perfis, onde fica cada segredo, como criar e trocar as chaves, proteções no código, como testar, riscos conhecidos e quem tem acesso a quê. Também em Word (`15 - Segurança (técnica).docx`).
+- **[docs/seguranca-resumo.md](docs/seguranca-resumo.md):** resumo de segurança para a liderança, sem termos técnicos: as quatro barreiras, perfis, registro das ações, LGPD, situações do tipo "e se acontecer…", o que já está implantado e próximos passos recomendados. Em Word: `02 - Segurança (resumo para a liderança).docx`.
+
+### Alterado
+
+- **Word:** as colunas das tabelas passam a ter largura proporcional ao conteúdo (uma coluna "#" não ocupa mais o mesmo espaço que uma de descrição), e uma linha de tabela não é mais quebrada entre duas páginas. Os documentos foram renumerados (o resumo de segurança entrou como 02).
 
 ## 2026-10-08 — Documentação completa e versão em Word
 

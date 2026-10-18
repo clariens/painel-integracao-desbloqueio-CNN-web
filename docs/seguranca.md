@@ -1,6 +1,8 @@
 # Segurança
 
-Voltar ao [índice](README.md). Como o painel protege os dados dos pacientes: quem pode chamar o quê, onde cada segredo fica, como criar e trocar as chaves, como testar e o que ainda falta melhorar.
+Voltar ao [índice](README.md). Versão para a liderança, sem termos técnicos: [seguranca-resumo.md](seguranca-resumo.md).
+
+Como o painel protege os dados dos pacientes: quem pode chamar o quê, onde cada segredo fica, como criar e trocar as chaves, como testar e o que ainda falta melhorar.
 
 ## Em um minuto
 
