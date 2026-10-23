@@ -62,6 +62,43 @@ export const avisar = (mensagem, { erro = false } = {}) => {
   }, 6000);
 };
 
+/**
+ * Carregamento no próprio botão, para ação que espera o n8n (e o CNN): spinner, texto ("Liberando…") e, depois de
+ * alguns segundos, quantos segundos já passaram. Devolve fim(), que devolve o botão como estava.
+ * outros: botões que ficam desabilitados junto (ex.: Cancelar do diálogo, os outros botões da linha).
+ */
+export const ocupado = (botao, texto, { outros = [] } = {}) => {
+  if (!botao) return () => {};
+  const antes = { html: botao.innerHTML, disabled: botao.disabled, title: botao.title, minWidth: botao.style.minWidth };
+  const outrosAntes = outros.filter(Boolean).map((b) => [b, b.disabled]);
+  const inicio = Date.now();
+  botao.style.minWidth = `${botao.offsetWidth}px`;
+  botao.disabled = true;
+  botao.classList.add("is-ocupado");
+  botao.setAttribute("aria-busy", "true");
+  outrosAntes.forEach(([b]) => (b.disabled = true));
+
+  const desenhar = () => {
+    const segundos = Math.floor((Date.now() - inicio) / 1000);
+    botao.textContent = segundos >= 3 ? `${texto} ${segundos} s` : texto;
+    if (segundos >= 15) botao.title = "O CNN pode levar até 1 minuto. Não feche a página.";
+  };
+  desenhar();
+  const relogio = window.setInterval(desenhar, 1000);
+
+  return () => {
+    window.clearInterval(relogio);
+    if (!botao.isConnected) return;
+    botao.innerHTML = antes.html;
+    botao.disabled = antes.disabled;
+    botao.title = antes.title;
+    botao.style.minWidth = antes.minWidth;
+    botao.classList.remove("is-ocupado");
+    botao.removeAttribute("aria-busy");
+    outrosAntes.forEach(([b, estava]) => b.isConnected && (b.disabled = estava));
+  };
+};
+
 // Contador do menu "Solicitações": quantas aguardam aprovação. Lê o que já está na aba (a lista de
 // solicitações ou, sem ela, o resumo de Pacientes); nunca chama a API só para isso.
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -129,6 +166,7 @@ const telasPadrao = () => {
     { nome: "Pacientes", key: "pacientes", path: "/api/pacientes" },
     { nome: "Solicitações", key: "solicitacoes", path: "/api/solicitacoes" },
     { nome: "Relatórios", key: `faltas:${inicio}:${hoje}`, path: `/api/faltas?${new URLSearchParams({ de: inicio, ate: hoje })}` },
+    { nome: "Dashboard", key: `dashboard:${inicio}:${hoje}`, path: `/api/dashboard?${new URLSearchParams({ de: inicio, ate: hoje })}` },
     { nome: "Histórico", key: "acoes:page=1", path: "/api/acoes?page=1" },
     { nome: "Configuração", key: "parametros", path: "/api/parametros" },
     ...(pode("ADMIN") ? [{ nome: "Usuários", key: "usuarios", path: "/api/usuarios" }] : []),
@@ -189,11 +227,18 @@ const relogio = () => {
   });
 };
 
+// Botão Entrar: parado, o texto tem um brilho que passa e a seta desliza no hover (css .login__entrar);
+// entrando, "Entrando" com três pontinhos piscando em sequência e o spinner do .is-ocupado.
+const LOGIN_PARADO = '<span class="login__texto">Entrar</span><span class="login__seta" aria-hidden="true">→</span>';
+const LOGIN_ENTRANDO =
+  '<span class="login__texto">Entrando</span><span class="login__pontos" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>';
 const setLoginBusy = (busy) => {
   const button = els.loginForm?.querySelector("button[type='submit']");
   if (!button) return;
   button.disabled = busy;
-  button.textContent = busy ? "Entrando…" : "Entrar";
+  button.classList.toggle("is-ocupado", busy);
+  button.toggleAttribute("aria-busy", busy);
+  button.innerHTML = busy ? LOGIN_ENTRANDO : LOGIN_PARADO;
 };
 
 const hora = (data) => data.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -298,8 +343,7 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
       return;
     }
 
-    els.senhaSalvar.disabled = true;
-    els.senhaSalvar.textContent = "Salvando…";
+    const fim = ocupado(els.senhaSalvar, "Salvando…", { outros: [els.senhaCancelar] });
     try {
       const sessao = await request("/api/senha", {
         method: "POST",
@@ -315,13 +359,12 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
       if (error.message !== "unauthorized") mostrar(error.message || "Falha ao trocar a senha.");
       else els.senha.close();
     } finally {
-      els.senhaSalvar.disabled = false;
-      els.senhaSalvar.textContent = "Salvar senha";
+      fim();
     }
   });
 
   els.senha?.addEventListener("cancel", (event) => {
-    if (senhaObrigatoria) event.preventDefault();
+    if (senhaObrigatoria || els.senhaSalvar.disabled) event.preventDefault();
   });
   els.senhaCancelar?.addEventListener("click", () => els.senha.close());
   els.trocarSenha?.addEventListener("click", () => abrirTrocaSenha(false));

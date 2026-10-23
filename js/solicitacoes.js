@@ -1,7 +1,7 @@
 // Tela Solicitações: pedidos de desbloqueio de pacientes antes do fim do prazo.
 // Todos abrem e veem; só o admin aprova ou recusa; Editor e Admin liberam no CNN uma solicitação aprovada.
 import { DECISAO_SOLICITACAO, dataBr, dataHoraBr, escapeHtml, numero, prazoTexto, seloSolicitacao } from "./formato.js";
-import { atualizadoAs, atualizarContador, avisar, iniciarPagina, usarCache } from "./pagina.js";
+import { atualizadoAs, atualizarContador, avisar, iniciarPagina, ocupado, usarCache } from "./pagina.js";
 import { CACHE, comCache, getAuth, getUsuario, lerFiltros, pode, prefetchCache, request, salvarFiltros, writeCache } from "./session.js";
 import { criarSolicitacao, decidirSolicitacao, liberarSolicitacao, limparDepoisDeSolicitacao } from "./solicitacao.js";
 
@@ -280,8 +280,7 @@ const enviarNova = async (event) => {
   if (!state.novaPaciente) return erro("Escolha o paciente na lista.");
   if (motivo.length < 5) return erro("Escreva o motivo (mínimo 5 caracteres).");
 
-  els.novaEnviar.disabled = true;
-  els.novaEnviar.textContent = "Enviando…";
+  const fim = ocupado(els.novaEnviar, "Enviando…", { outros: [els.novaCancelar] });
   try {
     const resultado = await criarSolicitacao(state.novaPaciente.idPaciente, motivo);
     els.novaDialog.close();
@@ -292,22 +291,25 @@ const enviarNova = async (event) => {
   } catch (error) {
     if (error.message !== "unauthorized") erro(error.message || "Falha ao enviar.");
   } finally {
-    els.novaEnviar.disabled = false;
-    els.novaEnviar.textContent = "Enviar solicitação";
+    fim();
   }
 };
 
 // ---------- aprovar, recusar, cancelar, liberar ----------
 const itemPorId = (id) => (state.dados?.itens || []).find((item) => item.id === id);
 
+const outrosDaLinha = (botao) => [...(botao.closest("td")?.querySelectorAll("button") || [])].filter((b) => b !== botao);
+
 const aprovar = async (botao, item) => {
   if (!window.confirm(`Aprovar a solicitação #${item.id} de ${item.nomePaciente || `paciente ${item.idPaciente}`}? Depois, um Editor ou Admin libera no CNN.`)) return;
-  botao.disabled = true;
+  const fim = ocupado(botao, "Aprovando…", { outros: outrosDaLinha(botao) });
   try {
     await decidirSolicitacao(item.id, "aprovar");
     avisar(`Solicitação #${item.id} aprovada. Falta liberar no CNN.`);
   } catch (error) {
     if (error.message !== "unauthorized") avisar(error.message || "Falha ao aprovar.", { erro: true });
+  } finally {
+    fim();
   }
   limparDepoisDeSolicitacao(item.idPaciente);
   await recarregar(true).catch(() => {});
@@ -319,7 +321,7 @@ const liberar = async (botao, item, { aprovar: aprovarJunto }) => {
     ? `Aprovar a solicitação #${item.id} e liberar ${nome} no CNN agora?`
     : `Liberar ${nome} no CNN pela solicitação #${item.id}?`;
   if (!window.confirm(pergunta)) return;
-  botao.disabled = true;
+  const fim = ocupado(botao, aprovarJunto ? "Aprovando e liberando…" : "Liberando…", { outros: outrosDaLinha(botao) });
   try {
     const resultado = await liberarSolicitacao(item.id, item.idPaciente, { aprovar: aprovarJunto });
     avisar(resultado.avisoAuditoria ? `${resultado.mensagem} ${resultado.avisoAuditoria}` : resultado.mensagem || "Paciente liberado.", {
@@ -329,6 +331,8 @@ const liberar = async (botao, item, { aprovar: aprovarJunto }) => {
   } catch (error) {
     if (error.message !== "unauthorized") avisar(error.message || "Falha ao liberar.", { erro: true });
     limparDepoisDeSolicitacao(item.idPaciente);
+  } finally {
+    fim();
   }
   await recarregar(true).catch(() => {});
 };
@@ -360,18 +364,19 @@ const confirmarDecisao = async (event) => {
     els.decisaoErro.hidden = false;
     return;
   }
-  els.decisaoConfirmar.disabled = true;
+  const fim = ocupado(els.decisaoConfirmar, acao === "recusar" ? "Recusando…" : "Cancelando…", { outros: [els.decisaoCancelar] });
   try {
     await decidirSolicitacao(item.id, acao, motivo);
     state.decisao = null;
+    fim();
     els.decisao.close();
     avisar(acao === "recusar" ? `Solicitação #${item.id} recusada.` : `Solicitação #${item.id} cancelada.`);
     limparDepoisDeSolicitacao(item.idPaciente);
     await recarregar(true).catch(() => {});
   } catch (error) {
+    fim();
     els.decisaoErro.textContent = error.message === "unauthorized" ? "Sessão expirada. Entre de novo." : error.message;
     els.decisaoErro.hidden = false;
-    els.decisaoConfirmar.disabled = false;
   }
 };
 
@@ -436,6 +441,9 @@ els.novaMotivo.addEventListener("input", () => {
 });
 els.novaForm.addEventListener("submit", (event) => void enviarNova(event));
 els.novaCancelar.addEventListener("click", () => els.novaDialog.close());
+els.novaDialog.addEventListener("cancel", (event) => {
+  if (els.novaEnviar.disabled) event.preventDefault();
+});
 
 els.decisaoMotivo.addEventListener("input", () => {
   els.decisaoContador.textContent = `${els.decisaoMotivo.value.length}/500`;

@@ -61,6 +61,7 @@ export const CACHE = {
   parametros: 30 * 60 * 1000, // configuração: quase não muda
   usuarios: 2 * 60 * 1000,
   solicitacoes: 60 * 1000, // pedidos de desbloqueio: o contador do menu sai daqui
+  dashboard: 10 * 60 * 1000, // dashboard, por período (junto com faltas)
 };
 
 export const PACIENTES_CACHE_KEY = "pacientes";

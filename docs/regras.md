@@ -120,7 +120,7 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | # | Regra | Onde |
 |---|---|---|
 | R62 | Ao entrar, o painel busca **todas as telas ao mesmo tempo** ("Preparando os dados…") | `prepararDados` ([js/pagina.js](../js/pagina.js)) |
-| R63 | Cada tela guarda o dado na aba por um prazo: Pacientes 2 min, detalhe 1 min, Relatórios 10 min, Histórico 2 min, Configuração 30 min, Usuários 2 min, Solicitações 1 min (a tela Solicitações busca de novo por trás ao abrir). Dentro do prazo, trocar de tela não chama o servidor | `CACHE` ([js/session.js](../js/session.js)) |
+| R63 | Cada tela guarda o dado na aba por um prazo: Pacientes 2 min, detalhe 1 min, Relatórios 10 min, Histórico 2 min, Configuração 30 min, Usuários 2 min, Solicitações 1 min (a tela Solicitações busca de novo por trás ao abrir), Dashboard 10 min por período. Dentro do prazo, trocar de tela não chama o servidor | `CACHE` ([js/session.js](../js/session.js)) |
 | R64 | Dado vencido (até 12 h) **aparece na hora** e é atualizado em segundo plano | `comCache` (`aoAtualizar`) |
 | R65 | Depois de uma ação (liberar, bloquear, registrar, pedir, aprovar, recusar, cancelar), o dado afetado é apagado da aba e buscado de novo | `js/pacientes.js`, `js/solicitacao.js` |
 

@@ -2,6 +2,27 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-23 — Dashboard, carregamento nos botões e botão Entrar
+
+### Adicionado
+
+- **Dashboard** (tela nova `/dashboard`, primeiro item do menu), com quatro seções e gráficos variados: linha, área, rosca, radar, colunas empilhadas, barras e mapa de calor:
+  - **Hoje:** situação dos pacientes, quem sai do bloqueio nos próximos 30 dias e pacientes por número de faltas;
+  - **Faltas:** variação contra o período anterior, faltas por dia com média de 7 dias, dia da semana × horário, local, especialidade;
+  - **Bloqueios e liberações:** por mês e tipo, falhas no CNN, dias bloqueado, dias poupados, ações por usuário;
+  - **Solicitações:** por situação, por dia, taxa de aprovação, tempo de resposta do admin, quem mais pede.
+- Ação `dashboard` no workflow Leitura e rota `GET /api/dashboard`.
+- **Chart.js 4.4.9** copiado para `js/vendor/`, com versão fixa e licença. O site não carrega nada de CDN.
+- **Carregamento no botão** em todas as ações que esperam o n8n: spinner, texto da ação e os segundos passando; os outros botões da linha e o Cancelar ficam bloqueados.
+
+### Alterado
+
+- **Botão Entrar:** brilho no texto, seta no hover, e "Entrando" com pontinhos piscando.
+
+### Corrigido
+
+- **Entrar com o mouse em cima:** o texto ficava invisível enquanto entrava, porque o hover geral dos botões pintava o texto da cor do fundo.
+
 ## 2026-10-23 — Solicitações de desbloqueio e liberação automática de volta
 
 ### Adicionado

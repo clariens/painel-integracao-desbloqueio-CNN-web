@@ -1,5 +1,5 @@
 import { ACAO, DECISAO_SOLICITACAO, ORIGEM, STATUS, dataBr, dataHoraBr, escapeHtml, hojeSp, inicioCiclo, numero, prazoTexto, selo, seloSolicitacao } from "./formato.js";
-import { avisar, iniciarPagina, usarCache } from "./pagina.js";
+import { avisar, iniciarPagina, ocupado, usarCache } from "./pagina.js";
 import { CACHE, comCache, getAuth, lerFiltros, pode, prefetchCache, request, salvarFiltros } from "./session.js";
 import { criarSolicitacao, liberarSolicitacao, limparDepoisDeSolicitacao } from "./solicitacao.js";
 
@@ -545,12 +545,10 @@ const confirmarAcao = async (event) => {
   }
 
   const { acao, id, apenasRegistrar } = state.acao;
-  const textoOriginal = els.acaoConfirmar.textContent;
-  els.acaoConfirmar.disabled = true;
-  els.acaoCancelar.disabled = true;
-  els.acaoConfirmar.textContent = apenasRegistrar
+  const texto = apenasRegistrar
     ? "Registrando…"
     : { solicitar: "Enviando…", "liberar-admin": "Liberando…", liberar: "Liberando…" }[acao] || "Bloqueando…";
+  const fim = ocupado(els.acaoConfirmar, texto, { outros: [els.acaoCancelar] });
   els.acaoErro.hidden = true;
 
   try {
@@ -565,6 +563,7 @@ const confirmarAcao = async (event) => {
       });
     }
     state.acao = null;
+    fim();
     els.acao.close();
     avisar(resultado.avisoAuditoria ? `${resultado.mensagem} ${resultado.avisoAuditoria}` : resultado.mensagem || "Feito.", {
       erro: Boolean(resultado.avisoAuditoria),
@@ -574,6 +573,7 @@ const confirmarAcao = async (event) => {
     await recarregar(true).catch(() => {});
     if (els.detalhe.open && state.detalheId === id) await abrirDetalhe(id);
   } catch (error) {
+    fim();
     // O atalho do admin criou a solicitação, mas o CNN falhou: ela ficou aprovada, e a lista precisa mostrar isso.
     if (error.status && acao === "liberar-admin") limparDepoisDeSolicitacao(id);
     if (REGISTRAR[error.codigo] && !apenasRegistrar) {
@@ -582,9 +582,6 @@ const confirmarAcao = async (event) => {
     }
     els.acaoErro.textContent = error.message === "unauthorized" ? "Sessão expirada. Entre de novo e repita." : error.message;
     els.acaoErro.hidden = false;
-    els.acaoConfirmar.disabled = false;
-    els.acaoCancelar.disabled = false;
-    els.acaoConfirmar.textContent = textoOriginal;
   }
 };
 
@@ -599,7 +596,8 @@ const liberarPorSolicitacao = async (botao) => {
     : `Liberar ${nome} no CNN pela solicitação #${idSolicitacao} (já aprovada)?`;
   if (!window.confirm(pergunta)) return;
 
-  botao.disabled = true;
+  const outros = [...(botao.parentElement?.querySelectorAll("button") || [])].filter((b) => b !== botao);
+  const fim = ocupado(botao, aprovar ? "Aprovando e liberando…" : "Liberando…", { outros });
   try {
     const resultado = await liberarSolicitacao(idSolicitacao, idPaciente, { aprovar });
     avisar(resultado.avisoAuditoria ? `${resultado.mensagem} ${resultado.avisoAuditoria}` : resultado.mensagem || "Paciente liberado.", {
@@ -610,7 +608,7 @@ const liberarPorSolicitacao = async (botao) => {
     if (error.message !== "unauthorized") avisar(error.message || "Falha ao liberar.", { erro: true });
     limparDepoisDeSolicitacao(idPaciente);
   } finally {
-    botao.disabled = false;
+    fim();
   }
   await recarregar(true).catch(() => {});
   if (els.detalhe.open && state.detalheId === idPaciente) await abrirDetalhe(idPaciente);

@@ -297,6 +297,68 @@ if (meta.action === 'faltas') {
   });
 }
 
+if (meta.action === 'dashboard') {
+  const anterior = secao('anterior')[0] || {};
+  const acao = secao('acaoResumo')[0] || {};
+  const tempo = secao('solTempo')[0] || {};
+  const media = (valor) => (valor === null || valor === undefined || valor === '' ? null : Math.round(Number(valor) * 10) / 10);
+  const porNome = (nome) => secao(nome).map((linha) => ({ nome: linha.Nome, faltas: num(linha.Faltas), pacientes: num(linha.Pacientes) }));
+
+  return ok({
+    periodo: { de: meta.de, ate: meta.ate, anterior: meta.anterior, inicioCiclo: meta.inicio, hoje: meta.hoje },
+    faltas: {
+      porDia: secao('dia')
+        .map((linha) => ({ dia: dataIso(linha.Dia), faltas: num(linha.Faltas) }))
+        .sort((a, b) => a.dia.localeCompare(b.dia)),
+      anterior: { faltas: num(anterior.Faltas), pacientes: num(anterior.Pacientes), reincidentes: num(anterior.Reincidentes) },
+      calor: secao('calor').map((linha) => ({ dia: num(linha.DiaSemana), hora: num(linha.Hora), faltas: num(linha.Faltas) })),
+      porNumero: secao('numeroFalta')
+        .map((linha) => ({ numero: num(linha.Numero), faltas: num(linha.Faltas) }))
+        .sort((a, b) => a.numero - b.numero),
+      maiorFaltaRegra,
+      porLocal: porNome('local'),
+      porEspecialidade: porNome('especialidade')
+    },
+    acoes: {
+      porMes: secao('acaoMes')
+        .map((linha) => ({ mes: linha.Mes, tipo: linha.Tipo, quantidade: num(linha.Quantidade) }))
+        .sort((a, b) => a.mes.localeCompare(b.mes)),
+      resumo: {
+        bloqueios: num(acao.Bloqueios),
+        liberacoes: num(acao.Liberacoes),
+        antecipadas: num(acao.Antecipadas),
+        falhas: num(acao.Falhas),
+        diasBloqueado: media(acao.DiasBloqueado),
+        diasPoupados: media(acao.DiasPoupados)
+      },
+      porUsuario: secao('acaoUsuario').map((linha) => ({
+        usuario: linha.Usuario,
+        bloqueios: num(linha.Bloqueios),
+        liberacoes: num(linha.Liberacoes),
+        total: num(linha.Total)
+      }))
+    },
+    solicitacoes: {
+      porStatus: Object.fromEntries(secao('solStatus').map((linha) => [linha.Status, num(linha.Quantidade)])),
+      porDia: secao('solDia')
+        .map((linha) => ({ dia: dataIso(linha.Dia), quantidade: num(linha.Quantidade) }))
+        .sort((a, b) => a.dia.localeCompare(b.dia)),
+      tempo: {
+        minutosResposta: media(tempo.MinutosResposta),
+        minutosLiberar: media(tempo.MinutosLiberar),
+        aprovadas: num(tempo.Aprovadas),
+        recusadas: num(tempo.Recusadas),
+        total: num(tempo.Total)
+      },
+      porSolicitante: secao('solSolicitante').map((linha) => ({
+        usuario: linha.SolicitadoPor,
+        quantidade: num(linha.Quantidade),
+        aprovadas: num(linha.Aprovadas)
+      }))
+    }
+  });
+}
+
 if (meta.action === 'acoes') {
   const contagem = secao('contagem')[0] || {};
 

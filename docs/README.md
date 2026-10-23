@@ -17,7 +17,7 @@
 
 ```mermaid
 flowchart TB
-    UI["Navegador · Painel<br/>Pacientes · Solicitações · Relatórios<br/>Histórico · Configuração · Usuários"]
+    UI["Navegador · Painel<br/>Dashboard · Pacientes · Solicitações · Relatórios<br/>Histórico · Configuração · Usuários"]
     API["Vercel /api/*<br/>sessão assinada + perfil · validação"]
     W["n8n · webhooks do painel<br/>Leitura · Ações · Usuários · Solicitações"]
     R["n8n · rotinas<br/>Bloqueio 01:00 · Liberação 02:00"]
@@ -42,7 +42,7 @@ flowchart TB
 | [seguranca-resumo.md](seguranca-resumo.md) | Liderança, gestão | Segurança sem termos técnicos: barreiras, perfis, registro das ações, LGPD, "e se acontecer…", o que está implantado e próximos passos |
 | [regras.md](regras.md) | Todos | As regras de negócio (R1 a R85): faltas, ciclo, prazos, bloqueio, liberação, auditoria, usuários, LGPD, desempenho |
 | [arquitetura.md](arquitetura.md) | Quem mantém | Peças, ligações, rotas, sequências, segurança, configuração e deploy |
-| [front-end.md](front-end.md) | Quem opera e quem mantém | O painel: telas, situações do paciente, liberar e bloquear, login |
+| [front-end.md](front-end.md) | Quem opera e quem mantém | O painel: telas (inclusive o Dashboard), situações do paciente, liberar e bloquear, carregamento nas ações, login |
 | [bloqueio.md](bloqueio.md) | Quem mantém ou opera | Workflow de bloqueio (01:00), nó a nó |
 | [fluxos/leitura.md](fluxos/leitura.md) | Quem mantém | Workflow CNN Painel - Leitura (consultas do painel) |
 | [fluxos/acoes.md](fluxos/acoes.md) | Quem mantém | Workflow CNN Painel - Ações (liberar e bloquear pelo painel) |

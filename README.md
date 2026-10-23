@@ -5,7 +5,7 @@ Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e libera quando o pr
 | Peça | Onde | O que faz |
 |---|---|---|
 | Bloqueio automático | n8n, `workflows/bloqueioPacientesFaltas.json`, 01:00 | Grava as faltas, bloqueia (`{ "ativo": false }`) e registra cada PATCH na auditoria |
-| Painel | Vercel (HTML estático + `api/`) | Lista os bloqueados, recebe e decide solicitações de desbloqueio, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
+| Painel | Vercel (HTML estático + `api/`) | Dashboard com indicadores e gráficos (Chart.js servido pelo próprio site), lista os bloqueados, recebe e decide solicitações de desbloqueio, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
 | CNN Painel - Leitura | n8n, `workflows/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
 | CNN Painel - Ações | n8n, `workflows/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
 | CNN Painel - Usuários | n8n, `workflows/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |

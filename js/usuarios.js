@@ -1,5 +1,5 @@
 import { EVENTO_USUARIO, dataHoraBr, escapeHtml, numero, selo, seloPerfil } from "./formato.js";
-import { avisar, iniciarPagina, usarCache } from "./pagina.js";
+import { avisar, iniciarPagina, ocupado, usarCache } from "./pagina.js";
 import { CACHE, getUsuario, request } from "./session.js";
 
 // Gestão de usuários (só ADMIN; a API recusa os demais com 403).
@@ -138,13 +138,15 @@ const abrirDialogo = (usuario = null) => {
 
 els.novo.addEventListener("click", () => abrirDialogo());
 els.cancelar.addEventListener("click", () => els.dialogo.close());
+els.dialogo.addEventListener("cancel", (event) => {
+  if (els.salvar.disabled) event.preventDefault();
+});
 
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (els.salvar.disabled) return;
   els.erro.hidden = true;
-  els.salvar.disabled = true;
-  els.salvar.textContent = "Salvando…";
+  const fim = ocupado(els.salvar, "Salvando…", { outros: [els.cancelar] });
 
   const editando = state.editando;
   try {
@@ -174,8 +176,7 @@ els.form.addEventListener("submit", async (event) => {
       els.dialogo.close();
     }
   } finally {
-    els.salvar.disabled = false;
-    els.salvar.textContent = "Salvar";
+    fim();
   }
 });
 
@@ -194,7 +195,9 @@ els.linhas.addEventListener("click", async (event) => {
 
   const executar = async (login, corpo, pergunta, sucesso) => {
     if (!window.confirm(pergunta)) return;
-    botao.disabled = true;
+    const texto = corpo.redefinirSenha ? "Gerando senha…" : corpo.ativo === false ? "Desativando…" : "Reativando…";
+    const outros = [...(botao.closest("td")?.querySelectorAll("button") || [])].filter((b) => b !== botao);
+    const fim = ocupado(botao, texto, { outros });
     try {
       const resposta = await request(`/api/usuarios/${encodeURIComponent(login)}`, { method: "PATCH", body: JSON.stringify(corpo) });
       if (resposta.senhaTemporaria) mostrarSenhaTemporaria(login, resposta.senhaTemporaria);
@@ -203,7 +206,7 @@ els.linhas.addEventListener("click", async (event) => {
     } catch (error) {
       if (error.message !== "unauthorized") avisar(error.message || "Falha ao alterar o usuário.", { erro: true });
     } finally {
-      botao.disabled = false;
+      fim();
     }
   };
 

@@ -97,3 +97,22 @@ export const inicioCiclo = (hoje = hojeSp()) => {
   const [ano, mes] = hoje.split("-").map(Number);
   return `${mes >= CICLO_MES ? ano : ano - 1}-${String(CICLO_MES).padStart(2, "0")}-01`;
 };
+
+// Soma dias a uma data "AAAA-MM-DD" (negativo volta).
+export const somarDiasIso = (iso, dias) => {
+  const data = new Date(`${iso}T00:00:00Z`);
+  data.setUTCDate(data.getUTCDate() + dias);
+  return data.toISOString().slice(0, 10);
+};
+
+// Atalhos de período das telas Relatórios e Dashboard: [de, ate].
+export const periodoDoAtalho = (atalho, hoje = hojeSp()) => {
+  const inicio = inicioCiclo(hoje);
+  const periodos = {
+    ciclo: [inicio, hoje],
+    anterior: [`${Number(inicio.slice(0, 4)) - 1}${inicio.slice(4)}`, somarDiasIso(inicio, -1)],
+    mes: [`${hoje.slice(0, 7)}-01`, hoje],
+    30: [somarDiasIso(hoje, -29), hoje],
+  };
+  return periodos[atalho] || periodos.ciclo;
+};

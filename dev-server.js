@@ -14,6 +14,7 @@ import sessao from "./api/sessao.js";
 import senha from "./api/senha.js";
 import usuarios from "./api/usuarios/index.js";
 import alterarUsuario from "./api/usuarios/[login].js";
+import dashboard from "./api/dashboard.js";
 import solicitacoes from "./api/solicitacoes/index.js";
 import decidirSolicitacao from "./api/solicitacoes/[id].js";
 import liberarSolicitacao from "./api/solicitacoes/[id]/liberar.js";
@@ -43,7 +44,7 @@ const mimeTypes = {
 };
 
 // Só o que a Vercel publica: páginas, css e js. Workflows, sql e docs ficam de fora (.vercelignore).
-const PUBLIC_PATTERN = /^(?:[\w-]+\.html|css\/[\w.-]+\.css|js\/[\w.-]+\.js|img\/[\w.-]+\.(?:png|svg))$/;
+const PUBLIC_PATTERN = /^(?:[\w-]+\.html|css\/[\w.-]+\.css|js\/(?:vendor\/)?[\w.-]+\.js|img\/[\w.-]+\.(?:png|svg))$/;
 
 const pages = {
   "/": "index.html",
@@ -53,6 +54,7 @@ const pages = {
   "/configuracao": "configuracao.html",
   "/usuarios": "usuarios.html",
   "/solicitacoes": "solicitacoes.html",
+  "/dashboard": "dashboard.html",
 };
 
 const routes = [
@@ -67,6 +69,7 @@ const routes = [
   [/^\/api\/senha$/, senha],
   [/^\/api\/usuarios$/, usuarios],
   [/^\/api\/usuarios\/([^/]+)$/, alterarUsuario, "login"],
+  [/^\/api\/dashboard$/, dashboard],
   [/^\/api\/solicitacoes$/, solicitacoes],
   [/^\/api\/solicitacoes\/([^/]+)$/, decidirSolicitacao],
   [/^\/api\/solicitacoes\/([^/]+)\/liberar$/, liberarSolicitacao],

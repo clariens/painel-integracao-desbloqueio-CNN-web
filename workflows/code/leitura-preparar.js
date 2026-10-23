@@ -203,6 +203,158 @@ WHERE IdPaciente = @id;`;
   return [{ json: { action, query, id, inicio, hoje } }];
 }
 
+// Agrupa as faltas por um cadastro: nome do CNN, ou "(sem ...)" quando a falta não tem o campo, ou o id quando o nome
+// ainda não veio. Usado pelas ações faltas e dashboard.
+const porCadastroSql = (secao, tipo, coluna, vazio, top, filtroF) => `SELECT TOP (${top}) N'${secao}' AS _secao,
+       CASE WHEN f.${coluna} IS NULL THEN N'${vazio}' ELSE ISNULL(cad.Nome, N'Código ' + CAST(f.${coluna} AS nvarchar(20))) END AS Nome,
+       COUNT(*) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
+FROM dbo.CtlCnnFaltaPaciente f
+LEFT JOIN dbo.CtlCnnCadastro cad
+    ON cad.Tipo = N'${tipo}' AND cad.Id = f.${coluna}
+WHERE ${filtroF}
+GROUP BY f.${coluna}, cad.Nome
+ORDER BY COUNT(*) DESC;`;
+
+// Período anterior de mesmo tamanho (para a variação dos indicadores): termina na véspera de "de".
+const periodoAnterior = (de, ate) => {
+  const ms = Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`);
+  const tamanho = Math.round(ms / 86_400_000) + 1;
+  return { de: somarDias(de, -tamanho), ate: somarDias(de, -1) };
+};
+
+if (action === 'dashboard') {
+  const de = safeDate(body.de) || inicio;
+  const ate = safeDate(body.ate) || hoje;
+
+  if (de > ate) {
+    return erro(400, 'A data inicial é depois da final.');
+  }
+
+  const anterior = periodoAnterior(de, ate);
+  const filtroF = `f.DataFalta >= @de AND f.DataFalta <= @ate`;
+  // CriadoEm e SolicitadoEm são UTC; São Paulo é UTC-3 o ano todo (sem horário de verão desde 2019).
+  const noPeriodo = (coluna) =>
+    `${coluna} >= DATEADD(HOUR, 3, CAST(@de AS datetime2)) AND ${coluna} < DATEADD(HOUR, 3, DATEADD(DAY, 1, CAST(@ate AS datetime2)))`;
+  const local = (coluna) => `DATEADD(HOUR, -3, ${coluna})`;
+  const tipoAcao = `CASE
+        WHEN a.Acao = N'BLOQUEIO' AND a.Origem = N'AUTOMATICO' THEN N'BLOQUEIO_AUTO'
+        WHEN a.Acao = N'BLOQUEIO' THEN N'BLOQUEIO_PAINEL'
+        WHEN a.Origem = N'AUTOMATICO' THEN N'LIBERACAO_AUTO'
+        WHEN a.IdSolicitacao IS NOT NULL OR a.Antecipada = 1 THEN N'LIBERACAO_SOLICITACAO'
+        ELSE N'LIBERACAO_PAINEL' END`;
+
+  const query = `${cabecalho}
+DECLARE @de DATE = ${sqlDate(de)};
+DECLARE @ate DATE = ${sqlDate(ate)};
+DECLARE @deAnterior DATE = ${sqlDate(anterior.de)};
+DECLARE @ateAnterior DATE = ${sqlDate(anterior.ate)};
+
+-- ===== Faltas =====
+SELECT N'dia' AS _secao, CONVERT(char(10), f.DataFalta, 23) AS Dia, COUNT(*) AS Faltas
+FROM dbo.CtlCnnFaltaPaciente f
+WHERE ${filtroF}
+GROUP BY f.DataFalta;
+
+SELECT N'anterior' AS _secao,
+       (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @deAnterior AND DataFalta <= @ateAnterior) AS Faltas,
+       (SELECT COUNT(DISTINCT IdPaciente) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @deAnterior AND DataFalta <= @ateAnterior) AS Pacientes,
+       (SELECT COUNT(*) FROM (
+            SELECT IdPaciente FROM dbo.CtlCnnFaltaPaciente
+            WHERE DataFalta >= @deAnterior AND DataFalta <= @ateAnterior
+            GROUP BY IdPaciente HAVING COUNT(*) >= 2
+        ) r) AS Reincidentes;
+
+-- 1900-01-01 foi segunda-feira: (dias desde então) % 7 dá 0 = segunda ... 6 = domingo, sem depender de DATEFIRST.
+SELECT N'calor' AS _secao, DATEDIFF(DAY, '19000101', f.DataFalta) % 7 AS DiaSemana,
+       DATEPART(HOUR, f.HoraInicio) AS Hora, COUNT(*) AS Faltas
+FROM dbo.CtlCnnFaltaPaciente f
+WHERE ${filtroF} AND f.HoraInicio IS NOT NULL
+GROUP BY DATEDIFF(DAY, '19000101', f.DataFalta) % 7, DATEPART(HOUR, f.HoraInicio);
+
+SELECT N'numeroFalta' AS _secao, Numero, COUNT(*) AS Faltas
+FROM (
+    SELECT CASE WHEN f.NumeroFalta >= ${maiorFaltaRegra} THEN ${maiorFaltaRegra} ELSE f.NumeroFalta END AS Numero
+    FROM dbo.CtlCnnFaltaPaciente f
+    WHERE ${filtroF}
+) porNumero
+GROUP BY Numero;
+
+${porCadastroSql('local', 'LOCAL_AGENDA', 'IdLocalAgenda', '(sem local)', 15, filtroF)}
+
+SELECT TOP (15) N'especialidade' AS _secao,
+       CASE WHEN fp.IdEspecialidade IS NULL THEN N'(sem especialidade)'
+            ELSE ISNULL(cad.Nome, N'Código ' + CAST(fp.IdEspecialidade AS nvarchar(20))) END AS Nome,
+       COUNT(DISTINCT f.IdAgenda) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
+FROM dbo.CtlCnnFaltaProcedimento fp
+INNER JOIN dbo.CtlCnnFaltaPaciente f
+    ON f.IdAgenda = fp.IdAgenda
+LEFT JOIN dbo.CtlCnnCadastro cad
+    ON cad.Tipo = N'ESPECIALIDADE' AND cad.Id = fp.IdEspecialidade
+WHERE ${filtroF}
+GROUP BY fp.IdEspecialidade, cad.Nome
+ORDER BY COUNT(DISTINCT f.IdAgenda) DESC;
+
+-- ===== Bloqueios e liberações (auditoria) =====
+SELECT N'acaoMes' AS _secao, CONVERT(char(7), ${local('a.CriadoEm')}, 23) AS Mes, ${tipoAcao} AS Tipo, COUNT(*) AS Quantidade
+FROM dbo.CtlCnnAcaoPaciente a
+WHERE ${noPeriodo('a.CriadoEm')} AND a.Sucesso = 1
+GROUP BY CONVERT(char(7), ${local('a.CriadoEm')}, 23), ${tipoAcao};
+
+SELECT N'acaoResumo' AS _secao,
+       SUM(CASE WHEN a.Acao = N'BLOQUEIO' AND a.Sucesso = 1 THEN 1 ELSE 0 END) AS Bloqueios,
+       SUM(CASE WHEN a.Acao = N'LIBERACAO' AND a.Sucesso = 1 THEN 1 ELSE 0 END) AS Liberacoes,
+       SUM(CASE WHEN a.Acao = N'LIBERACAO' AND a.Sucesso = 1 AND a.Antecipada = 1 THEN 1 ELSE 0 END) AS Antecipadas,
+       SUM(CASE WHEN a.Sucesso = 0 THEN 1 ELSE 0 END) AS Falhas,
+       AVG(CASE WHEN a.Acao = N'LIBERACAO' AND a.Sucesso = 1 AND a.DataInicioBloqueio IS NOT NULL
+                THEN CAST(DATEDIFF(DAY, a.DataInicioBloqueio, ${local('a.CriadoEm')}) AS float) END) AS DiasBloqueado,
+       AVG(CASE WHEN a.Acao = N'LIBERACAO' AND a.Sucesso = 1 AND a.Antecipada = 1 AND a.DataFimBloqueio IS NOT NULL
+                THEN CAST(DATEDIFF(DAY, ${local('a.CriadoEm')}, a.DataFimBloqueio) AS float) END) AS DiasPoupados
+FROM dbo.CtlCnnAcaoPaciente a
+WHERE ${noPeriodo('a.CriadoEm')};
+
+SELECT TOP (10) N'acaoUsuario' AS _secao, a.Usuario,
+       SUM(CASE WHEN a.Acao = N'BLOQUEIO' THEN 1 ELSE 0 END) AS Bloqueios,
+       SUM(CASE WHEN a.Acao = N'LIBERACAO' THEN 1 ELSE 0 END) AS Liberacoes,
+       COUNT(*) AS Total
+FROM dbo.CtlCnnAcaoPaciente a
+WHERE ${noPeriodo('a.CriadoEm')} AND a.Origem = N'PAINEL' AND a.Sucesso = 1
+GROUP BY a.Usuario
+ORDER BY COUNT(*) DESC;
+
+-- ===== Solicitações de desbloqueio =====
+SELECT N'solStatus' AS _secao, s.Status, COUNT(*) AS Quantidade
+FROM dbo.CtlCnnSolicitacao s
+WHERE ${noPeriodo('s.SolicitadoEm')}
+GROUP BY s.Status;
+
+SELECT N'solDia' AS _secao, CONVERT(char(10), ${local('s.SolicitadoEm')}, 23) AS Dia, COUNT(*) AS Quantidade
+FROM dbo.CtlCnnSolicitacao s
+WHERE ${noPeriodo('s.SolicitadoEm')}
+GROUP BY CONVERT(char(10), ${local('s.SolicitadoEm')}, 23);
+
+-- Resposta do admin: só as decididas por uma pessoa (aprovadas, liberadas, recusadas); encerradas são do sistema.
+SELECT N'solTempo' AS _secao,
+       AVG(CASE WHEN s.Status IN (N'APROVADA', N'LIBERADA', N'RECUSADA') AND s.DecididoEm IS NOT NULL
+                THEN CAST(DATEDIFF(MINUTE, s.SolicitadoEm, s.DecididoEm) AS float) END) AS MinutosResposta,
+       AVG(CASE WHEN s.LiberadoEm IS NOT NULL AND s.DecididoEm IS NOT NULL
+                THEN CAST(DATEDIFF(MINUTE, s.DecididoEm, s.LiberadoEm) AS float) END) AS MinutosLiberar,
+       SUM(CASE WHEN s.Status IN (N'APROVADA', N'LIBERADA') THEN 1 ELSE 0 END) AS Aprovadas,
+       SUM(CASE WHEN s.Status = N'RECUSADA' THEN 1 ELSE 0 END) AS Recusadas,
+       COUNT(*) AS Total
+FROM dbo.CtlCnnSolicitacao s
+WHERE ${noPeriodo('s.SolicitadoEm')};
+
+SELECT TOP (10) N'solSolicitante' AS _secao, s.SolicitadoPor,
+       COUNT(*) AS Quantidade,
+       SUM(CASE WHEN s.Status IN (N'APROVADA', N'LIBERADA') THEN 1 ELSE 0 END) AS Aprovadas
+FROM dbo.CtlCnnSolicitacao s
+WHERE ${noPeriodo('s.SolicitadoEm')}
+GROUP BY s.SolicitadoPor
+ORDER BY COUNT(*) DESC;`;
+
+  return [{ json: { action, query, de, ate, anterior, inicio, hoje } }];
+}
+
 if (action === 'faltas') {
   const de = safeDate(body.de) || inicio;
   const ate = safeDate(body.ate) || hoje;
@@ -213,16 +365,7 @@ if (action === 'faltas') {
 
   const filtro = `DataFalta >= @de AND DataFalta <= @ate`;
   const filtroF = `f.DataFalta >= @de AND f.DataFalta <= @ate`;
-  // Agrupa por um cadastro: nome do CNN, ou "(sem ...)" quando a falta não tem o campo, ou o id quando o nome ainda não veio.
-  const porCadastro = (secao, tipo, coluna, vazio, top) => `SELECT TOP (${top}) N'${secao}' AS _secao,
-       CASE WHEN f.${coluna} IS NULL THEN N'${vazio}' ELSE ISNULL(cad.Nome, N'Código ' + CAST(f.${coluna} AS nvarchar(20))) END AS Nome,
-       COUNT(*) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
-FROM dbo.CtlCnnFaltaPaciente f
-LEFT JOIN dbo.CtlCnnCadastro cad
-    ON cad.Tipo = N'${tipo}' AND cad.Id = f.${coluna}
-WHERE ${filtroF}
-GROUP BY f.${coluna}, cad.Nome
-ORDER BY COUNT(*) DESC;`;
+  const porCadastro = (secao, tipo, coluna, vazio, top) => porCadastroSql(secao, tipo, coluna, vazio, top, filtroF);
   // 1900-01-01 foi segunda-feira: (dias desde então) % 7 dá 0 = segunda ... 6 = domingo, sem depender de DATEFIRST.
   const query = `${cabecalho}
 DECLARE @de DATE = ${sqlDate(de)};

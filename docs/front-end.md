@@ -10,6 +10,7 @@ O painel é HTML estático com módulos JS, publicado na Vercel. Ele só fala co
 |---|---|---|
 | `/pacientes` (e `/`) | `index.html` + `js/pacientes.js` | Lista dos pacientes com falta no ciclo, solicitar desbloqueio, liberar e bloquear, detalhe |
 | `/solicitacoes` | `solicitacoes.html` + `js/solicitacoes.js` | Solicitações de desbloqueio: abrir, aprovar, recusar, cancelar, liberar |
+| `/dashboard` | `dashboard.html` + `js/dashboard.js` + `js/graficos.js` | Indicadores e gráficos: hoje, faltas, bloqueios e liberações, solicitações |
 | `/relatorios` | `relatorios.html` + `js/relatorios.js` | Faltas por período: mês, dia da semana, profissional, reincidência, CSV |
 | `/historico` | `historico.html` + `js/historico.js` | Auditoria de cada PATCH (automático e painel), com filtros |
 | `/configuracao` | `configuracao.html` + `js/configuracao.js` | Prazos, ciclo e horário em uso (só leitura) |
@@ -97,6 +98,44 @@ O botão **Bloquear** do painel vale para paciente com falta no ciclo atual e co
 
 Regras e situações em [fluxos/solicitacoes.md](fluxos/solicitacoes.md).
 
+### Dashboard
+
+Indicadores e gráficos num lugar só, em quatro seções:
+
+- **Hoje** (situação atual, sem depender do período):
+  - indicadores de aguardando, bloqueados, aptos, liberados antes do prazo e solicitações aguardando;
+  - rosca da situação dos pacientes;
+  - colunas por semana de quem sai do bloqueio nos próximos 30 dias;
+  - rosca de pacientes por número de faltas no ciclo.
+- **Faltas no período:**
+  - indicadores com a variação em relação ao período anterior de mesmo tamanho (subiu em vermelho, desceu em verde);
+  - linha de faltas por dia, com a média de 7 dias;
+  - faltas por mês (linha com 3 meses ou mais; colunas com menos);
+  - radar por dia da semana;
+  - mapa de calor dia da semana × horário;
+  - roscas por período do dia, tipo de consulta (os 6 maiores e "Outros") e número da falta;
+  - barras de profissionais, procedimentos, locais e especialidades (top 10).
+- **Bloqueios e liberações no período:**
+  - indicadores de bloqueios, liberações (quantas antes do prazo), falhas no CNN, média de dias bloqueado até a liberação e média de dias poupados nas liberações antecipadas;
+  - colunas empilhadas por mês e tipo: bloqueio automático, bloqueio pelo painel, liberação automática, por solicitação, após o prazo pelo painel;
+  - rosca de como os pacientes foram liberados;
+  - barras de ações pelo painel por usuário.
+- **Solicitações no período:**
+  - indicadores de pedidos, taxa de aprovação (aprovadas ÷ aprovadas + recusadas), tempo médio do pedido à decisão do admin e da aprovação à liberação;
+  - rosca por situação;
+  - colunas de pedidos por dia;
+  - barras de quem mais pede.
+
+**De onde vêm os dados:**
+- **Já estavam na aba:** `/api/pacientes`, `/api/solicitacoes` e `/api/faltas` (o mesmo cache de Relatórios).
+- **Só o que faltava:** `/api/dashboard` (ação `dashboard` da [Leitura](fluxos/leitura.md)).
+
+**Gráficos:**
+- **Biblioteca:** feitos com **Chart.js 4.4.9**, servido pelo próprio site (`js/vendor/chart.umd.min.js`, versão fixa, licença MIT ao lado). Nada vem de CDN.
+- **Cores e tema:** as cores saem dos tokens do CSS (`--serie-1` a `--serie-6` e os de situação). Trocar o tema redesenha tudo.
+- **Acessibilidade:** cada gráfico tem uma descrição em texto para leitor de tela. Sem dados, aparece "Sem dados no período".
+- **Movimento reduzido:** com `prefers-reduced-motion`, não há animação.
+
 ### Relatórios
 
 Período por atalho (ciclo atual, ciclo anterior, mês atual, 30 dias) ou datas. Mostra totais, faltas por mês, por dia da semana, por profissional (top 30), por tipo de consulta, por período do dia (manhã, tarde, noite), por rótulo da agenda, procedimentos com mais faltas (com quantas faltas têm procedimento; se a clínica não preenche, o gráfico avisa), pacientes por quantidade de faltas e os 20 que mais faltaram. Passe o mouse (ou o foco) numa barra para ver o valor.
@@ -119,6 +158,20 @@ Só leitura. Mostra os prazos, o início do ciclo, o fuso, os horários do bloqu
 - O admin não muda o próprio perfil nem se desativa por aqui, e o banco não deixa sobrar zero admins ativos.
 - **Eventos recentes:** criação, mudança de perfil ou nome, desativação, senha trocada ou redefinida e senhas erradas.
 
+## Carregamento nas ações
+
+Toda ação que espera o n8n (e o CNN) mostra o carregamento **no próprio botão**, com `ocupado(botao, texto)` ([js/pagina.js](../js/pagina.js)):
+
+- o botão fica desabilitado, com um spinner e o texto da ação ("Liberando…", "Aprovando…", "Recusando…", "Bloqueando…", "Enviando…", "Salvando…", "Gerando senha…");
+- depois de 3 segundos, mostra quantos já passaram ("Liberando… 8 s");
+- depois de 15 segundos, a dica do botão avisa que o CNN pode levar até 1 minuto;
+- os outros botões da mesma linha (ou o Cancelar do diálogo) ficam desabilitados, e o Esc não fecha o diálogo enquanto a ação roda;
+- no fim, o botão volta ao normal.
+
+Vale para Pacientes (diálogo de ação e liberação por solicitação), Solicitações (aprovar, aprovar e liberar, liberar, recusar, cancelar, nova solicitação), Usuários (salvar, redefinir senha, desativar, reativar) e troca de senha.
+
+O botão **Entrar** do login tem um brilho que passa pelo texto e uma seta que desliza no hover. Entrando, mostra "Entrando" com três pontinhos piscando e o spinner. Com `prefers-reduced-motion`, nada se mexe.
+
 ## Cache e filtros
 
 Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no prazo. Tudo fica no `sessionStorage`: some ao fechar a aba, e o login, o 401 e o Sair limpam. Funções em `js/session.js`: `comCache` ("cache primeiro"), `prefetchCache`, `clearCache`, `clearCaches(prefixo)`, `lerFiltros`/`salvarFiltros`.
@@ -128,12 +181,13 @@ Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no pr
 | Pacientes | `pacientes` | 2 min |
 | Detalhe do paciente | `paciente:<id>` | 1 min (tem o status ao vivo no CNN) |
 | Relatórios | `faltas:<de>:<ate>` (um por período) | 10 min |
+| Dashboard | `dashboard:<de>:<ate>` (um por período), mais `faltas`, `pacientes` e `solicitacoes` | 10 min |
 | Histórico | `acoes:<filtros e página>` | 2 min |
 | Configuração | `parametros` | 30 min |
 | Usuários | `usuarios` | 2 min |
 | Solicitações | `solicitacoes` | 1 min (e busca de novo por trás ao abrir a tela) |
 
-- **Ao entrar** (login ou aba sem nada guardado), a tela **"Preparando os dados…"** busca Pacientes, Solicitações, Relatórios (ciclo atual), Histórico, Configuração e, para admin, Usuários **ao mesmo tempo**. Depois disso, trocar de tela é instantâneo. Uma busca que falha não trava as outras: aquela tela busca sozinha ao abrir.
+- **Ao entrar** (login ou aba sem nada guardado), a tela **"Preparando os dados…"** busca Pacientes, Solicitações, Relatórios (ciclo atual), Dashboard (ciclo atual), Histórico, Configuração e, para admin, Usuários **ao mesmo tempo**. Depois disso, trocar de tela é instantâneo. Uma busca que falha não trava as outras: aquela tela busca sozinha ao abrir.
 - **Dado vencido aparece na hora** (até 12 h) e é atualizado em segundo plano: a barra mostra "atualizando…" e, quando chega, a tela se redesenha e mostra "atualizado às HH:MM". Só o detalhe do paciente espera a busca, por causa do status ao vivo no CNN.
 - **Atualizar agora** ignora o cache e regrava. Quando o prazo vence (aba visível, sem diálogo aberto), a tela busca de novo sozinha. A barra mostra "atualizado às HH:MM" com a hora do dado.
 - **Pré-carga:** Pacientes deixa prontos Relatórios (ciclo atual), Configuração e Solicitações; Solicitações deixa Pacientes pronto; Relatórios, Histórico e Configuração deixam Pacientes pronto.

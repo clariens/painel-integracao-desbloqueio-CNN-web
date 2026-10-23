@@ -1,4 +1,4 @@
-import { dataBr, escapeHtml, hojeSp, inicioCiclo, numero } from "./formato.js";
+import { dataBr, escapeHtml, numero, periodoDoAtalho } from "./formato.js";
 import { iniciarPagina, usarCache } from "./pagina.js";
 import { CACHE, lerFiltros, prefetchCache, salvarFiltros } from "./session.js";
 
@@ -34,22 +34,8 @@ const els = {
 };
 
 // ---------- período ----------
-const somarDias = (iso, dias) => {
-  const data = new Date(`${iso}T00:00:00Z`);
-  data.setUTCDate(data.getUTCDate() + dias);
-  return data.toISOString().slice(0, 10);
-};
-
 const aplicarAtalho = (atalho) => {
-  const hoje = hojeSp();
-  const inicio = inicioCiclo(hoje);
-  const periodos = {
-    ciclo: [inicio, hoje],
-    anterior: [`${Number(inicio.slice(0, 4)) - 1}${inicio.slice(4)}`, somarDias(inicio, -1)],
-    mes: [`${hoje.slice(0, 7)}-01`, hoje],
-    30: [somarDias(hoje, -29), hoje],
-  };
-  [els.de.value, els.ate.value] = periodos[atalho] || periodos.ciclo;
+  [els.de.value, els.ate.value] = periodoDoAtalho(atalho);
   state.atalho = atalho;
   els.atalhos.querySelectorAll("button").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.atalho === atalho));

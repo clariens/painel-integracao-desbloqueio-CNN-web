@@ -48,7 +48,7 @@
           <input id="login-password" name="password" type="password" autocomplete="current-password" required />
         </label>
         <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
-        <button type="submit">Entrar</button>
+        <button class="login__entrar" type="submit"><span class="login__texto">Entrar</span><span class="login__seta" aria-hidden="true">→</span></button>
       </form>
     </dialog>
 
@@ -85,6 +85,7 @@
         <button class="sidebar__close" type="button" data-nav-close aria-label="Fechar menu">×</button>
       </div>
       <nav class="sidebar__nav" aria-label="Seções do painel">
+        <a href="/dashboard">Dashboard</a>
         <a href="/pacientes">Pacientes</a>
         <a href="/solicitacoes">Solicitações <span class="sidebar__badge" id="nav-solicitacoes"></span></a>
         <a href="/relatorios" aria-current="page">Relatórios de faltas</a>

@@ -83,6 +83,7 @@ flowchart TB
 |---|---|
 | **Pacientes** | A lista principal: cada paciente com falta, o que ele ia fazer (procedimento em vermelho), o prazo e a situação. Botões **Solicitar desbloqueio**, **Liberar** e **Bloquear**, conforme o perfil |
 | **Solicitações** | Os pedidos de desbloqueio: quem pediu, quando, por qual motivo, e o que foi decidido. O menu mostra quantos aguardam aprovação. O administrador aprova ou recusa aqui |
+| **Dashboard** | Os números do sistema em gráficos: a situação de hoje, faltas (por dia, horário, profissional, local...), bloqueios e liberações, e as solicitações (quantas foram aprovadas, quanto tempo o administrador levou para responder) |
 | **Relatórios de faltas** | Números e gráficos: faltas por mês, por dia da semana, por profissional, por tipo de consulta, por procedimento e por período do dia. Dá para exportar em planilha |
 | **Histórico de ações** | Tudo o que foi feito: cada bloqueio e cada liberação, quem fez, quando e por quê |
 | **Configuração** | Mostra as regras em uso (prazos, início do ciclo, horários da automação). Só leitura |

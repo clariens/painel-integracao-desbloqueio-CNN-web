@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clariens · Dashboard</title>
+    <meta name="description" content="Dashboard do bloqueio CNN: situação de hoje, faltas, bloqueios e liberações e solicitações de desbloqueio." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/img/logo-clariens-C-preto.png" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <script>
+      // Tema antes da pintura: o salvo nesta máquina ou o claro (padrão Clariens).
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("clariens.cnn.tema") || "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+      // Sem login nesta aba: a tela de login aparece já na primeira pintura, sem mostrar o painel antes.
+      // O perfil também vem antes da pintura, para os botões que ele não pode usar nem aparecerem.
+      try {
+        document.documentElement.dataset.sessao = sessionStorage.getItem("clariens.cnn.auth") ? "sim" : "nao";
+        document.documentElement.dataset.perfil = (JSON.parse(sessionStorage.getItem("clariens.cnn.usuario") || "null") || {}).perfil || "";
+      } catch {
+        document.documentElement.dataset.sessao = "nao";
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip" href="#dashboard">Ir para os indicadores</a>
+
+    <dialog class="login" id="login" aria-labelledby="login-title">
+      <div class="login__fundo" aria-hidden="true"><span></span><span></span><span></span></div>
+      <form id="login-form" method="dialog">
+        <img class="login__logo login__logo--preta" src="/img/logo-clariens-preto.png" alt="Clariens Educação" width="180" height="66" />
+        <img class="login__logo login__logo--branca" src="/img/clariens-logo.png" alt="Clariens Educação" width="180" height="52" />
+        <h1 id="login-title">Bloqueio por faltas CNN</h1>
+        <label>
+          Usuário
+          <input id="login-user" name="user" autocomplete="username" required />
+        </label>
+        <label>
+          Senha
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
+        <button class="login__entrar" type="submit"><span class="login__texto">Entrar</span><span class="login__seta" aria-hidden="true">→</span></button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="senha" aria-labelledby="senha-titulo">
+      <form class="modal__form" id="senha-form" method="dialog">
+        <p class="modal__kicker">Sua conta</p>
+        <h2 id="senha-titulo">Trocar senha</h2>
+        <p class="modal__alerta" id="senha-aviso" hidden>Você entrou com uma senha temporária. Defina a sua senha para continuar.</p>
+        <label>
+          Senha atual
+          <input id="senha-atual" type="password" autocomplete="current-password" required />
+        </label>
+        <label>
+          Nova senha (mínimo 6 caracteres, com um número e um caractere especial)
+          <input id="senha-nova" type="password" autocomplete="new-password" minlength="6" maxlength="200" required />
+        </label>
+        <label>
+          Repita a nova senha
+          <input id="senha-confirma" type="password" autocomplete="new-password" minlength="6" maxlength="200" required />
+        </label>
+        <p class="modal__erro" id="senha-erro" hidden role="alert"></p>
+        <div class="modal__acoes">
+          <button class="btn" type="button" id="senha-cancelar">Cancelar</button>
+          <button class="btn btn--primario" type="submit" id="senha-salvar">Salvar senha</button>
+        </div>
+      </form>
+    </dialog>
+
+    <aside class="sidebar" id="sidebar" aria-label="Menu">
+      <div class="sidebar__head">
+        <p class="sidebar__brand">
+          <img class="sidebar__logo" src="/img/clariens-logo.png" alt="Clariens Educação" width="150" height="43" />
+        </p>
+        <button class="sidebar__close" type="button" data-nav-close aria-label="Fechar menu">×</button>
+      </div>
+      <nav class="sidebar__nav" aria-label="Seções do painel">
+        <a href="/dashboard" aria-current="page">Dashboard</a>
+        <a href="/pacientes">Pacientes</a>
+        <a href="/solicitacoes">Solicitações <span class="sidebar__badge" id="nav-solicitacoes"></span></a>
+        <a href="/relatorios">Relatórios de faltas</a>
+        <a href="/historico">Histórico de ações</a>
+        <a href="/configuracao">Configuração</a>
+        <a href="/usuarios" data-requer="admin">Usuários</a>
+      </nav>
+      <div class="sidebar__user">
+        <p><strong id="usuario-nome">—</strong> <span class="sidebar__perfil" id="usuario-perfil"></span></p>
+        <p><button id="trocar-senha" type="button">Trocar senha</button><button id="sair" type="button">Sair</button></p>
+      </div>
+    </aside>
+    <div class="nav-backdrop" data-nav-close aria-hidden="true"></div>
+    <script src="/js/layout.js"></script>
+
+    <div class="shell">
+      <p class="api-error" id="api-error" hidden role="alert"></p>
+
+      <header class="pagina__head">
+        <h1>Dashboard</h1>
+        <p id="periodo-texto">—</p>
+      </header>
+
+      <form class="toolbar" id="filtros" aria-label="Período">
+        <div class="campo">
+          Período
+          <div class="segmented" role="group" aria-label="Atalhos de período" id="atalhos">
+            <button type="button" data-atalho="ciclo" aria-pressed="true">Ciclo atual</button>
+            <button type="button" data-atalho="anterior" aria-pressed="false">Ciclo anterior</button>
+            <button type="button" data-atalho="mes" aria-pressed="false">Mês atual</button>
+            <button type="button" data-atalho="30" aria-pressed="false">30 dias</button>
+          </div>
+        </div>
+        <label>De <input id="de" type="date" required /></label>
+        <label>Até <input id="ate" type="date" required /></label>
+        <button class="btn" type="submit">Aplicar</button>
+        <p class="toolbar__nota">"Hoje" mostra a situação atual; as outras seções seguem o período.</p>
+      </form>
+
+      <main id="dashboard">
+        <!-- ===== Hoje ===== -->
+        <h2 class="secao__titulo" id="s-hoje">Hoje · situação atual</h2>
+        <section class="stats stats--5" aria-labelledby="s-hoje">
+          <article class="stat--pendente"><p>Aguardando bloqueio</p><strong id="hoje-pendentes">—</strong><small>falta no prazo, sem bloqueio</small></article>
+          <article class="stat--alert"><p>Bloqueados</p><strong id="hoje-bloqueados">—</strong><small id="hoje-saem">—</small></article>
+          <article class="stat--brass"><p>Aptos a liberar</p><strong id="hoje-aptos">—</strong><small>a rotina das 02:00 libera</small></article>
+          <article class="stat--steel"><p>Liberados antes do prazo</p><strong id="hoje-antecipados">—</strong><small>por solicitação aprovada</small></article>
+          <article class="stat--ok"><p>Solicitações aguardando</p><strong id="hoje-solicitacoes">—</strong><small id="hoje-aprovadas">—</small></article>
+        </section>
+        <div class="painel-grade">
+          <section class="painel-card" aria-labelledby="c-situacao">
+            <header><h3 id="c-situacao">Situação dos pacientes</h3><p>todos os pacientes da lista</p></header>
+            <div class="painel-card__area"><canvas id="g-situacao" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-saem">
+            <header><h3 id="c-saem">Saem do bloqueio nos próximos 30 dias</h3><p>por semana, pelo fim do prazo</p></header>
+            <div class="painel-card__area"><canvas id="g-saem" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-faltas-ciclo">
+            <header><h3 id="c-faltas-ciclo">Pacientes por faltas no ciclo</h3><p>define o prazo: 60, 90 ou 180 dias</p></header>
+            <div class="painel-card__area"><canvas id="g-faltas-ciclo" role="img"></canvas></div>
+          </section>
+        </div>
+
+        <!-- ===== Faltas ===== -->
+        <h2 class="secao__titulo" id="s-faltas">Faltas no período</h2>
+        <section class="stats stats--4" aria-labelledby="s-faltas">
+          <article><p>Faltas</p><strong id="f-faltas">—</strong><small id="f-faltas-var">—</small></article>
+          <article><p>Pacientes</p><strong id="f-pacientes">—</strong><small id="f-pacientes-var">—</small></article>
+          <article><p>Faltas por paciente</p><strong id="f-media">—</strong><small id="f-media-var">—</small></article>
+          <article class="stat--brass"><p>Reincidentes (2+)</p><strong id="f-reincidentes">—</strong><small id="f-reincidentes-var">—</small></article>
+        </section>
+        <div class="painel-grade">
+          <section class="painel-card painel-card--largo" aria-labelledby="c-dia">
+            <header><h3 id="c-dia">Faltas por dia</h3><p>com a média dos últimos 7 dias</p></header>
+            <div class="painel-card__area"><canvas id="g-dia" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-mes">
+            <header><h3 id="c-mes">Faltas por mês</h3><p>faltas e pacientes</p></header>
+            <div class="painel-card__area"><canvas id="g-mes" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-semana">
+            <header><h3 id="c-semana">Por dia da semana</h3><p>onde as faltas se concentram</p></header>
+            <div class="painel-card__area"><canvas id="g-semana" role="img"></canvas></div>
+          </section>
+          <section class="painel-card painel-card--largo" aria-labelledby="c-calor">
+            <header><h3 id="c-calor">Mapa de calor: dia da semana × horário</h3><p>quanto mais forte, mais faltas naquele horário</p></header>
+            <div class="calor" id="g-calor" role="img"></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-periodo">
+            <header><h3 id="c-periodo">Por período do dia</h3><p>pelo horário marcado</p></header>
+            <div class="painel-card__area"><canvas id="g-periodo" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-tipo">
+            <header><h3 id="c-tipo">Por tipo de consulta</h3><p>os 6 mais comuns</p></header>
+            <div class="painel-card__area"><canvas id="g-tipo" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-numero">
+            <header><h3 id="c-numero">1ª, 2ª ou 3ª falta</h3><p>o número da falta no ciclo</p></header>
+            <div class="painel-card__area"><canvas id="g-numero" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-prof">
+            <header><h3 id="c-prof">Profissionais com mais faltas</h3><p>top 10</p></header>
+            <div class="painel-card__area painel-card__area--alta"><canvas id="g-prof" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-proc">
+            <header><h3 id="c-proc">Procedimentos com mais faltas</h3><p>top 10</p></header>
+            <div class="painel-card__area painel-card__area--alta"><canvas id="g-proc" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-local">
+            <header><h3 id="c-local">Por local de atendimento</h3><p>top 10</p></header>
+            <div class="painel-card__area painel-card__area--alta"><canvas id="g-local" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-espec">
+            <header><h3 id="c-espec">Por especialidade</h3><p>só faltas com procedimento</p></header>
+            <div class="painel-card__area painel-card__area--alta"><canvas id="g-espec" role="img"></canvas></div>
+          </section>
+        </div>
+
+        <!-- ===== Bloqueios e liberações ===== -->
+        <h2 class="secao__titulo" id="s-acoes">Bloqueios e liberações no período</h2>
+        <section class="stats stats--5" aria-labelledby="s-acoes">
+          <article class="stat--alert"><p>Bloqueios</p><strong id="a-bloqueios">—</strong><small>no CNN, com sucesso</small></article>
+          <article class="stat--ok"><p>Liberações</p><strong id="a-liberacoes">—</strong><small id="a-antecipadas">—</small></article>
+          <article class="stat--pendente"><p>Falhas no CNN</p><strong id="a-falhas">—</strong><small id="a-taxa-falha">—</small></article>
+          <article class="stat--steel"><p>Dias bloqueado</p><strong id="a-dias">—</strong><small>média até a liberação</small></article>
+          <article class="stat--brass"><p>Dias poupados</p><strong id="a-poupados">—</strong><small>média nas liberações antecipadas</small></article>
+        </section>
+        <div class="painel-grade">
+          <section class="painel-card painel-card--largo" aria-labelledby="c-acao-mes">
+            <header><h3 id="c-acao-mes">Bloqueios e liberações por mês</h3><p>por origem: automática ou pelo painel</p></header>
+            <div class="painel-card__area"><canvas id="g-acao-mes" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-liberacoes">
+            <header><h3 id="c-liberacoes">Como os pacientes foram liberados</h3><p>no período</p></header>
+            <div class="painel-card__area"><canvas id="g-liberacoes" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-usuarios">
+            <header><h3 id="c-usuarios">Ações pelo painel, por usuário</h3><p>top 10</p></header>
+            <div class="painel-card__area painel-card__area--alta"><canvas id="g-usuarios" role="img"></canvas></div>
+          </section>
+        </div>
+
+        <!-- ===== Solicitações ===== -->
+        <h2 class="secao__titulo" id="s-sol">Solicitações de desbloqueio no período</h2>
+        <section class="stats stats--4" aria-labelledby="s-sol">
+          <article><p>Pedidos</p><strong id="s-total">—</strong><small id="s-abertas">—</small></article>
+          <article class="stat--ok"><p>Taxa de aprovação</p><strong id="s-taxa">—</strong><small id="s-decididas">—</small></article>
+          <article class="stat--steel"><p>Tempo até a resposta</p><strong id="s-resposta">—</strong><small>média, do pedido à decisão do admin</small></article>
+          <article class="stat--brass"><p>Tempo até liberar</p><strong id="s-liberar">—</strong><small>média, da aprovação ao CNN</small></article>
+        </section>
+        <div class="painel-grade">
+          <section class="painel-card" aria-labelledby="c-sol-status">
+            <header><h3 id="c-sol-status">Pedidos por situação</h3><p>no período</p></header>
+            <div class="painel-card__area"><canvas id="g-sol-status" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-sol-dia">
+            <header><h3 id="c-sol-dia">Pedidos por dia</h3><p>quando foram abertos</p></header>
+            <div class="painel-card__area"><canvas id="g-sol-dia" role="img"></canvas></div>
+          </section>
+          <section class="painel-card" aria-labelledby="c-sol-quem">
+            <header><h3 id="c-sol-quem">Quem mais pede</h3><p>aprovados e os demais</p></header>
+            <div class="painel-card__area painel-card__area--alta"><canvas id="g-sol-quem" role="img"></canvas></div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <footer class="statusbar" aria-label="Status do painel">
+      <div class="statusbar__left">
+        <button class="nav-toggle" type="button" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Abrir menu">
+          <span class="nav-toggle__bars" aria-hidden="true"></span>
+          Dashboard
+        </button>
+        <p class="statusbar__meta">
+          <span id="clock">—</span>
+          <span class="dot" id="sync-dot" aria-hidden="true"></span>
+          <span id="sync-state" aria-live="polite">aguardando</span>
+        </p>
+      </div>
+      <div class="statusbar__actions">
+        <button class="ghost tema-toggle" type="button" data-tema-toggle>Modo escuro</button>
+        <button class="ghost" id="refresh" type="button">Atualizar agora</button>
+      </div>
+    </footer>
+
+    <script src="/js/vendor/chart.umd.min.js"></script>
+    <script src="/js/dashboard.js" type="module"></script>
+  </body>
+</html>

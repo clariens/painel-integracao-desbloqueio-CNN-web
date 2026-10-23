@@ -220,7 +220,7 @@ Para um painel interno, o nível atual é bom. Estes são os pontos a melhorar, 
 | **`clinicaNasNuvens-cid` no repositório** | Está escrito nos JSON dos workflows. Sozinho não dá acesso (a API exige também a credencial), mas ajuda quem tentar | Manter o repositório privado e interno; se possível, mover para uma credencial do n8n |
 | **SQL montado como texto** | O escape funciona, mas consulta parametrizada é mais robusta | Migrar para parâmetros quando mexer nesses nós |
 | **n8n na internet** | A instância do n8n é pública; o login e as contas do próprio n8n também protegem os dados | Senhas fortes e 2FA nas contas do n8n; revisar periodicamente quem tem acesso |
-| **Token na aba** | Fica no `sessionStorage` enquanto a aba está aberta; um script malicioso na página poderia lê-lo (não a senha) | Só scripts do próprio projeto rodam na página. Próximo passo: uma `Content-Security-Policy` |
+| **Token na aba** | Fica no `sessionStorage` enquanto a aba está aberta; um script malicioso na página poderia lê-lo (não a senha) | Só scripts servidos pelo próprio site rodam na página. A única biblioteca de terceiros, o Chart.js do Dashboard, fica copiada no repositório (`js/vendor/`, versão fixa), não vem de CDN. Próximo passo: uma `Content-Security-Policy` |
 
 ## Quem tem acesso a quê
 
