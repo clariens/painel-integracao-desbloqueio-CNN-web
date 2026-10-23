@@ -46,7 +46,7 @@ npm run check     # confere os workflows (compila o código dos nós, referênci
 npm run admin    # gera senha aleatória e o INSERT do primeiro admin (colar no SSMS)
 ```
 
-Sem dependências de npm: Node 20.6 ou mais novo.
+Sem dependências de npm: Node 20.6 ou mais novo (a Vercel usa o Node 24, pelo `engines` do `package.json`).
 
 ## Usuários e perfis
 

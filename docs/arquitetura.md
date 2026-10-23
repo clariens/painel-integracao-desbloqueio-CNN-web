@@ -267,7 +267,7 @@ flowchart LR
         W["workflows/*.json<br/>+ workflows/code/*.js"]
         S["sql/*.sql"]
     end
-    F -- "push na main +<br/>vercel deploy --prod" --> V["Vercel"]
+    F -- "push na main" --> V["Vercel<br/>deploy automático"]
     W -- "npm run inject + check<br/>colar no n8n" --> N["n8n"]
     S -- "rodar no SSMS" --> B[("SQL Server")]
 ```

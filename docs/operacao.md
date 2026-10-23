@@ -32,7 +32,7 @@ Para um ambiente que já tem o painel funcionando. **A ordem importa:** o banco 
    - **Antes de ativar:** veja no painel quem está **Apto a liberar**. Esses pacientes serão liberados na primeira execução (02:00). Se quiser, rode uma vez pelo editor, de dia, para acompanhar.
    - Ative.
    - Se o workflow antigo de liberação ainda existir no n8n, apague-o.
-5. **Vercel:** crie `N8N_SOLICITACOES_URL` em Production e Preview e publique (`vercel deploy --prod`).
+5. **Vercel:** crie `N8N_SOLICITACOES_URL` em Production e Preview e publique (push na `main`, ou `vercel deploy --prod`).
 6. **Teste:**
    - Um Leitor abre uma solicitação.
    - O contador do menu aparece.
@@ -122,7 +122,7 @@ O admin não muda o próprio perfil nem se desativa: outro admin faz isso. O ban
 
 | Mudança | Onde mexer | Como publicar |
 |---|---|---|
-| Painel (páginas, css, js, `api/`, `lib/`) | Raiz do repo | Teste antes com `npm run dev`. Commit e push na `main` e publique com `vercel deploy --prod`, logado na conta do time (o deploy automático do push fica bloqueado quando o autor do commit não é membro do time na Vercel) |
+| Painel (páginas, css, js, `api/`, `lib/`) | Raiz do repo | Teste antes com `npm run dev`. Commit e push na `main`: a Vercel publica sozinha. Se o deploy aparecer como **Blocked** (autor do commit fora do time na Vercel), publique com `vercel deploy --prod`, logado na conta do time |
 | Lógica de um workflow | `workflows/code/*.js` (nós Code); demais nós, no JSON ou no n8n | Rode `npm run inject` e `npm run check`. No n8n, abra o workflow, **apague os nós e cole o JSON** no canvas: continua o mesmo workflow, com o mesmo id e a mesma URL de webhook. Confira as credenciais e salve. Commit. Se mexeu no n8n, exporte e copie o código de volta para `workflows/code/` |
 | Prazos 60 / 90 / 180 ou início do ciclo | [`workflows/code/_regra.js`](../workflows/code/_regra.js) | `npm run inject`, `npm run check`, publicar **bloqueio, liberação automática, Leitura, Ações e Solicitações**. O início do ciclo também está escrito na URL do nó `GET agenda do ciclo` (1/10) e em `sql/carga_inicial_controle.sql` |
 | Horário do bloqueio ou da liberação | Nós `Todo dia 01:00` / `Todo dia 02:00` e `horarioBloqueio` / `horarioLiberacao` em `_regra.js` (só exibição) | Os dois juntos. A liberação deve rodar **depois** do bloqueio |
