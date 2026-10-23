@@ -101,7 +101,7 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | R51 | **5 senhas erradas seguidas** travam o login daquele usuário por **15 minutos**. Redefinir a senha destrava | Workflow Usuários (`login-resultado`) |
 | R52 | A mensagem de erro do login é **sempre a mesma** ("Usuário ou senha inválidos"), para não revelar quais logins existem | `api/sessao.js` |
 | R53 | Usuários **não são excluídos**, só desativados: o nome continua no histórico | Tela e workflow Usuários |
-| R54 | O admin **não pode** tirar o próprio perfil de admin nem se desativar. O banco **não deixa** desativar ou rebaixar o **último admin ativo** | `api/usuarios/[login].js`, workflow Usuários (`ULTIMO_ADMIN`) |
+| R54 | O admin **não pode** tirar o próprio perfil de admin nem se desativar. O banco **não deixa** desativar ou rebaixar o **último admin ativo** | `lib/rotas/usuario-alterar.js`, workflow Usuários (`ULTIMO_ADMIN`) |
 | R55 | A senha **nunca** é gravada nem trafega até o banco: só o resumo criptográfico (scrypt com salt) | `gerarHash`, `conferirSenha` |
 | R56 | Toda mudança de usuário (criação, perfil, nome, desativação, senha) e toda senha errada viram um **evento** em `CtlCnnUsuarioEvento` | Workflow Usuários |
 
@@ -142,8 +142,8 @@ Detalhes em [fluxos/solicitacoes.md](fluxos/solicitacoes.md).
 | R70 | **Qualquer usuário**, inclusive Leitor, pode abrir uma solicitação de desbloqueio, com **motivo de 5 a 500 caracteres** | Tela Solicitações e Pacientes; `api/solicitacoes`; `solicitacoes-preparar.js` (`criar`) |
 | R71 | Só pode receber solicitação quem **ainda está no prazo**: bloqueado ou aguardando bloqueio, pela falta vigente, sem ter sido liberado por ela. Prazo cumprido: `PRAZO_CUMPRIDO` (a liberação automática cuida) | `criar` |
 | R72 | **Uma solicitação aberta** (pendente ou aprovada) **por paciente**. A segunda responde `JA_EXISTE` com o número da que já existe | `criar`; índice `UX_CtlCnnSolicitacao_Aberta` |
-| R73 | **Só o administrador aprova ou recusa.** Recusar exige motivo | `api/solicitacoes/[id].js`; `aprovar`, `recusar` |
-| R74 | **Editor ou administrador** libera no CNN uma solicitação **aprovada**. O admin também pode **Aprovar e liberar** de uma vez | `api/solicitacoes/[id]/liberar.js`; `decidir` |
+| R73 | **Só o administrador aprova ou recusa.** Recusar exige motivo | `lib/rotas/solicitacao-decidir.js`; `aprovar`, `recusar` |
+| R74 | **Editor ou administrador** libera no CNN uma solicitação **aprovada**. O admin também pode **Aprovar e liberar** de uma vez | `lib/rotas/solicitacao-liberar.js`; `decidir` |
 | R75 | O admin tem um **atalho** na tela Pacientes: **Liberar** abre a solicitação, aprova e libera num passo. Fica registrado como solicitação aprovada por ele | `POST /api/solicitacoes` com `aprovarELiberar` |
 | R76 | Quem abriu (ou um admin) pode **cancelar** a solicitação enquanto ela está aberta | `cancelar` |
 | R77 | A solicitação vale para a **falta vigente de quando foi aberta**. Com uma falta nova, ela fica **desatualizada**: aprovar ou liberar respondem 409 e ela é **encerrada** | `aprovar`, `decidir` (`SOLICITACAO_DESATUALIZADA`), `sqlRegistrarAcao` |

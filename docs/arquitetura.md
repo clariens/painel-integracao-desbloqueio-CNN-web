@@ -15,7 +15,7 @@ Além do painel, há dois workflows agendados: o bloqueio das 01:00 e a liberaç
 | Peça | Onde roda | No repositório |
 |---|---|---|
 | Painel (páginas, css, js) | Vercel (estático) | `*.html`, [css/](../css/), [js/](../js/) |
-| API do painel | Vercel (funções Node) | [api/](../api/), [lib/](../lib/) |
+| API do painel | Vercel (funções Node) | [api/](../api/), [lib/](../lib/). São **9 funções**: o plano Hobby da Vercel aceita até 12 por deploy. Pacientes, solicitações e usuários têm uma função cada (`api/pacientes.js`, `api/solicitacoes.js`, `api/usuarios.js`). O `vercel.json` reescreve `/api/pacientes/:id/liberar` e afins para essa função, com `id` e `op` na query, e o código de cada rota fica em [lib/rotas/](../lib/rotas/). Rota nova: acrescente em `lib/rotas/` e no despachante, não um arquivo novo em `api/` |
 | Workflow de bloqueio (01:00) | n8n | [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json) |
 | Workflow CNN Painel - Leitura | n8n (webhook) | [workflows/cnn-painel-leitura.json](../workflows/cnn-painel-leitura.json) |
 | Workflow CNN Painel - Ações | n8n (webhook) | [workflows/cnn-painel-acoes.json](../workflows/cnn-painel-acoes.json) |

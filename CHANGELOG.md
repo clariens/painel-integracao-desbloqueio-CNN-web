@@ -2,6 +2,13 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-23 — Deploy na Vercel: 9 funções (limite do plano Hobby)
+
+### Corrigido
+
+- **Os deploys falhavam com "Error"** desde as solicitações. O projeto foi para o time **team-clariens** (plano Hobby), que aceita até **12 funções** por deploy, e o painel tinha 15. Agora pacientes, solicitações e usuários têm uma função cada (`api/pacientes.js`, `api/solicitacoes.js`, `api/usuarios.js`). O `vercel.json` reescreve as rotas com `:id` para elas, e o código de cada rota foi para `lib/rotas/`. Os endereços da API não mudaram. Total: 9 funções.
+- `package.json`: Node 24 (`engines`), igual ao projeto na Vercel.
+
 ## 2026-10-23 — Dashboard, carregamento nos botões e botão Entrar
 
 ### Adicionado

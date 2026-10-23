@@ -7,6 +7,11 @@
     }
   },
   "rewrites": [
+    { "source": "/api/pacientes/:id/:op(liberar|bloquear)", "destination": "/api/pacientes?id=:id&op=:op" },
+    { "source": "/api/pacientes/:id", "destination": "/api/pacientes?id=:id" },
+    { "source": "/api/solicitacoes/:id/liberar", "destination": "/api/solicitacoes?id=:id&op=liberar" },
+    { "source": "/api/solicitacoes/:id", "destination": "/api/solicitacoes?id=:id" },
+    { "source": "/api/usuarios/:login", "destination": "/api/usuarios?login=:login" },
     { "source": "/pacientes", "destination": "/index.html" },
     { "source": "/relatorios", "destination": "/relatorios.html" },
     { "source": "/historico", "destination": "/historico.html" },

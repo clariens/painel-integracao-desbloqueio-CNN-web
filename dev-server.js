@@ -3,21 +3,15 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import listarPacientes from "./api/pacientes/index.js";
-import detalharPaciente from "./api/pacientes/[id].js";
-import liberarPaciente from "./api/pacientes/[id]/liberar.js";
-import bloquearPaciente from "./api/pacientes/[id]/bloquear.js";
+import pacientes from "./api/pacientes.js";
 import faltas from "./api/faltas.js";
 import acoes from "./api/acoes.js";
 import parametros from "./api/parametros.js";
 import sessao from "./api/sessao.js";
 import senha from "./api/senha.js";
-import usuarios from "./api/usuarios/index.js";
-import alterarUsuario from "./api/usuarios/[login].js";
+import usuarios from "./api/usuarios.js";
 import dashboard from "./api/dashboard.js";
-import solicitacoes from "./api/solicitacoes/index.js";
-import decidirSolicitacao from "./api/solicitacoes/[id].js";
-import liberarSolicitacao from "./api/solicitacoes/[id]/liberar.js";
+import solicitacoes from "./api/solicitacoes.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -57,22 +51,23 @@ const pages = {
   "/dashboard": "dashboard.html",
 };
 
+// Mesmas rotas e reescritas do vercel.json: cada trecho do caminho vira um parâmetro em req.query
+// (ex.: /api/pacientes/123/liberar → pacientes com id=123 e op=liberar).
 const routes = [
-  [/^\/api\/pacientes$/, listarPacientes],
-  [/^\/api\/pacientes\/([^/]+)$/, detalharPaciente],
-  [/^\/api\/pacientes\/([^/]+)\/liberar$/, liberarPaciente],
-  [/^\/api\/pacientes\/([^/]+)\/bloquear$/, bloquearPaciente],
+  [/^\/api\/pacientes$/, pacientes],
+  [/^\/api\/pacientes\/([^/]+)$/, pacientes, ["id"]],
+  [/^\/api\/pacientes\/([^/]+)\/(liberar|bloquear)$/, pacientes, ["id", "op"]],
   [/^\/api\/faltas$/, faltas],
   [/^\/api\/acoes$/, acoes],
   [/^\/api\/parametros$/, parametros],
   [/^\/api\/sessao$/, sessao],
   [/^\/api\/senha$/, senha],
   [/^\/api\/usuarios$/, usuarios],
-  [/^\/api\/usuarios\/([^/]+)$/, alterarUsuario, "login"],
+  [/^\/api\/usuarios\/([^/]+)$/, usuarios, ["login"]],
   [/^\/api\/dashboard$/, dashboard],
   [/^\/api\/solicitacoes$/, solicitacoes],
-  [/^\/api\/solicitacoes\/([^/]+)$/, decidirSolicitacao],
-  [/^\/api\/solicitacoes\/([^/]+)\/liberar$/, liberarSolicitacao],
+  [/^\/api\/solicitacoes\/([^/]+)$/, solicitacoes, ["id"]],
+  [/^\/api\/solicitacoes\/([^/]+)\/(liberar)$/, solicitacoes, ["id", "op"]],
 ];
 
 const readBody = (req) =>
@@ -124,13 +119,13 @@ const server = createServer(async (req, res) => {
     req.body = await readBody(req);
     applyHeaders(res, url.pathname);
 
-    // O trecho dinâmico vira req.query.<param>, como a Vercel faz com [id].js e [login].js.
-    for (const [pattern, handler, param = "id"] of routes) {
+    // Os trechos do caminho viram req.query.<param>, como fazem as reescritas do vercel.json.
+    for (const [pattern, handler, params = []] of routes) {
       const match = url.pathname.match(pattern);
       if (match) {
-        if (match[1] !== undefined) {
-          req.query[param] = decodeURIComponent(match[1]);
-        }
+        params.forEach((nome, i) => {
+          req.query[nome] = decodeURIComponent(match[i + 1]);
+        });
         await handler(req, res);
         return;
       }
