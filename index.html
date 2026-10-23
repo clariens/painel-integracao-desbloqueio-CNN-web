@@ -86,6 +86,7 @@
       </div>
       <nav class="sidebar__nav" aria-label="Seções do painel">
         <a href="/pacientes" aria-current="page">Pacientes</a>
+        <a href="/solicitacoes">Solicitações <span class="sidebar__badge" id="nav-solicitacoes"></span></a>
         <a href="/relatorios">Relatórios de faltas</a>
         <a href="/historico">Histórico de ações</a>
         <a href="/configuracao">Configuração</a>
@@ -109,8 +110,8 @@
 
       <p class="aviso" id="aviso-controle" hidden>
         A tabela de controle ainda está vazia: nenhum bloqueio foi registrado. Quem está no prazo aparece como
-        "Aguardando bloqueio" até a execução das 01:00 bloquear (ou registrar quem já está inativo no CNN), com o prazo
-        de liberação vencido ou não. Confira o status no CNN pelo detalhe antes de agir.
+        "Aguardando bloqueio" até a execução das 01:00 bloquear (ou registrar quem já está inativo no CNN).
+        Confira o status no CNN pelo detalhe antes de agir.
       </p>
 
       <section class="stats" aria-label="Resumo">
@@ -127,12 +128,12 @@
         <button class="stat stat--brass" type="button" data-filtro-situacao="apto">
           <p>Aptos a liberar</p>
           <strong id="kpi-aptos">—</strong>
-          <small>bloqueados com o prazo cumprido</small>
+          <small>prazo cumprido · a rotina das 02:00 libera</small>
         </button>
         <button class="stat stat--steel" type="button" data-filtro-situacao="liberado_antecipado">
           <p>Liberados antes do prazo</p>
           <strong id="kpi-antecipados">—</strong>
-          <small>liberação manual</small>
+          <small>por solicitação aprovada</small>
         </button>
         <article>
           <p>Faltas no ciclo</p>

@@ -4,10 +4,11 @@
 
 - **O que faz:** bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou a um agendamento. Prazo pela falta vigente do ciclo: 1ª falta = 60 dias, 2ª = 90, 3ª ou mais = 180.
 - **Bloqueio:** automático, num workflow n8n às 01:00. Grava as faltas em `INTEGRACAO.dbo.CtlCnnFaltaPaciente` e manda `{ "ativo": false }`.
-- **Liberação:** **manual**, pelo painel web, com motivo obrigatório. Pode ser antes do fim do prazo. A liberação automática das 02:00 foi desativada.
+- **Liberação depois do prazo:** automática, num workflow n8n às 02:00. Só reativa quem o próprio sistema bloqueou, e grava tudo na auditoria.
+- **Liberação antes do prazo:** só com uma **solicitação de desbloqueio** aprovada pelo administrador. Qualquer usuário (a recepção, por exemplo) abre o pedido, com o motivo; o admin aprova ou recusa; Editor ou Admin libera no CNN.
 - **Painel rápido:** ao entrar, prepara todas as telas de uma vez; depois, a navegação não espera o servidor.
-- **Bloquear pelo painel:** roda o fluxo de bloqueio só para um paciente (busca a agenda dele, grava as faltas novas e bloqueia pelo prazo da falta vigente).
-- **Usuários:** cada pessoa tem login próprio, com perfil Leitor (só vê), Editor (libera e bloqueia) ou Admin (também gerencia usuários). Os usuários ficam em `dbo.CtlCnnUsuario`; o admin cuida deles pela tela Usuários.
+- **Bloquear pelo painel:** roda o fluxo de bloqueio só para um paciente (busca a agenda dele, grava as faltas novas e bloqueia pela falta vigente, se o prazo dela ainda corre).
+- **Usuários:** cada pessoa tem login próprio, com perfil Leitor (vê e abre solicitações), Editor (também bloqueia e libera o que foi aprovado) ou Admin (também aprova solicitações e gerencia usuários). Os usuários ficam em `dbo.CtlCnnUsuario`; o admin cuida deles pela tela Usuários.
 - **Rastreabilidade:** cada PATCH no CNN, automático ou pelo painel, vira uma linha em `dbo.CtlCnnAcaoPaciente` (quem, quando, motivo, resposta da API). A situação atual de cada paciente fica em `dbo.CtlCnnControlePaciente`.
 - **Ciclo:** começa em 1º de outubro. De outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.
 - **Onde fica a regra:** [`workflows/code/_regra.js`](../workflows/code/_regra.js), copiada para todos os workflows por `npm run inject`. A tela Configuração mostra os valores em uso.
@@ -16,32 +17,19 @@
 
 ```mermaid
 flowchart TB
-    subgraph Navegador
-        UI["Painel<br/>Pacientes · Relatórios<br/>Histórico · Configuração · Usuários"]
-    end
-    subgraph Vercel
-        API["/api/*<br/>sessão assinada + perfil<br/>validação"]
-    end
-    subgraph N8N["n8n"]
-        B["Bloqueio<br/>01:00"]
-        L["CNN Painel - Leitura<br/>(webhook)"]
-        A["CNN Painel - Ações<br/>(webhook)"]
-        US["CNN Painel - Usuários<br/>(webhook)"]
-    end
+    UI["Navegador · Painel<br/>Pacientes · Solicitações · Relatórios<br/>Histórico · Configuração · Usuários"]
+    API["Vercel /api/*<br/>sessão assinada + perfil · validação"]
+    W["n8n · webhooks do painel<br/>Leitura · Ações · Usuários · Solicitações"]
+    R["n8n · rotinas<br/>Bloqueio 01:00 · Liberação 02:00"]
     CNN["API Clínica nas Nuvens<br/>agenda · paciente · status"]
-    DB[("SQL Server INTEGRACAO<br/>faltas · controle · auditoria · usuários")]
+    DB[("SQL Server INTEGRACAO<br/>faltas · controle · auditoria<br/>solicitações · usuários")]
 
     UI -- "fetch + Bearer" --> API
-    API -- "{ action } + X-Monitor-Key" --> L
-    API --> A
-    API --> US
-    B -- "lê a agenda e bloqueia" --> CNN
-    A -- "libera e bloqueia" --> CNN
-    L -. "status ao vivo" .-> CNN
-    B --> DB
-    L --> DB
-    A --> DB
-    US --> DB
+    API -- "{ action } + X-Monitor-Key" --> W
+    W -- "lê e grava" --> DB
+    W -- "Ações: libera e bloqueia<br/>Leitura: status ao vivo" --> CNN
+    R -- "bloqueia e libera" --> CNN
+    R -- "grava" --> DB
 ```
 
 ## Documentos
@@ -52,14 +40,15 @@ flowchart TB
 |---|---|---|
 | [visao-geral.md](visao-geral.md) | Todos, inclusive quem não é técnico | O que o sistema faz, telas, situações do paciente, perfis, perguntas frequentes, glossário |
 | [seguranca-resumo.md](seguranca-resumo.md) | Liderança, gestão | Segurança sem termos técnicos: barreiras, perfis, registro das ações, LGPD, "e se acontecer…", o que está implantado e próximos passos |
-| [regras.md](regras.md) | Todos | As regras de negócio (R1 a R69): faltas, ciclo, prazos, bloqueio, liberação, auditoria, usuários, LGPD, desempenho |
+| [regras.md](regras.md) | Todos | As regras de negócio (R1 a R85): faltas, ciclo, prazos, bloqueio, liberação, auditoria, usuários, LGPD, desempenho |
 | [arquitetura.md](arquitetura.md) | Quem mantém | Peças, ligações, rotas, sequências, segurança, configuração e deploy |
 | [front-end.md](front-end.md) | Quem opera e quem mantém | O painel: telas, situações do paciente, liberar e bloquear, login |
 | [bloqueio.md](bloqueio.md) | Quem mantém ou opera | Workflow de bloqueio (01:00), nó a nó |
 | [fluxos/leitura.md](fluxos/leitura.md) | Quem mantém | Workflow CNN Painel - Leitura (consultas do painel) |
 | [fluxos/acoes.md](fluxos/acoes.md) | Quem mantém | Workflow CNN Painel - Ações (liberar e bloquear pelo painel) |
 | [fluxos/usuarios.md](fluxos/usuarios.md) | Quem mantém | Workflow CNN Painel - Usuários (login, perfis, gestão de usuários) |
-| [liberacao.md](liberacao.md) | Quem mantém | Workflow de liberação automática (**desativado**) |
+| [fluxos/solicitacoes.md](fluxos/solicitacoes.md) | Quem mantém ou opera | Workflow CNN Painel - Solicitações (pedidos de desbloqueio: quem pode pedir, aprovar, liberar) |
+| [liberacao.md](liberacao.md) | Quem mantém ou opera | Workflow de liberação automática (02:00): libera quem cumpriu o prazo |
 | [api-cnn.md](api-cnn.md) | Quem mantém | Integração com a API do CNN: endpoints, campos, autenticação, paginação |
 | [banco-de-dados.md](banco-de-dados.md) | Quem mantém ou opera | Tabelas, colunas, índices, consultas úteis |
 | [script-sql.md](script-sql.md) | Quem instala | Scripts de criação, migração e carga inicial |

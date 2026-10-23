@@ -86,6 +86,7 @@
       </div>
       <nav class="sidebar__nav" aria-label="Seções do painel">
         <a href="/pacientes">Pacientes</a>
+        <a href="/solicitacoes">Solicitações <span class="sidebar__badge" id="nav-solicitacoes"></span></a>
         <a href="/relatorios">Relatórios de faltas</a>
         <a href="/historico">Histórico de ações</a>
         <a href="/configuracao" aria-current="page">Configuração</a>
@@ -111,7 +112,8 @@
         <section class="cartao" aria-labelledby="c-prazos">
           <h2 id="c-prazos">Prazo para liberação, pela falta vigente</h2>
           <table class="prazos"><tbody id="prazos"><tr><td>—</td><td></td></tr></tbody></table>
-          <p>Toda falta no ciclo bloqueia o paciente (se estiver ativo no CNN). O prazo diz a partir de quando ele pode ser liberado, contado da data da falta vigente (a de maior número no ciclo). Uma falta nova substitui a anterior.</p>
+          <p>Toda falta no ciclo bloqueia o paciente (se estiver ativo no CNN) enquanto o prazo corre; quem já cumpriu o prazo não é bloqueado. O prazo conta da data da falta vigente (a de maior número no ciclo), e uma falta nova substitui a anterior.</p>
+          <p>Quando o prazo termina, a liberação automática reativa o paciente. Antes disso, só com uma <a href="/solicitacoes">solicitação de desbloqueio</a> aprovada pelo administrador.</p>
         </section>
         <section class="cartao" aria-labelledby="c-ciclo">
           <h2 id="c-ciclo">Ciclo</h2>
@@ -129,6 +131,7 @@
             <dt>Liberação automática</dt><dd id="liberacao-auto">—</dd>
             <dt>Última coleta de faltas</dt><dd id="ultima-coleta">—</dd>
             <dt>Último bloqueio automático</dt><dd id="ultimo-bloqueio">—</dd>
+            <dt>Última liberação automática</dt><dd id="ultima-liberacao">—</dd>
             <dt>Última ação no painel</dt><dd id="ultima-acao">—</dd>
             <dt>Pacientes no controle</dt><dd id="linhas-controle">—</dd>
             <dt>Faltas registradas</dt><dd id="linhas-faltas">—</dd>
@@ -144,10 +147,10 @@
           <p>Os parâmetros ficam em <code>workflows/code/_regra.js</code>, no repositório. Para mudar:</p>
           <p>
             1. Edite o arquivo e rode <code>npm run inject</code> e <code>npm run check</code>.<br />
-            2. Cole os workflows de bloqueio, Leitura e Ações no n8n.<br />
+            2. Cole os workflows de bloqueio, liberação automática, Leitura, Ações e Solicitações no n8n.<br />
             3. Faça o commit. Esta tela passa a mostrar os novos valores.
           </p>
-          <p>O horário do bloqueio fica no nó "Todo dia 01:00" do workflow de bloqueio.</p>
+          <p>Os horários ficam nos nós "Todo dia 01:00" (bloqueio) e "Todo dia 02:00" (liberação automática).</p>
         </section>
       </main>
     </div>

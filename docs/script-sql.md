@@ -7,9 +7,10 @@ Voltar ao [índice](README.md).
 | [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql) | Cria ou migra `dbo.CtlCnnFaltaPaciente`, `dbo.CtlCnnFaltaProcedimento` e `dbo.CtlCnnCadastro` | Instalação e sempre que mudar |
 | [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) | Cria `dbo.CtlCnnControlePaciente`, `dbo.CtlCnnAcaoPaciente` e os índices do painel | Implantação do painel e sempre que mudar |
 | [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) | Cria `dbo.CtlCnnUsuario` e `dbo.CtlCnnUsuarioEvento` (usuários do painel) | Implantação da gestão de usuários e sempre que mudar. Depois, o `INSERT` do primeiro admin (`npm run admin`) |
-| [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) | Preenche o controle com a situação deixada pela automação | **Uma vez**, no corte da liberação automática |
+| [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) | Cria `dbo.CtlCnnSolicitacao` (solicitações de desbloqueio) e a coluna `IdSolicitacao` na auditoria | Implantação das solicitações, **antes** de colar os workflows novos, e sempre que mudar |
+| [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) | Preenche o controle com a situação deixada pela automação | **Uma vez**, no corte da liberação automática (histórico) |
 
-Os quatro rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
+Os cinco rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
 
 ## criar_tabelas_bloqueio.sql
 
@@ -141,6 +142,21 @@ Cria as tabelas de usuários. Pode rodar mais de uma vez e **nada é apagado**.
 | 4 | `SELECT` de conferência: as duas tabelas e o número de colunas (usuário = 16, evento = 6) |
 
 O script não cria usuário nenhum. O primeiro admin sai de `npm run admin` ([scripts/criar-admin.mjs](../scripts/criar-admin.mjs)): senha aleatória impressa uma vez e um `INSERT` para colar no SSMS. Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnnusuario).
+
+## criar_tabelas_solicitacoes.sql
+
+Cria a tabela das solicitações de desbloqueio. Pode rodar mais de uma vez e **nada é apagado**.
+
+| # | O que faz |
+|---|---|
+| 1 | Cria `dbo.CtlCnnSolicitacao` (`Id IDENTITY`, CHECK em `Status`, defaults de `Status` = `PENDENTE`, `SolicitadoEm` e `AtualizadoEm`) |
+| 2 | Índice único filtrado `UX_CtlCnnSolicitacao_Aberta` em `IdPaciente` só para `PENDENTE` e `APROVADA`: uma solicitação aberta por paciente. Fica dentro de `EXEC (N'…')` |
+| 3 | Índices `IX_CtlCnnSolicitacao_Status_SolicitadoEm` e `IX_CtlCnnSolicitacao_IdPaciente_SolicitadoEm` |
+| 4 | `ALTER TABLE dbo.CtlCnnAcaoPaciente ADD IdSolicitacao BIGINT NULL`, se não existir |
+| 5 | Comentário com o `GRANT` (`SELECT, INSERT, UPDATE` em `CtlCnnSolicitacao`) para o usuário da credencial `TST Araguari` |
+| 6 | `SELECT` de conferência: `CtlCnnSolicitacao` (19 colunas), `CtlCnnAcaoPaciente` e `BytesIdSolicitacaoNaAuditoria` = 8 |
+
+**Rode antes de colar os workflows novos.** O `sqlRegistrarAcao` (Ações, Bloqueio e Liberação automática) grava `IdSolicitacao` e atualiza `CtlCnnSolicitacao`. Sem a tabela, o registro da auditoria falha. Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnnsolicitacao).
 
 ## carga_inicial_controle.sql
 

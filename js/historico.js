@@ -45,7 +45,7 @@ const linhaHtml = (item) => `
       <a class="link-paciente" href="/pacientes?paciente=${item.idPaciente}">${escapeHtml(item.nome || "(sem nome)")}</a>
       <span class="sub">ID ${item.idPaciente}</span>
     </td>
-    <td>${escapeHtml(ACAO[item.acao] || item.acao)}${item.antecipada ? '<span class="sub">antes do prazo</span>' : ""}</td>
+    <td>${escapeHtml(ACAO[item.acao] || item.acao)}${item.antecipada ? '<span class="sub">antes do prazo</span>' : ""}${item.idSolicitacao ? `<span class="sub"><a href="/solicitacoes?id=${Number(item.idSolicitacao)}">solicitação #${Number(item.idSolicitacao)}</a></span>` : ""}</td>
     <td>${escapeHtml(quem(item) || "—")}</td>
     <td>${escapeHtml(item.motivo || "—")}</td>
     <td class="mono">${item.numeroFalta ? `${item.numeroFalta}ª falta` : "—"}<span class="sub">${item.dataFimBloqueio ? `prazo ${dataBr(item.dataFimBloqueio)}` : ""}</span></td>

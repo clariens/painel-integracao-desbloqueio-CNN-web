@@ -18,10 +18,11 @@ O botão **Bloquear** do painel reutiliza o código deste fluxo (`separar faltas
 
 ## Regra
 
-- **Bloqueia todo paciente com falta no período** (de 1/10 do ciclo até hoje) que esteja **ativo** no CNN, com o prazo de liberação vencido ou não.
-- O prazo abaixo **não decide o bloqueio**. Ele diz a partir de quando o paciente pode ser **liberado** pelo painel, e é gravado no controle (`DataFimBloqueio`).
+- **Bloqueia todo paciente com falta no período** (de 1/10 do ciclo até hoje) que esteja **ativo** no CNN, **enquanto o prazo da falta vigente corre**.
+- **Quem já cumpriu o prazo não é bloqueado** (por exemplo, uma falta lançada atrasada no CNN). Até 22/10/2026 o prazo não decidia o bloqueio; agora, com a [liberação automática das 02:00](liberacao.md), bloquear quem já cumpriu o prazo só para liberar uma hora depois não faz sentido.
+- O prazo é gravado no controle (`DataFimBloqueio`). Quando termina, a liberação automática libera. Antes disso, só com uma [solicitação de desbloqueio](fluxos/solicitacoes.md) aprovada.
 
-| `NumeroFalta` vigente | Pode ser liberado após |
+| `NumeroFalta` vigente | Bloqueio dura |
 |---|---|
 | 1 | 60 dias |
 | 2 | 90 dias |
@@ -102,8 +103,8 @@ flowchart TD
 | 9 | `gravar faltas` | Microsoft SQL | Executa a query de `preparar insert SQL` (`={{ $json.query }}`) numa transação (`SET XACT_ABORT ON`), com a renumeração de `NumeroFalta`. Devolve `faltasLidas`, `faltasNovas` e `cadastrosLidos` |
 | 10 | [`ids da consulta`](../workflows/code/bloqueio-ids-consulta.js) | Code | Monta a consulta de `consultar bloqueios` com a lista de pacientes do lote. Se `preparar insert SQL` não rodou, não devolve nada |
 | 11 | `consultar bloqueios` | Microsoft SQL | Devolve a linha vigente (`MAX(NumeroFalta)` no ciclo) de cada paciente do lote, **menos** quem está `LIBERADO` no controle com essa mesma falta |
-| 12 | [`montar info bloqueio`](../workflows/code/bloqueio-montar-info.js) | Code | Emite um item por paciente com falta no período (sem olhar o prazo; calcula a data a partir da qual pode liberar). Quem o GET trouxe `ativo: false` sai com `apenasRegistrar: true`, ou fica de fora se o controle já tem o bloqueio dessa falta |
-| 12a | `há o que bloquear?` | If | Sem ninguém para bloquear, `montar info bloqueio` devolve um item `{ nadaABloquear: true }` com o resumo (analisados, prazo vencido, já registrados). Esse item vai para o nó final `nada a bloquear`, e a execução termina mostrando o motivo |
+| 12 | [`montar info bloqueio`](../workflows/code/bloqueio-montar-info.js) | Code | Emite um item por paciente com falta no período e **prazo correndo** (quem já cumpriu o prazo fica de fora e entra na contagem `prazoCumprido`); calcula o fim do prazo. Quem o GET trouxe `ativo: false` sai com `apenasRegistrar: true`, ou fica de fora se o controle já tem o bloqueio dessa falta |
+| 12a | `há o que bloquear?` | If | Sem ninguém para bloquear, `montar info bloqueio` devolve um item `{ nadaABloquear: true }` com o resumo (analisados, já registrados, prazo cumprido). Esse item vai para o nó final `nada a bloquear`, e a execução termina mostrando o motivo |
 | 13 | `loop bloqueios` | Split in Batches | Passa os itens um por vez |
 | 13a | `enviar ao CNN?` | If | `apenasRegistrar` = true vai direto para `montar registro`, sem PATCH |
 | 14 | `PATCH status paciente` | HTTP Request | `PATCH /paciente/{id}/status` com `={{ { ativo: false } }}`. 1 por vez, 3000 ms entre chamadas. Resposta completa (`fullResponse`, `neverError`) para guardar o status HTTP; timeout de 15 s |

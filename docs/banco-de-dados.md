@@ -1,6 +1,6 @@
 # Banco de dados
 
-Voltar ao [índice](README.md). Scripts: [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql), [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) , [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) e [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) (detalhes em [script-sql.md](script-sql.md)).
+Voltar ao [índice](README.md). Scripts: [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql), [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) , [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql), [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) e [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) (detalhes em [script-sql.md](script-sql.md)).
 
 SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credencial `TST Araguari` do n8n.
 
@@ -9,10 +9,11 @@ SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credenci
 | Tabela | O que guarda | Quem grava | Quem lê | Retenção |
 |---|---|---|---|---|
 | `dbo.CtlCnnFaltaPaciente` | Uma linha por agendamento `FALTOU` (`IdAgenda` único), com a ordem da falta no ciclo | [Bloqueio](bloqueio.md) (`gravar faltas`) e [Ações](fluxos/acoes.md) no bloquear (mesmo código) | Bloqueio, [Leitura](fluxos/leitura.md), Ações | Sem prazo. Nenhum fluxo apaga linhas |
-| `dbo.CtlCnnControlePaciente` | **Tabela de controle**: uma linha por paciente com a situação atual (`BLOQUEADO`/`LIBERADO`), a falta de referência e a última ação | Bloqueio (`registrar bloqueio`), Ações (`registrar ação`), carga inicial | Bloqueio (`consultar bloqueios`), Leitura, Ações | Sem prazo. `MERGE` por paciente |
-| `dbo.CtlCnnAcaoPaciente` | **Auditoria**: uma linha por PATCH no CNN, automático ou pelo painel, com quem, motivo e resposta da API | Bloqueio (`registrar bloqueio`), Ações (`registrar ação`) | Leitura (histórico, detalhe) | Sem prazo. Só `INSERT` |
+| `dbo.CtlCnnControlePaciente` | **Tabela de controle**: uma linha por paciente com a situação atual (`BLOQUEADO`/`LIBERADO`), a falta de referência e a última ação | Bloqueio (`registrar bloqueio`), [liberação automática](liberacao.md) (`registrar liberação`), Ações (`registrar ação`), carga inicial | Bloqueio (`consultar bloqueios`), liberação (`consultar vencidos`), Leitura, Ações, Solicitações | Sem prazo. `MERGE` por paciente |
+| `dbo.CtlCnnAcaoPaciente` | **Auditoria**: uma linha por PATCH no CNN, automático ou pelo painel, com quem, motivo, resposta da API e a solicitação de origem (`IdSolicitacao`) | Bloqueio (`registrar bloqueio`), liberação automática (`registrar liberação`), Ações (`registrar ação`) | Leitura (histórico, detalhe) | Sem prazo. Só `INSERT` |
 | `dbo.CtlCnnFaltaProcedimento` | Procedimentos de cada falta (`procedimentos[]` do agendamento), uma linha por tipo | Bloqueio e Ações (`gravar faltas`): apaga e grava de novo os das faltas lidas | Leitura (lista, detalhe, relatórios) | Acompanha a falta |
 | `dbo.CtlCnnCadastro` | Nomes das listas do CNN: tipo de consulta, profissional (por `idpessoa`), rótulo, local, especialidade | Bloqueio (`gravar faltas`, `MERGE`); Ações só os profissionais | Leitura | Sem prazo. `MERGE` por `(Tipo, Id)` |
+| `dbo.CtlCnnSolicitacao` | **Solicitações de desbloqueio**: quem pediu, motivo, falta de referência, situação (`PENDENTE` a `ENCERRADA`), decisão e liberação | [Solicitações](fluxos/solicitacoes.md) (abrir, aprovar, recusar, cancelar); `sqlRegistrarAcao` (liberada, encerrada) nas Ações, no bloqueio e na liberação | Solicitações, Leitura, Ações | Sem prazo. Ninguém apaga; uma aberta por paciente |
 | `dbo.CtlCnnUsuario` | Usuários do painel: perfil, ativo, hash da senha, tentativas de login | [Usuários](fluxos/usuarios.md); o primeiro admin, à mão (`npm run admin`) | Usuários | Sem prazo. Ninguém é excluído, só desativado |
 | `dbo.CtlCnnUsuarioEvento` | Eventos de usuário: criação, perfil, senha, falhas de login | Usuários | Usuários (tela) | Sem prazo. Só `INSERT` |
 
@@ -110,6 +111,27 @@ erDiagram
     }
     CtlCnnUsuario ||--o{ CtlCnnUsuarioEvento : "Login"
     CtlCnnUsuario ||--o{ CtlCnnAcaoPaciente : "Login = Usuario"
+```
+
+### Solicitações de desbloqueio
+
+```mermaid
+erDiagram
+    CtlCnnSolicitacao {
+        bigint Id PK "IDENTITY"
+        bigint IdPaciente "uma aberta por paciente"
+        bigint IdAgendaReferencia "falta vigente ao pedir"
+        nvarchar Motivo
+        nvarchar SolicitadoPor
+        nvarchar Status "PENDENTE ... ENCERRADA"
+        nvarchar DecididoPor
+        nvarchar MotivoDecisao
+        nvarchar LiberadoPor
+        bigint IdAcao "auditoria da liberação"
+    }
+    CtlCnnFaltaPaciente ||--o{ CtlCnnSolicitacao : "IdAgenda = IdAgendaReferencia"
+    CtlCnnSolicitacao |o--o| CtlCnnAcaoPaciente : "IdAcao = Id, Id = IdSolicitacao"
+    CtlCnnUsuario ||--o{ CtlCnnSolicitacao : "Login = SolicitadoPor"
 ```
 
 ## Dicionário de dados
@@ -210,9 +232,37 @@ Só muda quando o PATCH dá certo.
 | `HttpStatus` | `INT` | Sim | Status HTTP do PATCH |
 | `RespostaApi` | `NVARCHAR(1000)` | Sim | Corpo ou erro quando falhou |
 | `IdExecucaoN8n` | `NVARCHAR(50)` | Sim | Execução do n8n que fez o PATCH |
+| `IdSolicitacao` | `BIGINT` | Sim | Solicitação de desbloqueio que originou a liberação (`dbo.CtlCnnSolicitacao.Id`). Criada por `criar_tabelas_solicitacoes.sql` |
 | `CriadoEm` | `DATETIME2(0)` | Não | UTC. Default `SYSUTCDATETIME()` |
 
 Índices: `IX_CtlCnnAcaoPaciente_IdPaciente_CriadoEm`, `IX_CtlCnnAcaoPaciente_CriadoEm` e, no controle, `IX_CtlCnnControlePaciente_Situacao`. Em `CtlCnnFaltaPaciente` entra `IX_CtlCnnFaltaPaciente_DataFalta` para os relatórios por período.
+
+### `dbo.CtlCnnSolicitacao`
+
+Pedidos de desbloqueio. Regras e situações em [fluxos/solicitacoes.md](fluxos/solicitacoes.md).
+
+| Coluna | Tipo | Nulo | Descrição |
+|---|---|---|---|
+| `Id` | `BIGINT IDENTITY(1, 1)` | Não | Número da solicitação (o "#N" do painel) |
+| `IdPaciente` | `BIGINT` | Não | Paciente do CNN |
+| `NomePaciente` | `NVARCHAR(200)` | Sim | Nome no momento do pedido |
+| `IdAgendaReferencia` | `BIGINT` | Não | Falta vigente quando o pedido foi aberto. Se mudar, o pedido fica desatualizado |
+| `NumeroFalta` | `INT` | Sim | Número dessa falta no ciclo |
+| `DataFalta` | `DATE` | Sim | Data dessa falta |
+| `DataFimBloqueio` | `DATE` | Sim | Fim do prazo dessa falta |
+| `Motivo` | `NVARCHAR(500)` | Não | Por que o paciente deve ser liberado (5 a 500 caracteres) |
+| `SolicitadoPor` | `NVARCHAR(100)` | Não | Login de quem pediu |
+| `SolicitadoEm` | `DATETIME2(0)` | Não | UTC. Default `SYSUTCDATETIME()` |
+| `Status` | `NVARCHAR(20)` | Não | `PENDENTE`, `APROVADA`, `LIBERADA`, `RECUSADA`, `CANCELADA` ou `ENCERRADA` (CHECK). Default `PENDENTE` |
+| `DecididoPor` | `NVARCHAR(100)` | Sim | Quem aprovou, recusou ou cancelou |
+| `DecididoEm` | `DATETIME2(0)` | Sim | Quando (UTC). Também no encerramento pelo sistema |
+| `MotivoDecisao` | `NVARCHAR(500)` | Sim | Motivo da recusa, do cancelamento ou do encerramento |
+| `LiberadoPor` | `NVARCHAR(100)` | Sim | Quem liberou no CNN |
+| `LiberadoEm` | `DATETIME2(0)` | Sim | Quando (UTC) |
+| `IdAcao` | `BIGINT` | Sim | Linha da auditoria da liberação (`CtlCnnAcaoPaciente.Id`) |
+| `AtualizadoEm` | `DATETIME2(0)` | Não | Última mudança (UTC) |
+
+Índices: `PK_CtlCnnSolicitacao` (`Id`); `UX_CtlCnnSolicitacao_Aberta`, único em `IdPaciente` só para `Status IN ('PENDENTE', 'APROVADA')` (uma aberta por paciente); `IX_CtlCnnSolicitacao_Status_SolicitadoEm`; `IX_CtlCnnSolicitacao_IdPaciente_SolicitadoEm`.
 
 ### `dbo.CtlCnnUsuario`
 
@@ -246,7 +296,8 @@ Calculada pelo workflow [Leitura](fluxos/leitura.md#situação-de-cada-paciente)
 
 | Controle aponta para a falta vigente? | `Situacao` | Prazo | Selo no painel |
 |---|---|---|---|
-| Não (ou sem linha) | — | correndo ou vencido | Aguardando bloqueio (toda falta do período bloqueia) |
+| Não (ou sem linha) | — | correndo | Aguardando bloqueio |
+| Não (ou sem linha) | — | cumprido | Liberado (situação `CUMPRIDO`: o bloqueio não bloqueia quem cumpriu o prazo) |
 | Sim | `BLOQUEADO` | correndo / vencido | Bloqueado / Apto a liberar |
 | Sim | `LIBERADO` | correndo | Liberado antes do prazo |
 | Sim | `LIBERADO` | vencido | Liberado |
@@ -394,6 +445,25 @@ SELECT *
 FROM Esperado
 WHERE NumeroFalta <> NumeroEsperado
 ORDER BY IdPaciente, DataFalta;
+```
+
+### Solicitações abertas
+
+```sql
+SELECT s.Id, s.SolicitadoEm, s.IdPaciente, s.NomePaciente, s.Status, s.SolicitadoPor, s.Motivo, s.DecididoPor
+FROM dbo.CtlCnnSolicitacao s
+WHERE s.Status IN (N'PENDENTE', N'APROVADA')
+ORDER BY s.SolicitadoEm;
+```
+
+### Liberações por solicitação (com quem pediu e quem aprovou)
+
+```sql
+SELECT a.CriadoEm, a.IdPaciente, a.NomePaciente, a.Usuario AS LiberadoPor, s.SolicitadoPor, s.DecididoPor, s.Motivo, a.Antecipada, a.Sucesso
+FROM dbo.CtlCnnAcaoPaciente a
+INNER JOIN dbo.CtlCnnSolicitacao s
+    ON s.Id = a.IdSolicitacao
+ORDER BY a.CriadoEm DESC;
 ```
 
 ### Auditoria do dia

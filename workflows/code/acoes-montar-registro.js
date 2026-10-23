@@ -13,13 +13,20 @@ const resposta = decisao.apenasRegistrar
   ? { ok: true, statusCode: null, erro: null, texto: SO_REGISTRO }
   : lerRespostaHttp($input.first().json);
 
+// Liberação por solicitação: sem motivo próprio, vale o motivo de quem pediu.
+const motivo = validar.motivo || (decisao.idSolicitacao
+  ? `Solicitação #${decisao.idSolicitacao}${decisao.solicitadoPor ? ` (${decisao.solicitadoPor})` : ''}: ${decisao.motivoSolicitacao || ''}`.trim()
+  : '');
+
 const query = sqlRegistrarAcao({
   idPaciente: decisao.idPaciente,
   nomePaciente: decisao.nomePaciente,
   acao: decisao.acao,
   origem: 'PAINEL',
   usuario: validar.usuario,
-  motivo: validar.motivo,
+  motivo,
+  idSolicitacao: decisao.idSolicitacao,
+  aprovador: validar.aprovar ? validar.usuario : null,
   idAgenda: decisao.idAgenda,
   numeroFalta: decisao.numeroFalta,
   dataInicioBloqueio: decisao.dataInicioBloqueio,
@@ -43,6 +50,7 @@ const resultado = resposta.ok
         nomePaciente: decisao.nomePaciente,
         antecipada: Boolean(decisao.antecipada),
         apenasRegistrado: Boolean(decisao.apenasRegistrar),
+        idSolicitacao: decisao.idSolicitacao || null,
         dataFimBloqueio: decisao.dataFimBloqueio,
         em: new Date().toISOString(),
         mensagem: decisao.isencao
@@ -55,7 +63,7 @@ const resultado = resposta.ok
   : {
       statusCode: 502,
       response: {
-        error: `A API do CNN recusou${resposta.statusCode ? ` (HTTP ${resposta.statusCode})` : ''}: ${(resposta.erro || resposta.texto || 'sem resposta').slice(0, 300)}`
+        error: `A API do CNN recusou${resposta.statusCode ? ` (HTTP ${resposta.statusCode})` : ''}: ${(resposta.erro || resposta.texto || 'sem resposta').slice(0, 300)}${validar.aprovar ? ' A solicitação ficou aprovada: tente liberar de novo.' : ''}`
       }
     };
 

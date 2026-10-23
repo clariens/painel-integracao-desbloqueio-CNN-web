@@ -94,10 +94,18 @@ SELECT
     c.UltimaAcao,
     c.OrigemUltimaAcao,
     c.UltimaAcaoPor,
-    c.UltimaAcaoEm
+    c.UltimaAcaoEm,
+    s.Id AS SolicitacaoId,
+    s.Status AS SolicitacaoStatus,
+    s.IdAgendaReferencia AS SolicitacaoIdAgenda,
+    s.SolicitadoPor AS SolicitacaoPor,
+    s.SolicitadoEm AS SolicitacaoEm
 FROM Faltas v
 LEFT JOIN dbo.CtlCnnControlePaciente c
     ON c.IdPaciente = v.IdPaciente
+LEFT JOIN dbo.CtlCnnSolicitacao s
+    ON s.IdPaciente = v.IdPaciente
+   AND s.Status IN (N'PENDENTE', N'APROVADA')
 WHERE v.Ordem = 1;
 
 SELECT
@@ -105,8 +113,11 @@ SELECT
     (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @inicio) AS FaltasCiclo,
     (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @inicioMes) AS FaltasMes,
     (SELECT MAX(DataColeta) FROM dbo.CtlCnnFaltaPaciente) AS UltimaColeta,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO') AS UltimoBloqueioAutomatico,
-    (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente) AS LinhasControle;`;
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'BLOQUEIO') AS UltimoBloqueioAutomatico,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'LIBERACAO') AS UltimaLiberacaoAutomatica,
+    (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente) AS LinhasControle,
+    (SELECT COUNT(*) FROM dbo.CtlCnnSolicitacao WHERE Status = N'PENDENTE') AS SolicitacoesPendentes,
+    (SELECT COUNT(*) FROM dbo.CtlCnnSolicitacao WHERE Status = N'APROVADA') AS SolicitacoesAprovadas;`;
 
   return [{ json: { action, query, inicio, hoje } }];
 }
@@ -151,10 +162,29 @@ SELECT TOP (200)
     Sucesso,
     HttpStatus,
     RespostaApi,
+    IdSolicitacao,
     CriadoEm
 FROM dbo.CtlCnnAcaoPaciente
 WHERE IdPaciente = @id
 ORDER BY CriadoEm DESC, Id DESC;
+
+SELECT TOP (50)
+    N'solicitacao' AS _secao,
+    Id,
+    IdAgendaReferencia,
+    NumeroFalta,
+    Motivo,
+    SolicitadoPor,
+    SolicitadoEm,
+    Status,
+    DecididoPor,
+    DecididoEm,
+    MotivoDecisao,
+    LiberadoPor,
+    LiberadoEm
+FROM dbo.CtlCnnSolicitacao
+WHERE IdPaciente = @id
+ORDER BY SolicitadoEm DESC, Id DESC;
 
 SELECT
     N'controle' AS _secao,
@@ -344,6 +374,7 @@ SELECT
     HttpStatus,
     RespostaApi,
     IdExecucaoN8n,
+    IdSolicitacao,
     CriadoEm
 FROM dbo.CtlCnnAcaoPaciente
 WHERE ${where}
@@ -365,7 +396,8 @@ SET NOCOUNT ON;
 SELECT
     N'status' AS _secao,
     (SELECT MAX(DataColeta) FROM dbo.CtlCnnFaltaPaciente) AS UltimaColeta,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO') AS UltimoBloqueioAutomatico,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'BLOQUEIO') AS UltimoBloqueioAutomatico,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'LIBERACAO') AS UltimaLiberacaoAutomatica,
     (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'PAINEL') AS UltimaAcaoPainel,
     (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente) AS LinhasControle,
     (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente) AS LinhasFaltas;

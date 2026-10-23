@@ -20,7 +20,7 @@ Esconder a URL do webhook (ela fica numa variável de ambiente e tem um UUID ale
 ```mermaid
 flowchart TB
     U["Pessoa no navegador"] -- "1 · HTTPS<br/>login + token da sessão" --> V["Vercel<br/>/api/*"]
-    V -- "2 · HTTPS<br/>X-Monitor-Key" --> N["n8n<br/>Leitura · Ações · Usuários<br/>+ Bloqueio 01:00 (pelo relógio)"]
+    V -- "2 · HTTPS<br/>X-Monitor-Key" --> N["n8n<br/>Leitura · Ações · Usuários · Solicitações<br/>+ Bloqueio 01:00 e Liberação 02:00 (pelo relógio)"]
     N -- "3 · credencial SQL" --> B[("SQL Server<br/>INTEGRACAO")]
     N -- "4 · credencial CNN" --> C["API Clínica nas Nuvens"]
 ```
@@ -28,11 +28,11 @@ flowchart TB
 | # | Trecho | Proteção | Onde está |
 |---|---|---|---|
 | 1 | Navegador → Vercel | HTTPS. Login com usuário e senha; depois, um token de sessão assinado (8 h) em cada chamada. Sem token válido, a resposta é 401. Sem o perfil exigido, 403 | [lib/auth.js](../lib/auth.js) |
-| 2 | Vercel → n8n | Cabeçalho `X-Monitor-Key`, conferido pela credencial **Header Auth** dos três webhooks. Sem a chave, o n8n recusa (403) | [lib/n8n.js](../lib/n8n.js), nós `Webhook` da [Leitura](fluxos/leitura.md), das [Ações](fluxos/acoes.md) e dos [Usuários](fluxos/usuarios.md) |
+| 2 | Vercel → n8n | Cabeçalho `X-Monitor-Key`, conferido pela credencial **Header Auth** dos quatro webhooks. Sem a chave, o n8n recusa (403) | [lib/n8n.js](../lib/n8n.js), nós `Webhook` da [Leitura](fluxos/leitura.md), das [Ações](fluxos/acoes.md), dos [Usuários](fluxos/usuarios.md) e das [Solicitações](fluxos/solicitacoes.md) |
 | 3 | n8n → SQL Server | Credencial `TST Araguari`, só no n8n. O banco não tem porta aberta para a internet | Credenciais do n8n |
 | 4 | n8n → API do CNN | Credencial `API CNN AUTH` (Basic) e o cabeçalho `clinicaNasNuvens-cid` | Credenciais e nós HTTP do n8n |
 
-O bloqueio das 01:00 não tem porta de entrada: ele é disparado pelo relógio do próprio n8n.
+O bloqueio das 01:00 e a liberação das 02:00 não têm porta de entrada: são disparados pelo relógio do próprio n8n.
 
 ## Login, sessão e perfis
 
@@ -59,8 +59,10 @@ sequenceDiagram
 
 | Rota | Perfil mínimo | Confere o banco de novo? |
 |---|---|---|
-| `GET /api/pacientes`, `/api/pacientes/:id`, `/api/faltas`, `/api/acoes`, `/api/parametros` | Leitor | Não (confia no token até expirar) |
-| `POST /api/pacientes/:id/liberar` e `/bloquear` | Editor | Sim |
+| `GET /api/pacientes`, `/api/pacientes/:id`, `/api/faltas`, `/api/acoes`, `/api/parametros`, `/api/solicitacoes` | Leitor | Não (confia no token até expirar) |
+| `POST /api/solicitacoes` (abrir pedido) e `PATCH /api/solicitacoes/:id` com `cancelar` | Leitor (cancelar: só quem abriu, ou admin) | Sim |
+| `PATCH /api/solicitacoes/:id` com `aprovar` ou `recusar`; `aprovarELiberar` e `aprovar: true` | Admin | Sim |
+| `POST /api/pacientes/:id/liberar` e `/bloquear`; `POST /api/solicitacoes/:id/liberar` | Editor | Sim |
 | `/api/usuarios` e `/api/usuarios/:login` | Admin | Sim, nas alterações |
 | `POST /api/senha` | Leitor (aceita sessão com troca obrigatória) | — |
 
@@ -70,7 +72,7 @@ sequenceDiagram
 |---|---|---|---|
 | `SESSION_SECRET` | Assinar os tokens de sessão | Variável da Vercel; `.env.local` no desenvolvimento | Só quem administra a Vercel |
 | `N8N_WEBHOOK_SECRET` | Chave enviada no `X-Monitor-Key` | Variável da Vercel **e** Value da credencial Header Auth no n8n (os dois iguais) | Só quem administra a Vercel e o n8n |
-| `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL` | Endereço dos webhooks | Variáveis da Vercel | Só quem administra a Vercel |
+| `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_SOLICITACOES_URL` | Endereço dos webhooks | Variáveis da Vercel | Só quem administra a Vercel |
 | Credencial SQL (`TST Araguari`) | Ler e gravar no banco | Credenciais do n8n | Só quem administra o n8n |
 | Credencial `API CNN AUTH` | Chamar a API do CNN | Credenciais do n8n | Só quem administra o n8n |
 | `clinicaNasNuvens-cid` | Identifica a clínica na API do CNN | Escrito nos nós HTTP e, por isso, nos JSON de `workflows/` | Quem tem acesso ao repositório |
@@ -113,7 +115,7 @@ O navegador só conhece o próprio token. A Vercel lê a chave da variável de a
    - **Name:** `X-Monitor-Key` (é o nome do cabeçalho; tem que ser exatamente esse);
    - **Value:** o segredo, sem espaço nem quebra de linha nas pontas.
 
-3. **Nos três webhooks** (Leitura, Ações e Usuários): nó `Webhook` → Authentication = **Header Auth** → escolher a credencial → salvar → **Publish**. Nas versões novas do n8n, Save não muda a produção: a URL de produção roda a versão publicada.
+3. **Nos quatro webhooks** (Leitura, Ações, Usuários e Solicitações): nó `Webhook` → Authentication = **Header Auth** → escolher a credencial → salvar → **Publish**. Nas versões novas do n8n, Save não muda a produção: a URL de produção roda a versão publicada.
 
 4. **Vercel:** Project → Settings → Environment Variables → `N8N_WEBHOOK_SECRET` = o mesmo segredo (Production e Preview) → **Redeploy**.
 
@@ -136,7 +138,7 @@ No n8n, cada credencial pertence a um **projeto** (ou ao espaço pessoal de quem
 
   Depois, selecionar de novo a credencial no nó e clicar em **Publish**.
 
-O mais simples é manter os quatro workflows (Bloqueio, Leitura, Ações e Usuários) **no mesmo projeto** das credenciais.
+O mais simples é manter os seis workflows (Bloqueio, Liberação, Leitura, Ações, Usuários e Solicitações) **no mesmo projeto** das credenciais.
 
 ## Trocar as chaves
 
@@ -148,7 +150,7 @@ Troque quando alguém que conhecia a chave sair da equipe, se houver suspeita de
 | `SESSION_SECRET` | Gere um segredo novo → atualize na Vercel → Redeploy | **Desloga todo mundo na hora.** Use também quando precisar cortar o acesso de alguém imediatamente |
 | Senha de um usuário | Tela Usuários → **Redefinir senha** | A pessoa recebe uma senha temporária; o login atual dela deixa de valer para escritas |
 | Tirar o acesso de alguém | Tela Usuários → **Desativar** | Não entra mais e não consegue liberar nem bloquear. Ver o risco "leitura até 8 h" abaixo |
-| Credenciais do CNN ou do SQL | No n8n, editar a credencial | Vale para os quatro workflows ao mesmo tempo |
+| Credenciais do CNN ou do SQL | No n8n, editar a credencial | Vale para todos os workflows ao mesmo tempo |
 
 ## Proteções no código
 

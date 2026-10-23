@@ -14,6 +14,9 @@ import sessao from "./api/sessao.js";
 import senha from "./api/senha.js";
 import usuarios from "./api/usuarios/index.js";
 import alterarUsuario from "./api/usuarios/[login].js";
+import solicitacoes from "./api/solicitacoes/index.js";
+import decidirSolicitacao from "./api/solicitacoes/[id].js";
+import liberarSolicitacao from "./api/solicitacoes/[id]/liberar.js";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -49,6 +52,7 @@ const pages = {
   "/historico": "historico.html",
   "/configuracao": "configuracao.html",
   "/usuarios": "usuarios.html",
+  "/solicitacoes": "solicitacoes.html",
 };
 
 const routes = [
@@ -63,6 +67,9 @@ const routes = [
   [/^\/api\/senha$/, senha],
   [/^\/api\/usuarios$/, usuarios],
   [/^\/api\/usuarios\/([^/]+)$/, alterarUsuario, "login"],
+  [/^\/api\/solicitacoes$/, solicitacoes],
+  [/^\/api\/solicitacoes\/([^/]+)$/, decidirSolicitacao],
+  [/^\/api\/solicitacoes\/([^/]+)\/liberar$/, liberarSolicitacao],
 ];
 
 const readBody = (req) =>
@@ -147,5 +154,6 @@ server.listen(port, () => {
   console.log(`Leitura: ${process.env.N8N_LEITURA_URL ? "configurada" : "(N8N_LEITURA_URL vazio)"}`);
   console.log(`Ações:   ${process.env.N8N_ACOES_URL ? "configurada" : "(N8N_ACOES_URL vazio)"}`);
   console.log(`Usuários: ${process.env.N8N_USUARIOS_URL ? "configurada" : "(N8N_USUARIOS_URL vazio)"}`);
+  console.log(`Solicitações: ${process.env.N8N_SOLICITACOES_URL ? "configurada" : "(N8N_SOLICITACOES_URL vazio)"}`);
   if (!process.env.SESSION_SECRET) console.log("Atenção: SESSION_SECRET vazio, ninguém consegue entrar.");
 });

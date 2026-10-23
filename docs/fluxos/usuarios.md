@@ -14,7 +14,7 @@ A senha em texto **nunca chega ao n8n**. A Vercel calcula salt e hash (scrypt, o
 |---|---|
 | Login (`POST /api/sessao`) | `login-buscar`, depois `login-resultado` |
 | Troca da própria senha (`POST /api/senha`) | `login-buscar`, `trocar-senha` |
-| Antes de cada escrita: liberar, bloquear, criar ou alterar usuário | `sessao` |
+| Antes de cada escrita: liberar, bloquear, solicitações (abrir, aprovar, recusar, cancelar), criar ou alterar usuário | `sessao` |
 | Tela Usuários (`/api/usuarios`, `/api/usuarios/:login`) | `listar`, `criar`, `alterar`, `redefinir-senha` |
 
 Webhook POST com a mesma credencial Header Auth (`X-Monitor-Key`) dos outros workflows.
@@ -58,8 +58,8 @@ Escritas rodam em transação (`XACT_ABORT`) e devolvem uma linha `Resultado`. A
 
 | Perfil | Pode |
 |---|---|
-| `LEITOR` | Ver pacientes, relatórios, histórico e configuração |
-| `EDITOR` | Tudo do leitor, mais liberar, bloquear, isentar e registrar |
-| `ADMIN` | Tudo do editor, mais a tela Usuários |
+| `LEITOR` | Ver pacientes, solicitações, relatórios, histórico e configuração; abrir solicitações de desbloqueio |
+| `EDITOR` | Tudo do leitor, mais bloquear, registrar, liberar quem cumpriu o prazo e liberar solicitações aprovadas |
+| `ADMIN` | Tudo do editor, mais aprovar e recusar solicitações e a tela Usuários |
 
 A permissão é conferida na API (403 `SEM_PERMISSAO`). A tela só esconde os botões.

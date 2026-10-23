@@ -1,6 +1,6 @@
 // Partes comuns de todas as páginas: login, usuário no menu, relógio, barra de status, erro da API e aviso rápido.
 import { PERFIL, escapeHtml, hojeSp, inicioCiclo } from "./formato.js";
-import { clearAuth, clearCaches, comCache, getAuth, getUsuario, pode, request, setAuth, temCache, writeCache } from "./session.js";
+import { clearAuth, clearCaches, comCache, getAuth, getUsuario, pode, readCache, request, setAuth, temCache, writeCache } from "./session.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -62,6 +62,21 @@ export const avisar = (mensagem, { erro = false } = {}) => {
   }, 6000);
 };
 
+// Contador do menu "Solicitações": quantas aguardam aprovação. Lê o que já está na aba (a lista de
+// solicitações ou, sem ela, o resumo de Pacientes); nunca chama a API só para isso.
+const DIA_MS = 24 * 60 * 60 * 1000;
+export const atualizarContador = () => {
+  const alvo = $("#nav-solicitacoes");
+  if (!alvo) return;
+  const lista = readCache("solicitacoes", DIA_MS)?.data;
+  const resumo = readCache("pacientes", DIA_MS)?.data?.resumo;
+  const pendentes = lista?.contagem ? Number(lista.contagem.PENDENTE || 0) : Number(resumo?.solicitacoesPendentes || 0);
+  alvo.textContent = pendentes > 0 ? String(pendentes) : "";
+  alvo.title = pendentes > 0 ? `${pendentes} aguardando aprovação` : "";
+  // Para o admin (quem aprova) o contador fica em destaque.
+  alvo.classList.toggle("is-destaque", pendentes > 0 && pode("ADMIN"));
+};
+
 const atualizarUsuario = () => {
   const usuario = getUsuario();
   if (els.usuario) els.usuario.textContent = usuario?.nome || usuario?.login || "—";
@@ -99,6 +114,7 @@ export const usarCache = async (key, apiPath, prazoMs, { forcar }, aplicar) => {
     aoAtualizar: (nova) => {
       aplicar(nova.data);
       atualizadoAs(nova.savedAt);
+      atualizarContador();
     },
   });
   aplicar(entrada.data);
@@ -111,6 +127,7 @@ const telasPadrao = () => {
   const inicio = inicioCiclo(hoje);
   return [
     { nome: "Pacientes", key: "pacientes", path: "/api/pacientes" },
+    { nome: "Solicitações", key: "solicitacoes", path: "/api/solicitacoes" },
     { nome: "Relatórios", key: `faltas:${inicio}:${hoje}`, path: `/api/faltas?${new URLSearchParams({ de: inicio, ate: hoje })}` },
     { nome: "Histórico", key: "acoes:page=1", path: "/api/acoes?page=1" },
     { nome: "Configuração", key: "parametros", path: "/api/parametros" },
@@ -157,6 +174,7 @@ export const prepararDados = async () => {
 
   camada.classList.add("is-saindo");
   window.setTimeout(() => camada.remove(), 350);
+  atualizarContador();
 };
 
 const relogio = () => {
@@ -192,6 +210,7 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
     mostrarErro("");
     try {
       const resultado = await carregar({ forcar });
+      atualizarContador();
       // Dado vencido na tela enquanto o novo vem por trás.
       if (resultado?.velho) status("busy", "atualizando…");
       else status("ok", `atualizado às ${hora(resultado?.savedAt ? new Date(resultado.savedAt) : new Date())}`);
@@ -330,6 +349,7 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
   relogio();
   window.setInterval(relogio, 30_000);
   atualizarUsuario();
+  atualizarContador();
 
   if (prazoMs) {
     window.setInterval(() => {

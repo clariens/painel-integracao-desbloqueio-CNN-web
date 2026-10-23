@@ -32,9 +32,12 @@ const desenhar = ({ regra, ciclo, status, cadastros = [] }) => {
   $("#ciclo-inicio").textContent = dataBr(ciclo.inicio);
   $("#fuso").textContent = regra.fuso;
   $("#horario").textContent = `todo dia às ${regra.horarioBloqueio}`;
-  $("#liberacao-auto").textContent = regra.liberacaoAutomatica ? "ligada" : "desligada · liberação manual pelo painel";
+  $("#liberacao-auto").textContent = regra.liberacaoAutomatica
+    ? `todo dia às ${regra.horarioLiberacao || "02:00"} · libera quem cumpriu o prazo`
+    : "desligada · liberação manual pelo painel";
   $("#ultima-coleta").textContent = dataHoraBr(status.ultimaColeta);
   $("#ultimo-bloqueio").textContent = dataHoraBr(status.ultimoBloqueioAutomatico);
+  $("#ultima-liberacao").textContent = dataHoraBr(status.ultimaLiberacaoAutomatica);
   $("#ultima-acao").textContent = dataHoraBr(status.ultimaAcaoPainel);
   $("#linhas-controle").textContent = numero(status.linhasControle);
   $("#linhas-faltas").textContent = numero(status.linhasFaltas);

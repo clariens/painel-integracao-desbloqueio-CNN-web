@@ -60,6 +60,7 @@ export const CACHE = {
   acoes: 2 * 60 * 1000, // histórico, por filtro e página
   parametros: 30 * 60 * 1000, // configuração: quase não muda
   usuarios: 2 * 60 * 1000,
+  solicitacoes: 60 * 1000, // pedidos de desbloqueio: o contador do menu sai daqui
 };
 
 export const PACIENTES_CACHE_KEY = "pacientes";

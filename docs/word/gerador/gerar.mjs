@@ -50,13 +50,14 @@ const DOCUMENTOS = [
   { arquivo: "fluxos/leitura.md", titulo: "Workflow CNN Painel - Leitura", saida: "08 - Fluxo de leitura.docx" },
   { arquivo: "fluxos/acoes.md", titulo: "Workflow CNN Painel - Ações", saida: "09 - Fluxo de ações (liberar e bloquear).docx" },
   { arquivo: "fluxos/usuarios.md", titulo: "Workflow CNN Painel - Usuários", saida: "10 - Fluxo de usuários.docx" },
-  { arquivo: "api-cnn.md", titulo: "Integração com a API do CNN", saida: "11 - Integração com a API CNN.docx" },
-  { arquivo: "banco-de-dados.md", titulo: "Banco de dados", saida: "12 - Banco de dados.docx" },
-  { arquivo: "script-sql.md", titulo: "Scripts SQL", saida: "13 - Scripts SQL.docx" },
-  { arquivo: "operacao.md", titulo: "Operação", saida: "14 - Operação.docx" },
-  { arquivo: "seguranca.md", titulo: "Segurança (técnica)", saida: "15 - Segurança (técnica).docx" },
-  { arquivo: "liberacao.md", titulo: "Liberação automática (desativada)", saida: "16 - Liberação automática (desativada).docx" },
-  { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "17 - Histórico de mudanças.docx" },
+  { arquivo: "fluxos/solicitacoes.md", titulo: "Workflow CNN Painel - Solicitações", saida: "11 - Fluxo de solicitações de desbloqueio.docx" },
+  { arquivo: "api-cnn.md", titulo: "Integração com a API do CNN", saida: "12 - Integração com a API CNN.docx" },
+  { arquivo: "banco-de-dados.md", titulo: "Banco de dados", saida: "13 - Banco de dados.docx" },
+  { arquivo: "script-sql.md", titulo: "Scripts SQL", saida: "14 - Scripts SQL.docx" },
+  { arquivo: "operacao.md", titulo: "Operação", saida: "15 - Operação.docx" },
+  { arquivo: "seguranca.md", titulo: "Segurança (técnica)", saida: "16 - Segurança (técnica).docx" },
+  { arquivo: "liberacao.md", titulo: "Liberação automática (02:00)", saida: "17 - Liberação automática (02h).docx" },
+  { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "18 - Histórico de mudanças.docx" },
 ];
 const COMPLETO = "00 - Documentação completa.docx";
 

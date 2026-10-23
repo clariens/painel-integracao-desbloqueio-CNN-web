@@ -1,0 +1,466 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        352
+      ],
+      "id": "de030ba0-815b-4787-bdd9-51e1bc81afb7",
+      "name": "Todo dia 02:00"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Regra do bloqueio por falta (fonte única: workflows/code/_regra.js) =====\n// O inject.mjs copia este bloco para o início de todo nó Code que usa prazo ou ciclo.\n// Para mudar a regra: edite aqui, rode `npm run inject` e publique os workflows no n8n.\nconst REGRA = {\n  // Prazo (dias) a partir da falta vigente do ciclo. A maior chave vale para \"essa ou mais\".\n  // Toda falta do período (ciclo) bloqueia quem está ativo no CNN enquanto o prazo corre; quem já cumpriu\n  // o prazo não é bloqueado. Antes do fim do prazo, liberar só com solicitação aprovada pelo admin;\n  // depois, a liberação automática (02:00) libera.\n  prazosDias: { 1: 60, 2: 90, 3: 180 },\n  // Início do ciclo: de outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.\n  // Mudou de 1/8 para 1/10 em 2026-10-08. Mudar aqui exige mudar também a URL do nó \"GET agenda do ciclo\".\n  cicloInicio: { mes: 10, dia: 1 },\n  fuso: 'America/Sao_Paulo',\n  // Só informativos (os crons ficam nos nós \"Todo dia 01:00\" e \"Todo dia 02:00\" dos workflows).\n  horarioBloqueio: '01:00',\n  liberacaoAutomatica: true,\n  horarioLiberacao: '02:00',\n};\n\nconst pad2 = (valor) => String(valor).padStart(2, '0');\nconst agoraSp = () => $now.setZone(REGRA.fuso);\nconst hojeSp = () => agoraSp().toFormat('yyyy-MM-dd');\n\nconst inicioCiclo = () => {\n  const agora = agoraSp();\n  const { mes, dia } = REGRA.cicloInicio;\n  const jaComecou = agora.month > mes || (agora.month === mes && agora.day >= dia);\n  const ano = jaComecou ? agora.year : agora.year - 1;\n  return `${ano}-${pad2(mes)}-${pad2(dia)}`;\n};\n\nconst maiorFaltaRegra = Math.max(...Object.keys(REGRA.prazosDias).map(Number));\n\nconst diasPorFalta = (numeroFalta) => {\n  const numero = Math.min(Math.max(Number(numeroFalta) || 1, 1), maiorFaltaRegra);\n  return REGRA.prazosDias[numero];\n};\n\n// Mesmo cálculo em SQL: CASE WHEN col >= 3 THEN 180 WHEN col = 2 THEN 90 ELSE 60 END.\nconst sqlDiasCase = (coluna) => {\n  const chaves = Object.keys(REGRA.prazosDias).map(Number).sort((a, b) => b - a);\n  const partes = chaves\n    .filter((chave) => chave !== 1)\n    .map((chave) => `WHEN ${coluna} ${chave === maiorFaltaRegra ? '>=' : '='} ${chave} THEN ${REGRA.prazosDias[chave]}`);\n  return `CASE ${partes.join(' ')} ELSE ${REGRA.prazosDias[1]} END`;\n};\n\nconst dataIso = (valor) => {\n  if (!valor) {\n    return null;\n  }\n\n  if (valor instanceof Date) {\n    return Number.isNaN(valor.getTime()) ? null : valor.toISOString().slice(0, 10);\n  }\n\n  const texto = String(valor).slice(0, 10);\n  return /^\\d{4}-\\d{2}-\\d{2}$/.test(texto) ? texto : null;\n};\n\nconst somarDias = (valor, dias) => {\n  const inicio = dataIso(valor);\n  if (!inicio || !dias) {\n    return null;\n  }\n\n  const [ano, mes, dia] = inicio.split('-').map(Number);\n  const data = new Date(Date.UTC(ano, mes - 1, dia));\n  if (Number.isNaN(data.getTime())) {\n    return null;\n  }\n\n  data.setUTCDate(data.getUTCDate() + dias);\n  return data.toISOString().slice(0, 10);\n};\n// ===== fim da regra =====\n\n// ===== Helpers de SQL (fonte única: workflows/code/_sql.js) =====\n// O SQL é montado por texto: todo valor passa por uma destas funções.\nconst sqlN = (valor) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const numero = Number(valor);\n  return Number.isFinite(numero) ? String(Math.trunc(numero)) : 'NULL';\n};\n\nconst sqlS = (valor, maxLength) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const texto = String(valor).slice(0, maxLength ?? 4000).replace(/'/g, \"''\");\n  return `N'${texto}'`;\n};\n\nconst sqlDate = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  const data = String(valor).slice(0, 10);\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(date, '${data}', 23)`;\n};\n\nconst sqlTime = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  let hora = String(valor).trim();\n  if (/^\\d{2}:\\d{2}$/.test(hora)) {\n    hora = `${hora}:00`;\n  }\n\n  if (!/^\\d{2}:\\d{2}:\\d{2}$/.test(hora)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(time(0), '${hora}')`;\n};\n\nconst sqlBit = (valor) => {\n  if (valor === null || valor === undefined) {\n    return 'NULL';\n  }\n\n  return valor ? '1' : '0';\n};\n\n// Linhas devolvidas por um nó Microsoft SQL, em qualquer dos formatos que o n8n já usou.\nconst linhasSql = (itens) => {\n  const linhas = [];\n\n  for (const item of itens) {\n    const payload = item?.json ?? {};\n\n    if (Array.isArray(payload.recordset)) {\n      linhas.push(...payload.recordset);\n    } else if (Array.isArray(payload.recordsets?.[0])) {\n      linhas.push(...payload.recordsets[0]);\n    } else if (Object.keys(payload).length > 0 && payload.error === undefined) {\n      linhas.push(payload);\n    }\n  }\n\n  return linhas;\n};\n\nconst erroSql = (itens) => {\n  const comErro = itens.find((item) => item?.json?.error !== undefined);\n  if (!comErro) {\n    return null;\n  }\n\n  const erro = comErro.json.error;\n  return typeof erro === 'string' ? erro : erro?.message || 'Falha no SQL Server.';\n};\n\n// Resposta de um nó HTTP com \"Full Response\" e \"Never Error\": { statusCode, body }.\n// Com erro de rede e onError = continueRegularOutput, chega { error: {...} }.\nconst lerRespostaHttp = (json) => {\n  const resposta = json ?? {};\n  const erro = resposta.error;\n  const statusCode = Number(resposta.statusCode ?? erro?.httpCode ?? erro?.status ?? erro?.cause?.status) || null;\n  const body = resposta.body !== undefined ? resposta.body : erro ? null : resposta;\n  const ok = !erro && statusCode !== null && statusCode >= 200 && statusCode < 300;\n  const texto = typeof body === 'string' ? body : body ? JSON.stringify(body) : erro?.message || String(erro ?? '');\n  return { ok, statusCode, body, erro: erro ? erro.message || String(erro) : null, texto: texto.slice(0, 1000) };\n};\n\n// Grava uma ação na auditoria e, se deu certo, atualiza a tabela de controle. Devolve o SQL completo.\nconst sqlRegistrarAcao = (acao) => {\n  const situacao = acao.acao === 'LIBERACAO' ? 'LIBERADO' : 'BLOQUEADO';\n  const merge = acao.sucesso\n    ? `\nMERGE dbo.CtlCnnControlePaciente WITH (HOLDLOCK) AS destino\nUSING (SELECT ${sqlN(acao.idPaciente)} AS IdPaciente) AS origem\n    ON destino.IdPaciente = origem.IdPaciente\nWHEN MATCHED THEN\n    UPDATE SET\n        NomePaciente = COALESCE(${sqlS(acao.nomePaciente, 200)}, destino.NomePaciente),\n        Situacao = ${sqlS(situacao, 20)},\n        IdAgendaReferencia = ${sqlN(acao.idAgenda)},\n        NumeroFalta = ${sqlN(acao.numeroFalta)},\n        DataInicioBloqueio = ${sqlDate(acao.dataInicioBloqueio)},\n        DataFimBloqueio = ${sqlDate(acao.dataFimBloqueio)},\n        UltimaAcao = ${sqlS(acao.acao, 20)},\n        OrigemUltimaAcao = ${sqlS(acao.origem, 20)},\n        UltimaAcaoPor = ${sqlS(acao.usuario, 100)},\n        MotivoUltimaAcao = ${sqlS(acao.motivo, 500)},\n        IdUltimaAcao = @IdAcao,\n        UltimaAcaoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (\n        IdPaciente, NomePaciente, Situacao, IdAgendaReferencia, NumeroFalta,\n        DataInicioBloqueio, DataFimBloqueio, UltimaAcao, OrigemUltimaAcao,\n        UltimaAcaoPor, MotivoUltimaAcao, IdUltimaAcao\n    )\n    VALUES (\n        ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(situacao, 20)}, ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)},\n        ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)},\n        ${sqlS(acao.usuario, 100)}, ${sqlS(acao.motivo, 500)}, @IdAcao\n    );`\n    : '';\n\n  // Solicitações de desbloqueio (dbo.CtlCnnSolicitacao), na mesma transação da auditoria.\n  const idSolicitacao = sqlN(acao.idSolicitacao);\n  const temSolicitacao = idSolicitacao !== 'NULL';\n  const liberou = acao.sucesso && acao.acao === 'LIBERACAO';\n  const solicitacoes = [];\n\n  if (temSolicitacao && liberou) {\n    // A solicitação usada nesta liberação fica LIBERADA (com \"Aprovar e liberar\", a decisão vai junto).\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'LIBERADA',\n    LiberadoPor = ${sqlS(acao.usuario, 100)},\n    LiberadoEm = SYSUTCDATETIME(),\n    IdAcao = @IdAcao,\n    DecididoPor = COALESCE(DecididoPor, ${sqlS(acao.aprovador, 100)}),\n    DecididoEm = COALESCE(DecididoEm, CASE WHEN ${sqlS(acao.aprovador, 100)} IS NULL THEN NULL ELSE SYSUTCDATETIME() END),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status IN (N'PENDENTE', N'APROVADA');`);\n  } else if (temSolicitacao && acao.aprovador) {\n    // \"Aprovar e liberar\" com o CNN fora do ar: a aprovação vale; a liberação pode ser tentada de novo.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'APROVADA',\n    DecididoPor = ${sqlS(acao.aprovador, 100)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status = N'PENDENTE';`);\n  }\n\n  if (liberou) {\n    // Liberado por outro caminho (prazo cumprido): as outras solicitações abertas perdem o sentido.\n    const motivoEncerramento = acao.origem === 'AUTOMATICO'\n      ? 'Prazo cumprido: paciente liberado pela rotina automática.'\n      : `Paciente liberado por ${acao.usuario || 'outro usuário'}.`;\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = ${sqlS(motivoEncerramento, 500)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')${temSolicitacao ? `\\n  AND Id <> ${idSolicitacao}` : ''};`);\n  }\n\n  if (acao.sucesso && acao.acao === 'BLOQUEIO') {\n    // Bloqueio por uma falta nova: a solicitação feita para a falta anterior não vale mais.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = N'Nova falta registrada: a solicitação era da falta anterior.',\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')\n  AND IdAgendaReferencia <> ${sqlN(acao.idAgenda)};`);\n  }\n\n  return `USE INTEGRACAO;\nSET NOCOUNT ON;\nSET XACT_ABORT ON;\nBEGIN TRANSACTION;\n\nINSERT INTO dbo.CtlCnnAcaoPaciente (\n    IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,\n    IdAgendaReferencia, NumeroFalta, DataInicioBloqueio, DataFimBloqueio,\n    Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n, IdSolicitacao\n)\nVALUES (\n    ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},\n    ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)}, ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)},\n    ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}, ${idSolicitacao}\n);\n\nDECLARE @IdAcao BIGINT = CONVERT(BIGINT, SCOPE_IDENTITY());\n${merge}\n${solicitacoes.join('\\n')}\n\nCOMMIT TRANSACTION;\n\nSELECT @IdAcao AS IdAcao, CAST(${sqlBit(Boolean(acao.sucesso))} AS bit) AS Sucesso;`;\n};\n// Junta os itens de um nó HTTP paginado da API do CNN: cada página chega como { lista: [...] }.\n// Página com erro (onError = continueRegularOutput) é ignorada.\nconst listaDaApi = (itens) => {\n  const lista = [];\n\n  for (const item of itens || []) {\n    const pagina = item?.json ?? {};\n    if (Array.isArray(pagina.lista)) {\n      lista.push(...pagina.lista);\n    }\n  }\n\n  return lista;\n};\n\n// Itens de um nó que pode não existir (ou não ter rodado) neste workflow: lista vazia em vez de erro.\nconst itensDoNo = (nome) => {\n  try {\n    return $(nome).all();\n  } catch (erro) {\n    return [];\n  }\n};\n\n// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra }. Blocos de 500 (VALUES aceita até 1000 linhas).\nconst sqlCadastros = (linhas) => {\n  const validas = [];\n  const vistos = new Set();\n\n  for (const linha of linhas) {\n    const id = Number(linha.id);\n    const chave = `${linha.tipo}:${id}`;\n    if (!linha.tipo || !Number.isFinite(id) || vistos.has(chave)) {\n      continue;\n    }\n    vistos.add(chave);\n    validas.push(`(${sqlS(linha.tipo, 20)}, ${sqlN(id)}, ${sqlS(linha.nome, 200)}, ${sqlS(linha.extra, 100)})`);\n  }\n\n  const blocos = [];\n  for (let i = 0; i < validas.length; i += 500) {\n    blocos.push(`\nMERGE dbo.CtlCnnCadastro WITH (HOLDLOCK) AS destino\nUSING (VALUES\n    ${validas.slice(i, i + 500).join(',\\n    ')}\n) AS origem (Tipo, Id, Nome, Extra)\n    ON destino.Tipo = origem.Tipo AND destino.Id = origem.Id\nWHEN MATCHED AND (ISNULL(destino.Nome, N'') <> ISNULL(origem.Nome, N'') OR ISNULL(destino.Extra, N'') <> ISNULL(origem.Extra, N'')) THEN\n    UPDATE SET Nome = origem.Nome, Extra = origem.Extra, AtualizadoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (Tipo, Id, Nome, Extra) VALUES (origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);\n  }\n\n  return blocos.join('\\n');\n};\n// ===== fim dos helpers de SQL =====\n\n// Nó \"preparar consulta\" (liberação automática às 02:00). Monta a consulta de quem cumpriu o prazo.\n// Só entra quem o PRÓPRIO sistema bloqueou: controle BLOQUEADO para a falta vigente de agora.\n// Paciente inativo no CNN por outro motivo (baixa cadastral, por exemplo) não tem essa linha e nunca é reativado.\nconst inicio = inicioCiclo();\nconst hoje = hojeSp();\n\nconst query = `USE INTEGRACAO;\nSET NOCOUNT ON;\nDECLARE @inicio DATE = ${sqlDate(inicio)};\nDECLARE @hoje DATE = ${sqlDate(hoje)};\n\n;WITH Vigente AS (\n    SELECT\n        f.IdPaciente,\n        f.IdAgenda,\n        f.NomePaciente,\n        f.DataFalta,\n        f.NumeroFalta,\n        ROW_NUMBER() OVER (\n            PARTITION BY f.IdPaciente\n            ORDER BY CASE WHEN f.DataFalta >= @inicio THEN 0 ELSE 1 END, f.NumeroFalta DESC, f.DataFalta DESC, f.IdAgenda DESC\n        ) AS Ordem\n    FROM dbo.CtlCnnFaltaPaciente f\n    WHERE f.IdPaciente IN (SELECT IdPaciente FROM dbo.CtlCnnControlePaciente WHERE Situacao = N'BLOQUEADO')\n)\nSELECT\n    c.IdPaciente,\n    COALESCE(c.NomePaciente, v.NomePaciente) AS NomePaciente,\n    v.IdAgenda,\n    CONVERT(char(10), v.DataFalta, 23) AS DataFalta,\n    v.NumeroFalta,\n    ${sqlDiasCase('v.NumeroFalta')} AS DiasBloqueio,\n    CONVERT(char(10), DATEADD(DAY, ${sqlDiasCase('v.NumeroFalta')}, v.DataFalta), 23) AS DataFimBloqueio\nFROM dbo.CtlCnnControlePaciente c\nINNER JOIN Vigente v\n    ON v.IdPaciente = c.IdPaciente\n   AND v.Ordem = 1\nWHERE c.Situacao = N'BLOQUEADO'\n  AND c.IdAgendaReferencia = v.IdAgenda\n  AND DATEADD(DAY, ${sqlDiasCase('v.NumeroFalta')}, v.DataFalta) < @hoje\nORDER BY v.DataFalta, c.IdPaciente;`;\n\nreturn [{ json: { query, hoje } }];\n"
+      },
+      "id": "b0c61555-4eba-47f1-a0ca-a5ece395aa38",
+      "name": "preparar consulta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}"
+      },
+      "id": "51ecb653-cfd3-4fa8-bfe7-bde9159004ed",
+      "name": "consultar vencidos",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1.1,
+      "position": [
+        80,
+        352
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "microsoftSql": {
+          "id": "qsbr3cHSQT6CODbU",
+          "name": "TST Araguari"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Regra do bloqueio por falta (fonte única: workflows/code/_regra.js) =====\n// O inject.mjs copia este bloco para o início de todo nó Code que usa prazo ou ciclo.\n// Para mudar a regra: edite aqui, rode `npm run inject` e publique os workflows no n8n.\nconst REGRA = {\n  // Prazo (dias) a partir da falta vigente do ciclo. A maior chave vale para \"essa ou mais\".\n  // Toda falta do período (ciclo) bloqueia quem está ativo no CNN enquanto o prazo corre; quem já cumpriu\n  // o prazo não é bloqueado. Antes do fim do prazo, liberar só com solicitação aprovada pelo admin;\n  // depois, a liberação automática (02:00) libera.\n  prazosDias: { 1: 60, 2: 90, 3: 180 },\n  // Início do ciclo: de outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.\n  // Mudou de 1/8 para 1/10 em 2026-10-08. Mudar aqui exige mudar também a URL do nó \"GET agenda do ciclo\".\n  cicloInicio: { mes: 10, dia: 1 },\n  fuso: 'America/Sao_Paulo',\n  // Só informativos (os crons ficam nos nós \"Todo dia 01:00\" e \"Todo dia 02:00\" dos workflows).\n  horarioBloqueio: '01:00',\n  liberacaoAutomatica: true,\n  horarioLiberacao: '02:00',\n};\n\nconst pad2 = (valor) => String(valor).padStart(2, '0');\nconst agoraSp = () => $now.setZone(REGRA.fuso);\nconst hojeSp = () => agoraSp().toFormat('yyyy-MM-dd');\n\nconst inicioCiclo = () => {\n  const agora = agoraSp();\n  const { mes, dia } = REGRA.cicloInicio;\n  const jaComecou = agora.month > mes || (agora.month === mes && agora.day >= dia);\n  const ano = jaComecou ? agora.year : agora.year - 1;\n  return `${ano}-${pad2(mes)}-${pad2(dia)}`;\n};\n\nconst maiorFaltaRegra = Math.max(...Object.keys(REGRA.prazosDias).map(Number));\n\nconst diasPorFalta = (numeroFalta) => {\n  const numero = Math.min(Math.max(Number(numeroFalta) || 1, 1), maiorFaltaRegra);\n  return REGRA.prazosDias[numero];\n};\n\n// Mesmo cálculo em SQL: CASE WHEN col >= 3 THEN 180 WHEN col = 2 THEN 90 ELSE 60 END.\nconst sqlDiasCase = (coluna) => {\n  const chaves = Object.keys(REGRA.prazosDias).map(Number).sort((a, b) => b - a);\n  const partes = chaves\n    .filter((chave) => chave !== 1)\n    .map((chave) => `WHEN ${coluna} ${chave === maiorFaltaRegra ? '>=' : '='} ${chave} THEN ${REGRA.prazosDias[chave]}`);\n  return `CASE ${partes.join(' ')} ELSE ${REGRA.prazosDias[1]} END`;\n};\n\nconst dataIso = (valor) => {\n  if (!valor) {\n    return null;\n  }\n\n  if (valor instanceof Date) {\n    return Number.isNaN(valor.getTime()) ? null : valor.toISOString().slice(0, 10);\n  }\n\n  const texto = String(valor).slice(0, 10);\n  return /^\\d{4}-\\d{2}-\\d{2}$/.test(texto) ? texto : null;\n};\n\nconst somarDias = (valor, dias) => {\n  const inicio = dataIso(valor);\n  if (!inicio || !dias) {\n    return null;\n  }\n\n  const [ano, mes, dia] = inicio.split('-').map(Number);\n  const data = new Date(Date.UTC(ano, mes - 1, dia));\n  if (Number.isNaN(data.getTime())) {\n    return null;\n  }\n\n  data.setUTCDate(data.getUTCDate() + dias);\n  return data.toISOString().slice(0, 10);\n};\n// ===== fim da regra =====\n\n// ===== Helpers de SQL (fonte única: workflows/code/_sql.js) =====\n// O SQL é montado por texto: todo valor passa por uma destas funções.\nconst sqlN = (valor) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const numero = Number(valor);\n  return Number.isFinite(numero) ? String(Math.trunc(numero)) : 'NULL';\n};\n\nconst sqlS = (valor, maxLength) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const texto = String(valor).slice(0, maxLength ?? 4000).replace(/'/g, \"''\");\n  return `N'${texto}'`;\n};\n\nconst sqlDate = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  const data = String(valor).slice(0, 10);\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(date, '${data}', 23)`;\n};\n\nconst sqlTime = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  let hora = String(valor).trim();\n  if (/^\\d{2}:\\d{2}$/.test(hora)) {\n    hora = `${hora}:00`;\n  }\n\n  if (!/^\\d{2}:\\d{2}:\\d{2}$/.test(hora)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(time(0), '${hora}')`;\n};\n\nconst sqlBit = (valor) => {\n  if (valor === null || valor === undefined) {\n    return 'NULL';\n  }\n\n  return valor ? '1' : '0';\n};\n\n// Linhas devolvidas por um nó Microsoft SQL, em qualquer dos formatos que o n8n já usou.\nconst linhasSql = (itens) => {\n  const linhas = [];\n\n  for (const item of itens) {\n    const payload = item?.json ?? {};\n\n    if (Array.isArray(payload.recordset)) {\n      linhas.push(...payload.recordset);\n    } else if (Array.isArray(payload.recordsets?.[0])) {\n      linhas.push(...payload.recordsets[0]);\n    } else if (Object.keys(payload).length > 0 && payload.error === undefined) {\n      linhas.push(payload);\n    }\n  }\n\n  return linhas;\n};\n\nconst erroSql = (itens) => {\n  const comErro = itens.find((item) => item?.json?.error !== undefined);\n  if (!comErro) {\n    return null;\n  }\n\n  const erro = comErro.json.error;\n  return typeof erro === 'string' ? erro : erro?.message || 'Falha no SQL Server.';\n};\n\n// Resposta de um nó HTTP com \"Full Response\" e \"Never Error\": { statusCode, body }.\n// Com erro de rede e onError = continueRegularOutput, chega { error: {...} }.\nconst lerRespostaHttp = (json) => {\n  const resposta = json ?? {};\n  const erro = resposta.error;\n  const statusCode = Number(resposta.statusCode ?? erro?.httpCode ?? erro?.status ?? erro?.cause?.status) || null;\n  const body = resposta.body !== undefined ? resposta.body : erro ? null : resposta;\n  const ok = !erro && statusCode !== null && statusCode >= 200 && statusCode < 300;\n  const texto = typeof body === 'string' ? body : body ? JSON.stringify(body) : erro?.message || String(erro ?? '');\n  return { ok, statusCode, body, erro: erro ? erro.message || String(erro) : null, texto: texto.slice(0, 1000) };\n};\n\n// Grava uma ação na auditoria e, se deu certo, atualiza a tabela de controle. Devolve o SQL completo.\nconst sqlRegistrarAcao = (acao) => {\n  const situacao = acao.acao === 'LIBERACAO' ? 'LIBERADO' : 'BLOQUEADO';\n  const merge = acao.sucesso\n    ? `\nMERGE dbo.CtlCnnControlePaciente WITH (HOLDLOCK) AS destino\nUSING (SELECT ${sqlN(acao.idPaciente)} AS IdPaciente) AS origem\n    ON destino.IdPaciente = origem.IdPaciente\nWHEN MATCHED THEN\n    UPDATE SET\n        NomePaciente = COALESCE(${sqlS(acao.nomePaciente, 200)}, destino.NomePaciente),\n        Situacao = ${sqlS(situacao, 20)},\n        IdAgendaReferencia = ${sqlN(acao.idAgenda)},\n        NumeroFalta = ${sqlN(acao.numeroFalta)},\n        DataInicioBloqueio = ${sqlDate(acao.dataInicioBloqueio)},\n        DataFimBloqueio = ${sqlDate(acao.dataFimBloqueio)},\n        UltimaAcao = ${sqlS(acao.acao, 20)},\n        OrigemUltimaAcao = ${sqlS(acao.origem, 20)},\n        UltimaAcaoPor = ${sqlS(acao.usuario, 100)},\n        MotivoUltimaAcao = ${sqlS(acao.motivo, 500)},\n        IdUltimaAcao = @IdAcao,\n        UltimaAcaoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (\n        IdPaciente, NomePaciente, Situacao, IdAgendaReferencia, NumeroFalta,\n        DataInicioBloqueio, DataFimBloqueio, UltimaAcao, OrigemUltimaAcao,\n        UltimaAcaoPor, MotivoUltimaAcao, IdUltimaAcao\n    )\n    VALUES (\n        ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(situacao, 20)}, ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)},\n        ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)},\n        ${sqlS(acao.usuario, 100)}, ${sqlS(acao.motivo, 500)}, @IdAcao\n    );`\n    : '';\n\n  // Solicitações de desbloqueio (dbo.CtlCnnSolicitacao), na mesma transação da auditoria.\n  const idSolicitacao = sqlN(acao.idSolicitacao);\n  const temSolicitacao = idSolicitacao !== 'NULL';\n  const liberou = acao.sucesso && acao.acao === 'LIBERACAO';\n  const solicitacoes = [];\n\n  if (temSolicitacao && liberou) {\n    // A solicitação usada nesta liberação fica LIBERADA (com \"Aprovar e liberar\", a decisão vai junto).\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'LIBERADA',\n    LiberadoPor = ${sqlS(acao.usuario, 100)},\n    LiberadoEm = SYSUTCDATETIME(),\n    IdAcao = @IdAcao,\n    DecididoPor = COALESCE(DecididoPor, ${sqlS(acao.aprovador, 100)}),\n    DecididoEm = COALESCE(DecididoEm, CASE WHEN ${sqlS(acao.aprovador, 100)} IS NULL THEN NULL ELSE SYSUTCDATETIME() END),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status IN (N'PENDENTE', N'APROVADA');`);\n  } else if (temSolicitacao && acao.aprovador) {\n    // \"Aprovar e liberar\" com o CNN fora do ar: a aprovação vale; a liberação pode ser tentada de novo.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'APROVADA',\n    DecididoPor = ${sqlS(acao.aprovador, 100)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status = N'PENDENTE';`);\n  }\n\n  if (liberou) {\n    // Liberado por outro caminho (prazo cumprido): as outras solicitações abertas perdem o sentido.\n    const motivoEncerramento = acao.origem === 'AUTOMATICO'\n      ? 'Prazo cumprido: paciente liberado pela rotina automática.'\n      : `Paciente liberado por ${acao.usuario || 'outro usuário'}.`;\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = ${sqlS(motivoEncerramento, 500)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')${temSolicitacao ? `\\n  AND Id <> ${idSolicitacao}` : ''};`);\n  }\n\n  if (acao.sucesso && acao.acao === 'BLOQUEIO') {\n    // Bloqueio por uma falta nova: a solicitação feita para a falta anterior não vale mais.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = N'Nova falta registrada: a solicitação era da falta anterior.',\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')\n  AND IdAgendaReferencia <> ${sqlN(acao.idAgenda)};`);\n  }\n\n  return `USE INTEGRACAO;\nSET NOCOUNT ON;\nSET XACT_ABORT ON;\nBEGIN TRANSACTION;\n\nINSERT INTO dbo.CtlCnnAcaoPaciente (\n    IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,\n    IdAgendaReferencia, NumeroFalta, DataInicioBloqueio, DataFimBloqueio,\n    Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n, IdSolicitacao\n)\nVALUES (\n    ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},\n    ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)}, ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)},\n    ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}, ${idSolicitacao}\n);\n\nDECLARE @IdAcao BIGINT = CONVERT(BIGINT, SCOPE_IDENTITY());\n${merge}\n${solicitacoes.join('\\n')}\n\nCOMMIT TRANSACTION;\n\nSELECT @IdAcao AS IdAcao, CAST(${sqlBit(Boolean(acao.sucesso))} AS bit) AS Sucesso;`;\n};\n// Junta os itens de um nó HTTP paginado da API do CNN: cada página chega como { lista: [...] }.\n// Página com erro (onError = continueRegularOutput) é ignorada.\nconst listaDaApi = (itens) => {\n  const lista = [];\n\n  for (const item of itens || []) {\n    const pagina = item?.json ?? {};\n    if (Array.isArray(pagina.lista)) {\n      lista.push(...pagina.lista);\n    }\n  }\n\n  return lista;\n};\n\n// Itens de um nó que pode não existir (ou não ter rodado) neste workflow: lista vazia em vez de erro.\nconst itensDoNo = (nome) => {\n  try {\n    return $(nome).all();\n  } catch (erro) {\n    return [];\n  }\n};\n\n// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra }. Blocos de 500 (VALUES aceita até 1000 linhas).\nconst sqlCadastros = (linhas) => {\n  const validas = [];\n  const vistos = new Set();\n\n  for (const linha of linhas) {\n    const id = Number(linha.id);\n    const chave = `${linha.tipo}:${id}`;\n    if (!linha.tipo || !Number.isFinite(id) || vistos.has(chave)) {\n      continue;\n    }\n    vistos.add(chave);\n    validas.push(`(${sqlS(linha.tipo, 20)}, ${sqlN(id)}, ${sqlS(linha.nome, 200)}, ${sqlS(linha.extra, 100)})`);\n  }\n\n  const blocos = [];\n  for (let i = 0; i < validas.length; i += 500) {\n    blocos.push(`\nMERGE dbo.CtlCnnCadastro WITH (HOLDLOCK) AS destino\nUSING (VALUES\n    ${validas.slice(i, i + 500).join(',\\n    ')}\n) AS origem (Tipo, Id, Nome, Extra)\n    ON destino.Tipo = origem.Tipo AND destino.Id = origem.Id\nWHEN MATCHED AND (ISNULL(destino.Nome, N'') <> ISNULL(origem.Nome, N'') OR ISNULL(destino.Extra, N'') <> ISNULL(origem.Extra, N'')) THEN\n    UPDATE SET Nome = origem.Nome, Extra = origem.Extra, AtualizadoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (Tipo, Id, Nome, Extra) VALUES (origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);\n  }\n\n  return blocos.join('\\n');\n};\n// ===== fim dos helpers de SQL =====\n\n// Nó \"montar candidatos\" (liberação automática às 02:00). Um item por paciente com o prazo cumprido.\n// Ninguém (ou falha no SQL): um item { nadaALiberar: true } com o motivo, para a execução mostrar e terminar.\nconst consulta = $input.all();\nconst falha = erroSql(consulta);\nconst hoje = $('preparar consulta').first().json.hoje;\n\nif (falha) {\n  return [{ json: { nadaALiberar: true, hoje, erro: falha, mensagem: `Falha ao consultar quem cumpriu o prazo: ${falha}` } }];\n}\n\nconst vistos = new Set();\nconst saida = [];\n\nfor (const linha of linhasSql(consulta)) {\n  const idPaciente = Number(linha.IdPaciente);\n  if (!Number.isSafeInteger(idPaciente) || idPaciente <= 0 || vistos.has(idPaciente)) {\n    continue;\n  }\n  vistos.add(idPaciente);\n\n  const numeroFalta = Number(linha.NumeroFalta) || 1;\n  const diasBloqueio = Number(linha.DiasBloqueio) || diasPorFalta(numeroFalta);\n  const dataInicio = dataIso(linha.DataFalta);\n\n  saida.push({\n    json: {\n      idPaciente,\n      nomePaciente: linha.NomePaciente || null,\n      idAgenda: linha.IdAgenda ?? null,\n      numeroFalta,\n      diasBloqueio,\n      dataInicioBloqueio: dataInicio,\n      dataFimBloqueio: dataIso(linha.DataFimBloqueio) || somarDias(dataInicio, diasBloqueio),\n      mensagem: `Liberar ${linha.NomePaciente || idPaciente}: prazo de ${diasBloqueio} dias da falta ${numeroFalta} cumprido.`\n    }\n  });\n}\n\nif (!saida.length) {\n  return [{ json: { nadaALiberar: true, hoje, mensagem: `Ninguém com o prazo cumprido hoje (${hoje}).` } }];\n}\n\nreturn saida;\n"
+      },
+      "id": "8b3a9dee-a516-44f2-aa01-593d35aace8d",
+      "name": "montar candidatos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0fe8bc4c-24da-4572-90a7-c7f26feace07",
+              "leftValue": "={{ !$json.nadaALiberar }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4eaa3b8f-628b-452e-bf1e-678365523613",
+      "name": "há o que liberar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        352
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "1829fa86-75ec-48a7-8354-377efbd8f189",
+      "name": "nada a liberar",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        800,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e86e7b24-0b83-43e4-875c-e5f8c9337f37",
+      "name": "loop liberações",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        800,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.clinicanasnuvens.com.br/paciente/{{ $json.idPaciente }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "value": "6273a60af59c2312373329b00d2947cf"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "cd95a698-6d7d-42cd-92fe-db6e9bae9b90",
+      "name": "GET paciente atual",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        352
+      ],
+      "executeOnce": false,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "oaKmuYyjUPtAlZiT",
+          "name": "API CNN AUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Helpers de SQL (fonte única: workflows/code/_sql.js) =====\n// O SQL é montado por texto: todo valor passa por uma destas funções.\nconst sqlN = (valor) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const numero = Number(valor);\n  return Number.isFinite(numero) ? String(Math.trunc(numero)) : 'NULL';\n};\n\nconst sqlS = (valor, maxLength) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const texto = String(valor).slice(0, maxLength ?? 4000).replace(/'/g, \"''\");\n  return `N'${texto}'`;\n};\n\nconst sqlDate = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  const data = String(valor).slice(0, 10);\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(date, '${data}', 23)`;\n};\n\nconst sqlTime = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  let hora = String(valor).trim();\n  if (/^\\d{2}:\\d{2}$/.test(hora)) {\n    hora = `${hora}:00`;\n  }\n\n  if (!/^\\d{2}:\\d{2}:\\d{2}$/.test(hora)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(time(0), '${hora}')`;\n};\n\nconst sqlBit = (valor) => {\n  if (valor === null || valor === undefined) {\n    return 'NULL';\n  }\n\n  return valor ? '1' : '0';\n};\n\n// Linhas devolvidas por um nó Microsoft SQL, em qualquer dos formatos que o n8n já usou.\nconst linhasSql = (itens) => {\n  const linhas = [];\n\n  for (const item of itens) {\n    const payload = item?.json ?? {};\n\n    if (Array.isArray(payload.recordset)) {\n      linhas.push(...payload.recordset);\n    } else if (Array.isArray(payload.recordsets?.[0])) {\n      linhas.push(...payload.recordsets[0]);\n    } else if (Object.keys(payload).length > 0 && payload.error === undefined) {\n      linhas.push(payload);\n    }\n  }\n\n  return linhas;\n};\n\nconst erroSql = (itens) => {\n  const comErro = itens.find((item) => item?.json?.error !== undefined);\n  if (!comErro) {\n    return null;\n  }\n\n  const erro = comErro.json.error;\n  return typeof erro === 'string' ? erro : erro?.message || 'Falha no SQL Server.';\n};\n\n// Resposta de um nó HTTP com \"Full Response\" e \"Never Error\": { statusCode, body }.\n// Com erro de rede e onError = continueRegularOutput, chega { error: {...} }.\nconst lerRespostaHttp = (json) => {\n  const resposta = json ?? {};\n  const erro = resposta.error;\n  const statusCode = Number(resposta.statusCode ?? erro?.httpCode ?? erro?.status ?? erro?.cause?.status) || null;\n  const body = resposta.body !== undefined ? resposta.body : erro ? null : resposta;\n  const ok = !erro && statusCode !== null && statusCode >= 200 && statusCode < 300;\n  const texto = typeof body === 'string' ? body : body ? JSON.stringify(body) : erro?.message || String(erro ?? '');\n  return { ok, statusCode, body, erro: erro ? erro.message || String(erro) : null, texto: texto.slice(0, 1000) };\n};\n\n// Grava uma ação na auditoria e, se deu certo, atualiza a tabela de controle. Devolve o SQL completo.\nconst sqlRegistrarAcao = (acao) => {\n  const situacao = acao.acao === 'LIBERACAO' ? 'LIBERADO' : 'BLOQUEADO';\n  const merge = acao.sucesso\n    ? `\nMERGE dbo.CtlCnnControlePaciente WITH (HOLDLOCK) AS destino\nUSING (SELECT ${sqlN(acao.idPaciente)} AS IdPaciente) AS origem\n    ON destino.IdPaciente = origem.IdPaciente\nWHEN MATCHED THEN\n    UPDATE SET\n        NomePaciente = COALESCE(${sqlS(acao.nomePaciente, 200)}, destino.NomePaciente),\n        Situacao = ${sqlS(situacao, 20)},\n        IdAgendaReferencia = ${sqlN(acao.idAgenda)},\n        NumeroFalta = ${sqlN(acao.numeroFalta)},\n        DataInicioBloqueio = ${sqlDate(acao.dataInicioBloqueio)},\n        DataFimBloqueio = ${sqlDate(acao.dataFimBloqueio)},\n        UltimaAcao = ${sqlS(acao.acao, 20)},\n        OrigemUltimaAcao = ${sqlS(acao.origem, 20)},\n        UltimaAcaoPor = ${sqlS(acao.usuario, 100)},\n        MotivoUltimaAcao = ${sqlS(acao.motivo, 500)},\n        IdUltimaAcao = @IdAcao,\n        UltimaAcaoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (\n        IdPaciente, NomePaciente, Situacao, IdAgendaReferencia, NumeroFalta,\n        DataInicioBloqueio, DataFimBloqueio, UltimaAcao, OrigemUltimaAcao,\n        UltimaAcaoPor, MotivoUltimaAcao, IdUltimaAcao\n    )\n    VALUES (\n        ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(situacao, 20)}, ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)},\n        ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)},\n        ${sqlS(acao.usuario, 100)}, ${sqlS(acao.motivo, 500)}, @IdAcao\n    );`\n    : '';\n\n  // Solicitações de desbloqueio (dbo.CtlCnnSolicitacao), na mesma transação da auditoria.\n  const idSolicitacao = sqlN(acao.idSolicitacao);\n  const temSolicitacao = idSolicitacao !== 'NULL';\n  const liberou = acao.sucesso && acao.acao === 'LIBERACAO';\n  const solicitacoes = [];\n\n  if (temSolicitacao && liberou) {\n    // A solicitação usada nesta liberação fica LIBERADA (com \"Aprovar e liberar\", a decisão vai junto).\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'LIBERADA',\n    LiberadoPor = ${sqlS(acao.usuario, 100)},\n    LiberadoEm = SYSUTCDATETIME(),\n    IdAcao = @IdAcao,\n    DecididoPor = COALESCE(DecididoPor, ${sqlS(acao.aprovador, 100)}),\n    DecididoEm = COALESCE(DecididoEm, CASE WHEN ${sqlS(acao.aprovador, 100)} IS NULL THEN NULL ELSE SYSUTCDATETIME() END),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status IN (N'PENDENTE', N'APROVADA');`);\n  } else if (temSolicitacao && acao.aprovador) {\n    // \"Aprovar e liberar\" com o CNN fora do ar: a aprovação vale; a liberação pode ser tentada de novo.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'APROVADA',\n    DecididoPor = ${sqlS(acao.aprovador, 100)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status = N'PENDENTE';`);\n  }\n\n  if (liberou) {\n    // Liberado por outro caminho (prazo cumprido): as outras solicitações abertas perdem o sentido.\n    const motivoEncerramento = acao.origem === 'AUTOMATICO'\n      ? 'Prazo cumprido: paciente liberado pela rotina automática.'\n      : `Paciente liberado por ${acao.usuario || 'outro usuário'}.`;\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = ${sqlS(motivoEncerramento, 500)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')${temSolicitacao ? `\\n  AND Id <> ${idSolicitacao}` : ''};`);\n  }\n\n  if (acao.sucesso && acao.acao === 'BLOQUEIO') {\n    // Bloqueio por uma falta nova: a solicitação feita para a falta anterior não vale mais.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = N'Nova falta registrada: a solicitação era da falta anterior.',\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')\n  AND IdAgendaReferencia <> ${sqlN(acao.idAgenda)};`);\n  }\n\n  return `USE INTEGRACAO;\nSET NOCOUNT ON;\nSET XACT_ABORT ON;\nBEGIN TRANSACTION;\n\nINSERT INTO dbo.CtlCnnAcaoPaciente (\n    IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,\n    IdAgendaReferencia, NumeroFalta, DataInicioBloqueio, DataFimBloqueio,\n    Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n, IdSolicitacao\n)\nVALUES (\n    ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},\n    ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)}, ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)},\n    ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}, ${idSolicitacao}\n);\n\nDECLARE @IdAcao BIGINT = CONVERT(BIGINT, SCOPE_IDENTITY());\n${merge}\n${solicitacoes.join('\\n')}\n\nCOMMIT TRANSACTION;\n\nSELECT @IdAcao AS IdAcao, CAST(${sqlBit(Boolean(acao.sucesso))} AS bit) AS Sucesso;`;\n};\n// Junta os itens de um nó HTTP paginado da API do CNN: cada página chega como { lista: [...] }.\n// Página com erro (onError = continueRegularOutput) é ignorada.\nconst listaDaApi = (itens) => {\n  const lista = [];\n\n  for (const item of itens || []) {\n    const pagina = item?.json ?? {};\n    if (Array.isArray(pagina.lista)) {\n      lista.push(...pagina.lista);\n    }\n  }\n\n  return lista;\n};\n\n// Itens de um nó que pode não existir (ou não ter rodado) neste workflow: lista vazia em vez de erro.\nconst itensDoNo = (nome) => {\n  try {\n    return $(nome).all();\n  } catch (erro) {\n    return [];\n  }\n};\n\n// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra }. Blocos de 500 (VALUES aceita até 1000 linhas).\nconst sqlCadastros = (linhas) => {\n  const validas = [];\n  const vistos = new Set();\n\n  for (const linha of linhas) {\n    const id = Number(linha.id);\n    const chave = `${linha.tipo}:${id}`;\n    if (!linha.tipo || !Number.isFinite(id) || vistos.has(chave)) {\n      continue;\n    }\n    vistos.add(chave);\n    validas.push(`(${sqlS(linha.tipo, 20)}, ${sqlN(id)}, ${sqlS(linha.nome, 200)}, ${sqlS(linha.extra, 100)})`);\n  }\n\n  const blocos = [];\n  for (let i = 0; i < validas.length; i += 500) {\n    blocos.push(`\nMERGE dbo.CtlCnnCadastro WITH (HOLDLOCK) AS destino\nUSING (VALUES\n    ${validas.slice(i, i + 500).join(',\\n    ')}\n) AS origem (Tipo, Id, Nome, Extra)\n    ON destino.Tipo = origem.Tipo AND destino.Id = origem.Id\nWHEN MATCHED AND (ISNULL(destino.Nome, N'') <> ISNULL(origem.Nome, N'') OR ISNULL(destino.Extra, N'') <> ISNULL(origem.Extra, N'')) THEN\n    UPDATE SET Nome = origem.Nome, Extra = origem.Extra, AtualizadoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (Tipo, Id, Nome, Extra) VALUES (origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);\n  }\n\n  return blocos.join('\\n');\n};\n// ===== fim dos helpers de SQL =====\n\n// Nó \"decidir\" (liberação automática às 02:00). Roda para cada paciente do laço, depois do GET no CNN:\n//   - inativo no CNN -> enviar PATCH { ativo: true };\n//   - já ativo (alguém liberou direto no CNN) -> só registrar, sem PATCH;\n//   - GET falhou ou paciente não existe -> não envia nada; a falha fica na auditoria (Sucesso = 0).\nlet alvo = {};\ntry {\n  alvo = $('loop liberações').itemMatching(0).json;\n} catch (erro) {\n  alvo = $('loop liberações').first().json;\n}\n\nconst resposta = lerRespostaHttp($input.first().json);\nconst paciente = resposta.body && typeof resposta.body === 'object' ? resposta.body : {};\nconst ativoAntes = typeof paciente.ativo === 'boolean' ? paciente.ativo : null;\nconst consultou = resposta.ok && paciente.id != null && ativoAntes !== null;\n\nreturn [{\n  json: {\n    ...alvo,\n    nomePaciente: paciente.nome || alvo.nomePaciente || null,\n    ativoAntes,\n    enviar: consultou && ativoAntes === false,\n    apenasRegistrar: consultou && ativoAntes === true,\n    falhaConsulta: consultou\n      ? null\n      : resposta.statusCode === 404\n        ? 'Paciente não encontrado no CNN (HTTP 404).'\n        : `Não foi possível consultar o paciente no CNN${resposta.statusCode ? ` (HTTP ${resposta.statusCode})` : ''}: ${(resposta.erro || resposta.texto || 'sem resposta').slice(0, 300)}`,\n    httpConsulta: resposta.statusCode\n  }\n}];\n"
+      },
+      "id": "6025765a-15da-465a-8da7-38585d1951c2",
+      "name": "decidir",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "daf0ee80-ebf2-450d-964d-b22d952336dc",
+              "leftValue": "={{ $json.enviar === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4ae229b-7c1e-489f-ad4a-ed4f2c412a64",
+      "name": "enviar ao CNN?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.clinicanasnuvens.com.br/paciente/{{ $json.idPaciente }}/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "clinicaNasNuvens-cid",
+              "value": "6273a60af59c2312373329b00d2947cf"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { ativo: true } }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "d77125d5-7250-48f7-ad9a-666065200f23",
+      "name": "PATCH status paciente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        288
+      ],
+      "executeOnce": false,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "oaKmuYyjUPtAlZiT",
+          "name": "API CNN AUTH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Regra do bloqueio por falta (fonte única: workflows/code/_regra.js) =====\n// O inject.mjs copia este bloco para o início de todo nó Code que usa prazo ou ciclo.\n// Para mudar a regra: edite aqui, rode `npm run inject` e publique os workflows no n8n.\nconst REGRA = {\n  // Prazo (dias) a partir da falta vigente do ciclo. A maior chave vale para \"essa ou mais\".\n  // Toda falta do período (ciclo) bloqueia quem está ativo no CNN enquanto o prazo corre; quem já cumpriu\n  // o prazo não é bloqueado. Antes do fim do prazo, liberar só com solicitação aprovada pelo admin;\n  // depois, a liberação automática (02:00) libera.\n  prazosDias: { 1: 60, 2: 90, 3: 180 },\n  // Início do ciclo: de outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.\n  // Mudou de 1/8 para 1/10 em 2026-10-08. Mudar aqui exige mudar também a URL do nó \"GET agenda do ciclo\".\n  cicloInicio: { mes: 10, dia: 1 },\n  fuso: 'America/Sao_Paulo',\n  // Só informativos (os crons ficam nos nós \"Todo dia 01:00\" e \"Todo dia 02:00\" dos workflows).\n  horarioBloqueio: '01:00',\n  liberacaoAutomatica: true,\n  horarioLiberacao: '02:00',\n};\n\nconst pad2 = (valor) => String(valor).padStart(2, '0');\nconst agoraSp = () => $now.setZone(REGRA.fuso);\nconst hojeSp = () => agoraSp().toFormat('yyyy-MM-dd');\n\nconst inicioCiclo = () => {\n  const agora = agoraSp();\n  const { mes, dia } = REGRA.cicloInicio;\n  const jaComecou = agora.month > mes || (agora.month === mes && agora.day >= dia);\n  const ano = jaComecou ? agora.year : agora.year - 1;\n  return `${ano}-${pad2(mes)}-${pad2(dia)}`;\n};\n\nconst maiorFaltaRegra = Math.max(...Object.keys(REGRA.prazosDias).map(Number));\n\nconst diasPorFalta = (numeroFalta) => {\n  const numero = Math.min(Math.max(Number(numeroFalta) || 1, 1), maiorFaltaRegra);\n  return REGRA.prazosDias[numero];\n};\n\n// Mesmo cálculo em SQL: CASE WHEN col >= 3 THEN 180 WHEN col = 2 THEN 90 ELSE 60 END.\nconst sqlDiasCase = (coluna) => {\n  const chaves = Object.keys(REGRA.prazosDias).map(Number).sort((a, b) => b - a);\n  const partes = chaves\n    .filter((chave) => chave !== 1)\n    .map((chave) => `WHEN ${coluna} ${chave === maiorFaltaRegra ? '>=' : '='} ${chave} THEN ${REGRA.prazosDias[chave]}`);\n  return `CASE ${partes.join(' ')} ELSE ${REGRA.prazosDias[1]} END`;\n};\n\nconst dataIso = (valor) => {\n  if (!valor) {\n    return null;\n  }\n\n  if (valor instanceof Date) {\n    return Number.isNaN(valor.getTime()) ? null : valor.toISOString().slice(0, 10);\n  }\n\n  const texto = String(valor).slice(0, 10);\n  return /^\\d{4}-\\d{2}-\\d{2}$/.test(texto) ? texto : null;\n};\n\nconst somarDias = (valor, dias) => {\n  const inicio = dataIso(valor);\n  if (!inicio || !dias) {\n    return null;\n  }\n\n  const [ano, mes, dia] = inicio.split('-').map(Number);\n  const data = new Date(Date.UTC(ano, mes - 1, dia));\n  if (Number.isNaN(data.getTime())) {\n    return null;\n  }\n\n  data.setUTCDate(data.getUTCDate() + dias);\n  return data.toISOString().slice(0, 10);\n};\n// ===== fim da regra =====\n\n// ===== Helpers de SQL (fonte única: workflows/code/_sql.js) =====\n// O SQL é montado por texto: todo valor passa por uma destas funções.\nconst sqlN = (valor) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const numero = Number(valor);\n  return Number.isFinite(numero) ? String(Math.trunc(numero)) : 'NULL';\n};\n\nconst sqlS = (valor, maxLength) => {\n  if (valor === null || valor === undefined || valor === '') {\n    return 'NULL';\n  }\n\n  const texto = String(valor).slice(0, maxLength ?? 4000).replace(/'/g, \"''\");\n  return `N'${texto}'`;\n};\n\nconst sqlDate = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  const data = String(valor).slice(0, 10);\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(date, '${data}', 23)`;\n};\n\nconst sqlTime = (valor) => {\n  if (!valor) {\n    return 'NULL';\n  }\n\n  let hora = String(valor).trim();\n  if (/^\\d{2}:\\d{2}$/.test(hora)) {\n    hora = `${hora}:00`;\n  }\n\n  if (!/^\\d{2}:\\d{2}:\\d{2}$/.test(hora)) {\n    return 'NULL';\n  }\n\n  return `CONVERT(time(0), '${hora}')`;\n};\n\nconst sqlBit = (valor) => {\n  if (valor === null || valor === undefined) {\n    return 'NULL';\n  }\n\n  return valor ? '1' : '0';\n};\n\n// Linhas devolvidas por um nó Microsoft SQL, em qualquer dos formatos que o n8n já usou.\nconst linhasSql = (itens) => {\n  const linhas = [];\n\n  for (const item of itens) {\n    const payload = item?.json ?? {};\n\n    if (Array.isArray(payload.recordset)) {\n      linhas.push(...payload.recordset);\n    } else if (Array.isArray(payload.recordsets?.[0])) {\n      linhas.push(...payload.recordsets[0]);\n    } else if (Object.keys(payload).length > 0 && payload.error === undefined) {\n      linhas.push(payload);\n    }\n  }\n\n  return linhas;\n};\n\nconst erroSql = (itens) => {\n  const comErro = itens.find((item) => item?.json?.error !== undefined);\n  if (!comErro) {\n    return null;\n  }\n\n  const erro = comErro.json.error;\n  return typeof erro === 'string' ? erro : erro?.message || 'Falha no SQL Server.';\n};\n\n// Resposta de um nó HTTP com \"Full Response\" e \"Never Error\": { statusCode, body }.\n// Com erro de rede e onError = continueRegularOutput, chega { error: {...} }.\nconst lerRespostaHttp = (json) => {\n  const resposta = json ?? {};\n  const erro = resposta.error;\n  const statusCode = Number(resposta.statusCode ?? erro?.httpCode ?? erro?.status ?? erro?.cause?.status) || null;\n  const body = resposta.body !== undefined ? resposta.body : erro ? null : resposta;\n  const ok = !erro && statusCode !== null && statusCode >= 200 && statusCode < 300;\n  const texto = typeof body === 'string' ? body : body ? JSON.stringify(body) : erro?.message || String(erro ?? '');\n  return { ok, statusCode, body, erro: erro ? erro.message || String(erro) : null, texto: texto.slice(0, 1000) };\n};\n\n// Grava uma ação na auditoria e, se deu certo, atualiza a tabela de controle. Devolve o SQL completo.\nconst sqlRegistrarAcao = (acao) => {\n  const situacao = acao.acao === 'LIBERACAO' ? 'LIBERADO' : 'BLOQUEADO';\n  const merge = acao.sucesso\n    ? `\nMERGE dbo.CtlCnnControlePaciente WITH (HOLDLOCK) AS destino\nUSING (SELECT ${sqlN(acao.idPaciente)} AS IdPaciente) AS origem\n    ON destino.IdPaciente = origem.IdPaciente\nWHEN MATCHED THEN\n    UPDATE SET\n        NomePaciente = COALESCE(${sqlS(acao.nomePaciente, 200)}, destino.NomePaciente),\n        Situacao = ${sqlS(situacao, 20)},\n        IdAgendaReferencia = ${sqlN(acao.idAgenda)},\n        NumeroFalta = ${sqlN(acao.numeroFalta)},\n        DataInicioBloqueio = ${sqlDate(acao.dataInicioBloqueio)},\n        DataFimBloqueio = ${sqlDate(acao.dataFimBloqueio)},\n        UltimaAcao = ${sqlS(acao.acao, 20)},\n        OrigemUltimaAcao = ${sqlS(acao.origem, 20)},\n        UltimaAcaoPor = ${sqlS(acao.usuario, 100)},\n        MotivoUltimaAcao = ${sqlS(acao.motivo, 500)},\n        IdUltimaAcao = @IdAcao,\n        UltimaAcaoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (\n        IdPaciente, NomePaciente, Situacao, IdAgendaReferencia, NumeroFalta,\n        DataInicioBloqueio, DataFimBloqueio, UltimaAcao, OrigemUltimaAcao,\n        UltimaAcaoPor, MotivoUltimaAcao, IdUltimaAcao\n    )\n    VALUES (\n        ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(situacao, 20)}, ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)},\n        ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)},\n        ${sqlS(acao.usuario, 100)}, ${sqlS(acao.motivo, 500)}, @IdAcao\n    );`\n    : '';\n\n  // Solicitações de desbloqueio (dbo.CtlCnnSolicitacao), na mesma transação da auditoria.\n  const idSolicitacao = sqlN(acao.idSolicitacao);\n  const temSolicitacao = idSolicitacao !== 'NULL';\n  const liberou = acao.sucesso && acao.acao === 'LIBERACAO';\n  const solicitacoes = [];\n\n  if (temSolicitacao && liberou) {\n    // A solicitação usada nesta liberação fica LIBERADA (com \"Aprovar e liberar\", a decisão vai junto).\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'LIBERADA',\n    LiberadoPor = ${sqlS(acao.usuario, 100)},\n    LiberadoEm = SYSUTCDATETIME(),\n    IdAcao = @IdAcao,\n    DecididoPor = COALESCE(DecididoPor, ${sqlS(acao.aprovador, 100)}),\n    DecididoEm = COALESCE(DecididoEm, CASE WHEN ${sqlS(acao.aprovador, 100)} IS NULL THEN NULL ELSE SYSUTCDATETIME() END),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status IN (N'PENDENTE', N'APROVADA');`);\n  } else if (temSolicitacao && acao.aprovador) {\n    // \"Aprovar e liberar\" com o CNN fora do ar: a aprovação vale; a liberação pode ser tentada de novo.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'APROVADA',\n    DecididoPor = ${sqlS(acao.aprovador, 100)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE Id = ${idSolicitacao}\n  AND Status = N'PENDENTE';`);\n  }\n\n  if (liberou) {\n    // Liberado por outro caminho (prazo cumprido): as outras solicitações abertas perdem o sentido.\n    const motivoEncerramento = acao.origem === 'AUTOMATICO'\n      ? 'Prazo cumprido: paciente liberado pela rotina automática.'\n      : `Paciente liberado por ${acao.usuario || 'outro usuário'}.`;\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = ${sqlS(motivoEncerramento, 500)},\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')${temSolicitacao ? `\\n  AND Id <> ${idSolicitacao}` : ''};`);\n  }\n\n  if (acao.sucesso && acao.acao === 'BLOQUEIO') {\n    // Bloqueio por uma falta nova: a solicitação feita para a falta anterior não vale mais.\n    solicitacoes.push(`\nUPDATE dbo.CtlCnnSolicitacao\nSET Status = N'ENCERRADA',\n    MotivoDecisao = N'Nova falta registrada: a solicitação era da falta anterior.',\n    DecididoEm = SYSUTCDATETIME(),\n    AtualizadoEm = SYSUTCDATETIME()\nWHERE IdPaciente = ${sqlN(acao.idPaciente)}\n  AND Status IN (N'PENDENTE', N'APROVADA')\n  AND IdAgendaReferencia <> ${sqlN(acao.idAgenda)};`);\n  }\n\n  return `USE INTEGRACAO;\nSET NOCOUNT ON;\nSET XACT_ABORT ON;\nBEGIN TRANSACTION;\n\nINSERT INTO dbo.CtlCnnAcaoPaciente (\n    IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,\n    IdAgendaReferencia, NumeroFalta, DataInicioBloqueio, DataFimBloqueio,\n    Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n, IdSolicitacao\n)\nVALUES (\n    ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},\n    ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)}, ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)},\n    ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}, ${idSolicitacao}\n);\n\nDECLARE @IdAcao BIGINT = CONVERT(BIGINT, SCOPE_IDENTITY());\n${merge}\n${solicitacoes.join('\\n')}\n\nCOMMIT TRANSACTION;\n\nSELECT @IdAcao AS IdAcao, CAST(${sqlBit(Boolean(acao.sucesso))} AS bit) AS Sucesso;`;\n};\n// Junta os itens de um nó HTTP paginado da API do CNN: cada página chega como { lista: [...] }.\n// Página com erro (onError = continueRegularOutput) é ignorada.\nconst listaDaApi = (itens) => {\n  const lista = [];\n\n  for (const item of itens || []) {\n    const pagina = item?.json ?? {};\n    if (Array.isArray(pagina.lista)) {\n      lista.push(...pagina.lista);\n    }\n  }\n\n  return lista;\n};\n\n// Itens de um nó que pode não existir (ou não ter rodado) neste workflow: lista vazia em vez de erro.\nconst itensDoNo = (nome) => {\n  try {\n    return $(nome).all();\n  } catch (erro) {\n    return [];\n  }\n};\n\n// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra }. Blocos de 500 (VALUES aceita até 1000 linhas).\nconst sqlCadastros = (linhas) => {\n  const validas = [];\n  const vistos = new Set();\n\n  for (const linha of linhas) {\n    const id = Number(linha.id);\n    const chave = `${linha.tipo}:${id}`;\n    if (!linha.tipo || !Number.isFinite(id) || vistos.has(chave)) {\n      continue;\n    }\n    vistos.add(chave);\n    validas.push(`(${sqlS(linha.tipo, 20)}, ${sqlN(id)}, ${sqlS(linha.nome, 200)}, ${sqlS(linha.extra, 100)})`);\n  }\n\n  const blocos = [];\n  for (let i = 0; i < validas.length; i += 500) {\n    blocos.push(`\nMERGE dbo.CtlCnnCadastro WITH (HOLDLOCK) AS destino\nUSING (VALUES\n    ${validas.slice(i, i + 500).join(',\\n    ')}\n) AS origem (Tipo, Id, Nome, Extra)\n    ON destino.Tipo = origem.Tipo AND destino.Id = origem.Id\nWHEN MATCHED AND (ISNULL(destino.Nome, N'') <> ISNULL(origem.Nome, N'') OR ISNULL(destino.Extra, N'') <> ISNULL(origem.Extra, N'')) THEN\n    UPDATE SET Nome = origem.Nome, Extra = origem.Extra, AtualizadoEm = SYSUTCDATETIME()\nWHEN NOT MATCHED THEN\n    INSERT (Tipo, Id, Nome, Extra) VALUES (origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);\n  }\n\n  return blocos.join('\\n');\n};\n// ===== fim dos helpers de SQL =====\n\n// Nó \"montar registro\" (liberação automática às 02:00). Depois do PATCH (ou no lugar dele):\n// grava a auditoria (Origem AUTOMATICO) e, se deu certo, marca LIBERADO no controle e encerra as\n// solicitações de desbloqueio abertas do paciente (sqlRegistrarAcao faz tudo numa transação).\nlet decisao = {};\ntry {\n  decisao = $('decidir').itemMatching(0).json;\n} catch (erro) {\n  decisao = $('decidir').first().json;\n}\n\nconst SO_REGISTRO = 'Sem PATCH: paciente já estava ativo no CNN; liberação só registrada pela automação.';\nconst resposta = decisao.falhaConsulta\n  ? { ok: false, statusCode: decisao.httpConsulta ?? null, erro: decisao.falhaConsulta, texto: decisao.falhaConsulta }\n  : decisao.apenasRegistrar\n    ? { ok: true, statusCode: null, erro: null, texto: SO_REGISTRO }\n    : lerRespostaHttp($input.first().json);\n\nconst query = sqlRegistrarAcao({\n  idPaciente: decisao.idPaciente,\n  nomePaciente: decisao.nomePaciente,\n  acao: 'LIBERACAO',\n  origem: 'AUTOMATICO',\n  usuario: 'n8n',\n  motivo: `Prazo de ${decisao.diasBloqueio} dias da falta ${decisao.numeroFalta} cumprido (falta de ${decisao.dataInicioBloqueio}).`,\n  idAgenda: decisao.idAgenda,\n  numeroFalta: decisao.numeroFalta,\n  dataInicioBloqueio: decisao.dataInicioBloqueio,\n  dataFimBloqueio: decisao.dataFimBloqueio,\n  antecipada: false,\n  ativoAntes: decisao.ativoAntes,\n  sucesso: resposta.ok,\n  httpStatus: resposta.statusCode,\n  respostaApi: decisao.apenasRegistrar ? SO_REGISTRO : resposta.ok ? null : resposta.erro || resposta.texto,\n  idExecucao: $execution.id,\n});\n\nreturn [{\n  json: {\n    query,\n    idPaciente: decisao.idPaciente,\n    apenasRegistrar: Boolean(decisao.apenasRegistrar),\n    sucesso: resposta.ok,\n    httpStatus: resposta.statusCode\n  }\n}];\n"
+      },
+      "id": "9c4b2e77-35db-45f8-814b-7b2ade2de79c",
+      "name": "montar registro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}"
+      },
+      "id": "7be8cbf1-655d-4a8e-b034-81d5cef85614",
+      "name": "registrar liberação",
+      "type": "n8n-nodes-base.microsoftSql",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        352
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "microsoftSql": {
+          "id": "qsbr3cHSQT6CODbU",
+          "name": "TST Araguari"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## Liberação automática (02:00)\n\nLibera quem CUMPRIU o prazo 60/90/180 da falta vigente.\nSó entra quem o próprio sistema bloqueou (controle BLOQUEADO\npara a falta vigente): inativo por outro motivo nunca é reativado.\n\nPara cada um: GET no CNN → inativo: PATCH ativo:true;\njá ativo: só registra. Grava a auditoria (Origem AUTOMATICO),\nmarca LIBERADO no controle e encerra solicitações abertas.\n\nLiberar ANTES do prazo: só por solicitação aprovada (painel).\nSettings: Error workflow = Error Handler do monitoramento.\nCódigo: workflows/code/liberacao-*.js (npm run inject).\nDoc: docs/liberacao.md",
+        "height": 340,
+        "width": 460,
+        "color": 4
+      },
+      "id": "da08863e-3c98-452c-a511-9b5d9bb1e81c",
+      "name": "Nota liberação",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        -64
+      ]
+    }
+  ],
+  "connections": {
+    "Todo dia 02:00": {
+      "main": [
+        [
+          {
+            "node": "preparar consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "preparar consulta": {
+      "main": [
+        [
+          {
+            "node": "consultar vencidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar vencidos": {
+      "main": [
+        [
+          {
+            "node": "montar candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "montar candidatos": {
+      "main": [
+        [
+          {
+            "node": "há o que liberar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "há o que liberar?": {
+      "main": [
+        [
+          {
+            "node": "loop liberações",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "nada a liberar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "loop liberações": {
+      "main": [
+        [],
+        [
+          {
+            "node": "GET paciente atual",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET paciente atual": {
+      "main": [
+        [
+          {
+            "node": "decidir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "decidir": {
+      "main": [
+        [
+          {
+            "node": "enviar ao CNN?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enviar ao CNN?": {
+      "main": [
+        [
+          {
+            "node": "PATCH status paciente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "montar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH status paciente": {
+      "main": [
+        [
+          {
+            "node": "montar registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "montar registro": {
+      "main": [
+        [
+          {
+            "node": "registrar liberação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrar liberação": {
+      "main": [
+        [
+          {
+            "node": "loop liberações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "a58f4bcc67596c230e0eb8e28f02626c123d0e2e059f5b6e23cacd1a4ad0c612"
+  }
+}

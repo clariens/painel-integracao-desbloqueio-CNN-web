@@ -48,7 +48,11 @@ Ação desconhecida ou parâmetro inválido → 400. Falha no SQL → 502 com a 
 Calculada em `Montar resposta` (`situacaoDe`):
 
 1. Se a tabela de controle aponta para a falta vigente (`IdAgendaReferencia = IdAgenda`), vale a `Situacao` dela: `BLOQUEADO` + prazo correndo = `bloqueado`; + vencido = `apto`; `LIBERADO` + prazo correndo = `liberado_antecipado`; + vencido = `liberado`.
-2. Senão, ninguém registrou o bloqueio dessa falta: `pendente` ("Aguardando bloqueio", situação `PENDENTE`), com o prazo de liberação vencido ou não. Toda falta do período bloqueia; o prazo só decide quando pode liberar.
+2. Senão, ninguém registrou o bloqueio dessa falta:
+   - prazo correndo: `pendente` ("Aguardando bloqueio", situação `PENDENTE`), e a execução das 01:00 bloqueia;
+   - prazo cumprido: `liberado` (situação `CUMPRIDO`), porque o bloqueio não bloqueia mais quem cumpriu o prazo.
+
+Cada item traz também `solicitacao` (a solicitação de desbloqueio aberta, com `id`, `status`, `solicitadoPor`, `em` e `valida`, que diz se ela é da falta vigente), e o resumo traz `solicitacoesPendentes` e `solicitacoesAprovadas` (o contador do menu). O detalhe (`paciente`) traz a seção `solicitacoes` com o histórico do paciente, e as ações trazem `idSolicitacao`.
 
 O resumo traz `pendentes` além de `bloqueados`, `aptos`, `liberadosAntecipados` e `liberados`.
 

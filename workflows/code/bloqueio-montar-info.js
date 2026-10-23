@@ -1,5 +1,6 @@
 // Nó "montar info bloqueio" (bloqueio às 01:00). Um item por paciente com falta no período analisado
-// (início do ciclo até hoje), sem olhar o prazo: o prazo 60/90/180 só diz quando o paciente pode ser liberado.
+// (início do ciclo até hoje) e com o prazo 60/90/180 da falta vigente ainda correndo:
+//   - prazo já cumprido (falta lançada atrasada, por exemplo) -> não bloqueia (a liberação automática não teria o que fazer);
 //   - ativo no CNN (ou sem resposta do GET) -> bloquear (PATCH);
 //   - já inativo no CNN e sem bloqueio registrado para esta falta -> só registrar (sem PATCH);
 //   - já inativo e já registrado -> nada a fazer.
@@ -26,7 +27,7 @@ try {
 
 const hoje = hojeSp();
 const linhas = linhasSql(items);
-const resumo = { analisados: linhas.length, jaRegistrado: 0, invalidos: 0 };
+const resumo = { analisados: linhas.length, jaRegistrado: 0, prazoCumprido: 0, invalidos: 0 };
 
 const saida = linhas.flatMap((linha) => {
   const numeroFalta = Number(linha.NumeroFalta ?? linha.numeroFalta ?? 0);
@@ -37,11 +38,16 @@ const saida = linhas.flatMap((linha) => {
     return [];
   }
 
-  // O prazo não decide o bloqueio; vai para o controle como "liberável a partir de".
+  // O prazo vai para o controle como "liberável a partir de". Prazo já cumprido: não bloqueia.
   const diasBloqueio = diasPorFalta(numeroFalta);
   const nomePaciente = linha.NomePaciente ?? linha.nomePaciente ?? null;
   const dataInicio = dataIso(linha.DataFalta ?? linha.dataFalta);
   const dataFim = somarDias(dataInicio, diasBloqueio);
+
+  if (dataFim && dataFim < hoje) {
+    resumo.prazoCumprido += 1;
+    return [];
+  }
 
   const idAgenda = linha.IdAgenda ?? linha.idAgenda ?? null;
   const bloqueioRegistrado =
@@ -83,7 +89,8 @@ if (!saida.length) {
       hoje,
       ...resumo,
       mensagem: `Nada a bloquear hoje (${hoje}): ${resumo.analisados} paciente(s) com falta no período; `
-        + `${resumo.jaRegistrado} já inativo(s) no CNN e registrado(s).`
+        + `${resumo.jaRegistrado} já inativo(s) no CNN e registrado(s); `
+        + `${resumo.prazoCumprido} com o prazo já cumprido (não bloqueia).`
     }
   }];
 }

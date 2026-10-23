@@ -132,6 +132,65 @@ WHEN NOT MATCHED THEN
     );`
     : '';
 
+  // Solicitações de desbloqueio (dbo.CtlCnnSolicitacao), na mesma transação da auditoria.
+  const idSolicitacao = sqlN(acao.idSolicitacao);
+  const temSolicitacao = idSolicitacao !== 'NULL';
+  const liberou = acao.sucesso && acao.acao === 'LIBERACAO';
+  const solicitacoes = [];
+
+  if (temSolicitacao && liberou) {
+    // A solicitação usada nesta liberação fica LIBERADA (com "Aprovar e liberar", a decisão vai junto).
+    solicitacoes.push(`
+UPDATE dbo.CtlCnnSolicitacao
+SET Status = N'LIBERADA',
+    LiberadoPor = ${sqlS(acao.usuario, 100)},
+    LiberadoEm = SYSUTCDATETIME(),
+    IdAcao = @IdAcao,
+    DecididoPor = COALESCE(DecididoPor, ${sqlS(acao.aprovador, 100)}),
+    DecididoEm = COALESCE(DecididoEm, CASE WHEN ${sqlS(acao.aprovador, 100)} IS NULL THEN NULL ELSE SYSUTCDATETIME() END),
+    AtualizadoEm = SYSUTCDATETIME()
+WHERE Id = ${idSolicitacao}
+  AND Status IN (N'PENDENTE', N'APROVADA');`);
+  } else if (temSolicitacao && acao.aprovador) {
+    // "Aprovar e liberar" com o CNN fora do ar: a aprovação vale; a liberação pode ser tentada de novo.
+    solicitacoes.push(`
+UPDATE dbo.CtlCnnSolicitacao
+SET Status = N'APROVADA',
+    DecididoPor = ${sqlS(acao.aprovador, 100)},
+    DecididoEm = SYSUTCDATETIME(),
+    AtualizadoEm = SYSUTCDATETIME()
+WHERE Id = ${idSolicitacao}
+  AND Status = N'PENDENTE';`);
+  }
+
+  if (liberou) {
+    // Liberado por outro caminho (prazo cumprido): as outras solicitações abertas perdem o sentido.
+    const motivoEncerramento = acao.origem === 'AUTOMATICO'
+      ? 'Prazo cumprido: paciente liberado pela rotina automática.'
+      : `Paciente liberado por ${acao.usuario || 'outro usuário'}.`;
+    solicitacoes.push(`
+UPDATE dbo.CtlCnnSolicitacao
+SET Status = N'ENCERRADA',
+    MotivoDecisao = ${sqlS(motivoEncerramento, 500)},
+    DecididoEm = SYSUTCDATETIME(),
+    AtualizadoEm = SYSUTCDATETIME()
+WHERE IdPaciente = ${sqlN(acao.idPaciente)}
+  AND Status IN (N'PENDENTE', N'APROVADA')${temSolicitacao ? `\n  AND Id <> ${idSolicitacao}` : ''};`);
+  }
+
+  if (acao.sucesso && acao.acao === 'BLOQUEIO') {
+    // Bloqueio por uma falta nova: a solicitação feita para a falta anterior não vale mais.
+    solicitacoes.push(`
+UPDATE dbo.CtlCnnSolicitacao
+SET Status = N'ENCERRADA',
+    MotivoDecisao = N'Nova falta registrada: a solicitação era da falta anterior.',
+    DecididoEm = SYSUTCDATETIME(),
+    AtualizadoEm = SYSUTCDATETIME()
+WHERE IdPaciente = ${sqlN(acao.idPaciente)}
+  AND Status IN (N'PENDENTE', N'APROVADA')
+  AND IdAgendaReferencia <> ${sqlN(acao.idAgenda)};`);
+  }
+
   return `USE INTEGRACAO;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
@@ -140,16 +199,17 @@ BEGIN TRANSACTION;
 INSERT INTO dbo.CtlCnnAcaoPaciente (
     IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,
     IdAgendaReferencia, NumeroFalta, DataInicioBloqueio, DataFimBloqueio,
-    Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n
+    Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n, IdSolicitacao
 )
 VALUES (
     ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},
     ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)}, ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)},
-    ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}
+    ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}, ${idSolicitacao}
 );
 
 DECLARE @IdAcao BIGINT = CONVERT(BIGINT, SCOPE_IDENTITY());
 ${merge}
+${solicitacoes.join('\n')}
 
 COMMIT TRANSACTION;
 

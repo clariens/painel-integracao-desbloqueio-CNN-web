@@ -24,13 +24,13 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | R9 | O prazo depende do número da falta vigente: **1ª = 60 dias, 2ª = 90 dias, 3ª ou mais = 180 dias** | `_regra.js` (`prazosDias`) |
 | R10 | O prazo conta a partir da **data da falta vigente**. Fim do prazo = data da falta + dias do prazo | `somarDias`, `sqlDiasCase` |
 | R11 | Uma falta nova **substitui** a vigente: o prazo recomeça da nova data, com o prazo do novo número | Consequência de R6 e R10 |
-| R12 | **O prazo não decide o bloqueio.** Ele só diz **a partir de quando o paciente pode ser liberado**. Toda falta do ciclo bloqueia, com o prazo correndo ou já vencido | `montar info bloqueio`, `decidir` |
+| R12 | **O prazo decide o fim do bloqueio.** Toda falta do ciclo bloqueia **enquanto o prazo corre**. Quem já cumpriu o prazo da falta vigente (por exemplo, falta lançada atrasada no CNN) **não é bloqueado**. (Até 22/10/2026, toda falta do ciclo bloqueava, com o prazo correndo ou não.) | `montar info bloqueio`, `decidir` |
 
 ## 3. Bloqueio automático (01:00)
 
 | # | Regra | Onde |
 |---|---|---|
-| R13 | Todo dia à **01:00** (horário de São Paulo), a automação bloqueia **todo paciente com falta no ciclo que esteja ativo no CNN** | Workflow de bloqueio |
+| R13 | Todo dia à **01:00** (horário de São Paulo), a automação bloqueia **todo paciente com falta no ciclo, com o prazo correndo, que esteja ativo no CNN** | Workflow de bloqueio |
 | R14 | **Exceção:** quem foi **liberado ou teve a falta isenta pelo painel** por aquela mesma falta vigente **não é bloqueado de novo**. Só uma falta nova bloqueia outra vez | `ids da consulta` (filtro `LIBERADO` + `IdAgendaReferencia`) |
 | R15 | Paciente que **já está inativo** no CNN não recebe comando de bloqueio: o bloqueio é só **registrado** no banco (auditoria e controle), com a anotação "Sem PATCH" | `enviar ao CNN?`, `montar registro` |
 | R16 | Paciente já inativo **e** já registrado como bloqueado por aquela falta é ignorado (nada a fazer) | `montar info bloqueio` |
@@ -39,15 +39,15 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | R19 | Paciente **reativado direto no CNN** (fora do painel) volta a ser bloqueado na madrugada seguinte, porque não houve liberação registrada | Consequência de R13 e R14 |
 | R20 | Sem ninguém a bloquear, a execução termina com um resumo do motivo ("nada a bloquear") | `montar info bloqueio`, nó `nada a bloquear` |
 
-## 4. Liberação (sempre manual)
+## 4. Liberação
 
 | # | Regra | Onde |
 |---|---|---|
-| R21 | **A liberação é sempre feita por uma pessoa**, pelo painel. A liberação automática das 02:00 está **desativada** | Workflow Ações; [liberacao.md](liberacao.md) |
+| R21 | **Depois do prazo**, a liberação é **automática**, todo dia às **02:00** (R81). Editor e Admin também podem liberar na hora quem está **Apto a liberar** | Workflow de liberação ([liberacao.md](liberacao.md)); Ações |
 | R22 | Toda liberação exige **motivo** de **5 a 500 caracteres** | Painel, `lib/acao.js`, nó `Validar` |
-| R23 | Pode liberar **antes do fim do prazo**. A liberação fica marcada como **antecipada** no histórico | `decidir` (`antecipada`) |
-| R24 | Antes de liberar, o sistema consulta o CNN. Se o paciente **já está ativo**, não envia nada (resposta `JA_ATIVO`) e oferece **registrar a liberação** feita fora do painel | `decidir` |
-| R25 | Se o paciente está ativo e **ainda não foi bloqueado** por aquela falta, a resposta é `NAO_BLOQUEADO`, e o painel oferece **isentar a falta** (R31) | `decidir` |
+| R23 | **Antes do fim do prazo**, liberar só com uma **solicitação de desbloqueio aprovada pelo administrador** (R70 a R80). Sem ela, a resposta é `SOLICITACAO_NECESSARIA`, inclusive para o admin. A liberação fica marcada como **antecipada** no histórico | `decidir` (`antecipada`, `SOLICITACAO_NECESSARIA`) |
+| R24 | Antes de liberar, o sistema consulta o CNN. Se o paciente **já está ativo** e o prazo já terminou, não envia nada (resposta `JA_ATIVO`) e oferece **registrar a liberação** feita fora do painel. Antes do prazo, vale R23 | `decidir` |
+| R25 | Paciente ativo e **ainda não bloqueado** por aquela falta, com o prazo correndo: não há o que liberar; se ele justificou a falta, o caminho é a **solicitação**, que aprovada **isenta a falta** (R31) | `decidir` |
 | R26 | Também é possível liberar paciente cuja falta vigente é de **ciclo anterior** (bloqueio que atravessou a virada do ciclo) | `decidir` |
 
 ## 5. Bloqueio pelo painel
@@ -63,7 +63,7 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 
 | # | Regra | Onde |
 |---|---|---|
-| R31 | **Isentar a falta:** com o paciente ainda ativo e sem bloqueio registrado, o painel registra uma liberação **sem enviar nada ao CNN**. A automação deixa de bloquear por aquela falta (R14) | `decidir` (`isencao`), `montar registro` |
+| R31 | **Isentar a falta:** com o paciente ainda ativo e sem bloqueio registrado, uma **solicitação aprovada** registra uma liberação **sem enviar nada ao CNN**. A automação deixa de bloquear por aquela falta (R14). O botão "Isentar" direto do Editor saiu em 22/10/2026 | `decidir` (`isencao`), `montar registro` |
 | R32 | **Registrar situação feita no CNN:** quando alguém liberou ou bloqueou direto no CNN, o painel registra a mesma situação no banco **sem enviar comando**. O histórico mostra "Só registro" | `apenasRegistrar` em `lib/acao.js` e no workflow Ações |
 | R33 | O registro só é aceito se o CNN estiver **de fato** no estado pedido. Se não estiver, a ação segue normalmente, com o comando | `decidir` |
 
@@ -84,7 +84,7 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | R39 | **Todo** comando enviado ao CNN (automático ou pelo painel), e todo registro sem comando, vira uma linha na **auditoria** (`CtlCnnAcaoPaciente`), com quem, quando, motivo, resposta do CNN e número da execução no n8n | `sqlRegistrarAcao` ([_sql.js](../workflows/code/_sql.js)) |
 | R40 | A auditoria é gravada **sempre**, mesmo quando o CNN recusa. A tabela de **controle** só muda quando o CNN **aceita** | Idem |
 | R41 | A auditoria **só recebe inclusões**: nenhum fluxo altera ou apaga uma linha | Desenho das tabelas e fluxos |
-| R42 | A automação aparece no histórico como **"Automático (01:00)"**, com usuário `n8n` | `montar registro` do bloqueio |
+| R42 | A automação aparece no histórico como **"Automático"**, com usuário `n8n`: bloqueios da 01:00 e liberações das 02:00 | `montar registro` do bloqueio e da liberação |
 | R43 | Se o comando deu certo no CNN mas a gravação da auditoria falhou, o painel mostra um **aviso** e a correção é manual, a partir da execução do n8n | `Montar resposta` das Ações |
 
 ## 9. Usuários e acesso
@@ -92,7 +92,7 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | # | Regra | Onde |
 |---|---|---|
 | R44 | Cada pessoa tem **login próprio**. O nome de quem fez aparece em todas as ações | `CtlCnnUsuario`, `lib/acao.js` |
-| R45 | Perfis: **Leitor** só vê; **Editor** também libera, bloqueia, isenta e registra; **Admin** também gerencia usuários | `requireAuth` ([lib/auth.js](../lib/auth.js)) |
+| R45 | Perfis: **Leitor** vê e **abre solicitações**; **Editor** também bloqueia, registra, libera quem cumpriu o prazo e libera solicitações aprovadas; **Admin** também **aprova e recusa solicitações** e gerencia usuários | `requireAuth` ([lib/auth.js](../lib/auth.js)) |
 | R46 | A permissão é decidida pelo **servidor** (Vercel). A tela só esconde os botões; chamar a API direto sem permissão dá erro 403 | `requireAuth` |
 | R47 | A sessão dura **8 horas** e fica só na aba do navegador. Fechar a aba encerra a sessão | `assinarSessao`, `js/session.js` |
 | R48 | Antes de **qualquer ação que altera dados**, o sistema confere no banco se o usuário continua **ativo, com o mesmo perfil e a mesma versão de sessão**. Desativar alguém ou mudar seu perfil vale **na hora** para as ações | `revalidarSessao` ([lib/usuarios.js](../lib/usuarios.js)) |
@@ -120,9 +120,9 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | # | Regra | Onde |
 |---|---|---|
 | R62 | Ao entrar, o painel busca **todas as telas ao mesmo tempo** ("Preparando os dados…") | `prepararDados` ([js/pagina.js](../js/pagina.js)) |
-| R63 | Cada tela guarda o dado na aba por um prazo: Pacientes 2 min, detalhe 1 min, Relatórios 10 min, Histórico 2 min, Configuração 30 min, Usuários 2 min. Dentro do prazo, trocar de tela não chama o servidor | `CACHE` ([js/session.js](../js/session.js)) |
+| R63 | Cada tela guarda o dado na aba por um prazo: Pacientes 2 min, detalhe 1 min, Relatórios 10 min, Histórico 2 min, Configuração 30 min, Usuários 2 min, Solicitações 1 min (a tela Solicitações busca de novo por trás ao abrir). Dentro do prazo, trocar de tela não chama o servidor | `CACHE` ([js/session.js](../js/session.js)) |
 | R64 | Dado vencido (até 12 h) **aparece na hora** e é atualizado em segundo plano | `comCache` (`aoAtualizar`) |
-| R65 | Depois de uma ação (liberar, bloquear, isentar, registrar), o dado afetado é apagado da aba e buscado de novo | `js/pacientes.js` |
+| R65 | Depois de uma ação (liberar, bloquear, registrar, pedir, aprovar, recusar, cancelar), o dado afetado é apagado da aba e buscado de novo | `js/pacientes.js`, `js/solicitacao.js` |
 
 ## 12. Nomes e cadastros
 
@@ -132,3 +132,33 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | R67 | O **profissional** da agenda é identificado pelo `idpessoa` da lista de executores (não pelo `id` do executor) | `preparar insert SQL` |
 | R68 | O "o que o paciente ia fazer" é o **procedimento** do agendamento. Quando a clínica não preenche procedimentos, vale o **tipo de consulta** | `js/pacientes.js` (`procedimentoHtml`) |
 | R69 | Sem nome cadastrado ainda, os relatórios mostram **"Código …"**, e a próxima execução completa | Consulta `faltas` da Leitura |
+
+## 13. Solicitações de desbloqueio
+
+Detalhes em [fluxos/solicitacoes.md](fluxos/solicitacoes.md).
+
+| # | Regra | Onde |
+|---|---|---|
+| R70 | **Qualquer usuário**, inclusive Leitor, pode abrir uma solicitação de desbloqueio, com **motivo de 5 a 500 caracteres** | Tela Solicitações e Pacientes; `api/solicitacoes`; `solicitacoes-preparar.js` (`criar`) |
+| R71 | Só pode receber solicitação quem **ainda está no prazo**: bloqueado ou aguardando bloqueio, pela falta vigente, sem ter sido liberado por ela. Prazo cumprido: `PRAZO_CUMPRIDO` (a liberação automática cuida) | `criar` |
+| R72 | **Uma solicitação aberta** (pendente ou aprovada) **por paciente**. A segunda responde `JA_EXISTE` com o número da que já existe | `criar`; índice `UX_CtlCnnSolicitacao_Aberta` |
+| R73 | **Só o administrador aprova ou recusa.** Recusar exige motivo | `api/solicitacoes/[id].js`; `aprovar`, `recusar` |
+| R74 | **Editor ou administrador** libera no CNN uma solicitação **aprovada**. O admin também pode **Aprovar e liberar** de uma vez | `api/solicitacoes/[id]/liberar.js`; `decidir` |
+| R75 | O admin tem um **atalho** na tela Pacientes: **Liberar** abre a solicitação, aprova e libera num passo. Fica registrado como solicitação aprovada por ele | `POST /api/solicitacoes` com `aprovarELiberar` |
+| R76 | Quem abriu (ou um admin) pode **cancelar** a solicitação enquanto ela está aberta | `cancelar` |
+| R77 | A solicitação vale para a **falta vigente de quando foi aberta**. Com uma falta nova, ela fica **desatualizada**: aprovar ou liberar respondem 409 e ela é **encerrada** | `aprovar`, `decidir` (`SOLICITACAO_DESATUALIZADA`), `sqlRegistrarAcao` |
+| R78 | O sistema **encerra** as solicitações abertas quando o paciente é liberado pela rotina automática ou por outro caminho, ou bloqueado por uma falta nova | `sqlRegistrarAcao` ([_sql.js](../workflows/code/_sql.js)) |
+| R79 | A liberação por solicitação usa o **motivo do pedido** na auditoria ("Solicitação #N (quem pediu): motivo") e liga a ação à solicitação (`IdSolicitacao`) | `montar registro` das Ações |
+| R80 | **Todos veem** as solicitações: paciente, quem pediu, quando, motivo, decisão (quem e por quê) e quem liberou. O menu mostra quantas aguardam aprovação | Tela Solicitações; `atualizarContador` ([js/pagina.js](../js/pagina.js)) |
+
+## 14. Liberação automática (02:00)
+
+Detalhes em [liberacao.md](liberacao.md).
+
+| # | Regra | Onde |
+|---|---|---|
+| R81 | Todo dia às **02:00**, a automação libera no CNN quem **cumpriu o prazo** da falta vigente | Workflow de liberação |
+| R82 | Só entra quem o **próprio sistema bloqueou**: controle `BLOQUEADO` apontando para a falta vigente. Paciente inativo por outro motivo **nunca é reativado** | `liberacao-preparar-consulta.js` |
+| R83 | Paciente que já está ativo no CNN (liberado direto na plataforma) não recebe comando: a liberação é só **registrada** | `liberacao-decidir.js` |
+| R84 | Toda liberação automática vai para a **auditoria** (Origem `AUTOMATICO`), marca **LIBERADO** no controle e encerra as solicitações abertas do paciente. Se o CNN falhar, a falha fica registrada e a rotina tenta de novo na noite seguinte | `liberacao-montar-registro.js`, `sqlRegistrarAcao` |
+| R85 | Com o controle `LIBERADO` para aquela falta, o bloqueio da 01:00 não bloqueia de novo. Só uma falta nova bloqueia | Consequência de R14 |

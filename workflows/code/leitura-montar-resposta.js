@@ -47,14 +47,17 @@ const mascararCpf = (valor) => {
 };
 
 // Situação do paciente: a tabela de controle vale enquanto aponta para a falta vigente.
-// Sem registro para a falta vigente, ninguém confirmou o bloqueio no CNN -> PENDENTE ("Aguardando bloqueio"),
-// com o prazo correndo ou não: toda falta do período bloqueia; o prazo 60/90/180 só diz quando pode liberar.
+// Sem registro para a falta vigente: com o prazo correndo, ninguém confirmou o bloqueio no CNN -> PENDENTE
+// ("Aguardando bloqueio"); com o prazo já cumprido, o bloqueio das 01:00 não bloqueia mais -> CUMPRIDO
+// (status "liberado": o paciente pode agendar).
 const situacaoDe = (vigente, controle) => {
   const controleVale = controle?.Situacao && String(controle.IdAgendaReferencia ?? '') === String(vigente.IdAgenda ?? '');
   const prazoCorrendo = Boolean(vigente.DataFimBloqueio) && vigente.DataFimBloqueio >= meta.hoje;
 
   if (!controleVale) {
-    return { situacao: 'PENDENTE', status: 'pendente', controleVale };
+    return prazoCorrendo
+      ? { situacao: 'PENDENTE', status: 'pendente', controleVale }
+      : { situacao: 'CUMPRIDO', status: 'liberado', controleVale };
   }
 
   if (controle.Situacao === 'LIBERADO') {
@@ -88,6 +91,16 @@ if (meta.action === 'pacientes') {
             em: iso(linha.UltimaAcaoEm),
             vigente: controleVale
           }
+        : null,
+      // Solicitação de desbloqueio aberta (pendente ou aprovada). "valida": é da falta vigente de agora.
+      solicitacao: linha.SolicitacaoId
+        ? {
+            id: num(linha.SolicitacaoId),
+            status: linha.SolicitacaoStatus,
+            solicitadoPor: linha.SolicitacaoPor || null,
+            em: iso(linha.SolicitacaoEm),
+            valida: String(linha.SolicitacaoIdAgenda ?? '') === String(linha.IdAgenda ?? '')
+          }
         : null
     };
   });
@@ -113,7 +126,9 @@ if (meta.action === 'pacientes') {
       faltasMes: num(totais.FaltasMes),
       ultimaColeta: iso(totais.UltimaColeta),
       ultimoBloqueioAutomatico: iso(totais.UltimoBloqueioAutomatico),
-      controleCarregado: num(totais.LinhasControle) > 0
+      controleCarregado: num(totais.LinhasControle) > 0,
+      solicitacoesPendentes: num(totais.SolicitacoesPendentes),
+      solicitacoesAprovadas: num(totais.SolicitacoesAprovadas)
     },
     total: items.length,
     items
@@ -212,7 +227,23 @@ if (meta.action === 'paciente') {
       sucesso: bool(acao.Sucesso),
       httpStatus: acao.HttpStatus,
       respostaApi: acao.RespostaApi,
+      idSolicitacao: acao.IdSolicitacao ?? null,
       em: iso(acao.CriadoEm)
+    })),
+    solicitacoes: secao('solicitacao').map((s) => ({
+      id: num(s.Id),
+      idAgenda: s.IdAgendaReferencia,
+      numeroFalta: num(s.NumeroFalta),
+      motivo: s.Motivo || '',
+      solicitadoPor: s.SolicitadoPor || null,
+      solicitadoEm: iso(s.SolicitadoEm),
+      status: s.Status,
+      decididoPor: s.DecididoPor || null,
+      decididoEm: iso(s.DecididoEm),
+      motivoDecisao: s.MotivoDecisao || null,
+      liberadoPor: s.LiberadoPor || null,
+      liberadoEm: iso(s.LiberadoEm),
+      valida: vigente ? String(s.IdAgendaReferencia ?? '') === String(vigente.idAgenda ?? '') : false
     }))
   });
 }
@@ -296,6 +327,7 @@ if (meta.action === 'acoes') {
       httpStatus: acao.HttpStatus,
       respostaApi: acao.RespostaApi,
       execucao: acao.IdExecucaoN8n,
+      idSolicitacao: acao.IdSolicitacao ?? null,
       em: iso(acao.CriadoEm)
     }))
   });
@@ -311,12 +343,14 @@ if (meta.action === 'parametros') {
       cicloInicio: REGRA.cicloInicio,
       fuso: REGRA.fuso,
       horarioBloqueio: REGRA.horarioBloqueio,
-      liberacaoAutomatica: REGRA.liberacaoAutomatica
+      liberacaoAutomatica: REGRA.liberacaoAutomatica,
+      horarioLiberacao: REGRA.horarioLiberacao
     },
     ciclo: { inicio: meta.inicio, hoje: meta.hoje },
     status: {
       ultimaColeta: iso(status.UltimaColeta),
       ultimoBloqueioAutomatico: iso(status.UltimoBloqueioAutomatico),
+      ultimaLiberacaoAutomatica: iso(status.UltimaLiberacaoAutomatica),
       ultimaAcaoPainel: iso(status.UltimaAcaoPainel),
       linhasControle: num(status.LinhasControle),
       linhasFaltas: num(status.LinhasFaltas)

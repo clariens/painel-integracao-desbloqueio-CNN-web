@@ -72,7 +72,21 @@ export const EVENTO_USUARIO = {
   LOGIN_FALHA: "Senha errada",
   LOGIN_BLOQUEADO: "Login bloqueado",
 };
-export const ORIGEM = { AUTOMATICO: "Automático (01:00)", PAINEL: "Painel", CARGA_INICIAL: "Carga inicial" };
+export const ORIGEM = { AUTOMATICO: "Automático", PAINEL: "Painel", CARGA_INICIAL: "Carga inicial" };
+
+// Solicitações de desbloqueio: situação e selo (cores em css/app.css, .selo--sol-*).
+export const SOLICITACAO = {
+  PENDENTE: "Aguardando aprovação",
+  APROVADA: "Aprovada · falta liberar",
+  LIBERADA: "Liberada",
+  RECUSADA: "Recusada",
+  CANCELADA: "Cancelada",
+  ENCERRADA: "Encerrada",
+};
+// Verbo da decisão (quem aprovou, recusou, cancelou ou o sistema encerrou).
+export const DECISAO_SOLICITACAO = { APROVADA: "Aprovada", LIBERADA: "Aprovada", RECUSADA: "Recusada", CANCELADA: "Cancelada", ENCERRADA: "Encerrada" };
+export const seloSolicitacao = (status, texto = SOLICITACAO[status] || status) =>
+  `<span class="selo selo--sol-${escapeHtml(String(status).toLowerCase())}">${escapeHtml(texto)}</span>`;
 
 export const hojeSp = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());

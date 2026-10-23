@@ -2,6 +2,28 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-23 — Solicitações de desbloqueio e liberação automática de volta
+
+### Adicionado
+
+- **Solicitações de desbloqueio** (tela nova `/solicitacoes`, workflow [CNN Painel - Solicitações](docs/fluxos/solicitacoes.md), tabela `dbo.CtlCnnSolicitacao`): qualquer usuário, inclusive Leitor, pede a liberação de um paciente com o motivo; **só o administrador aprova ou recusa**; Editor ou Admin libera no CNN. O admin tem **Aprovar e liberar** e, na tela Pacientes, o atalho **Liberar** (abre, aprova e libera num passo). Quem pediu pode cancelar. O menu mostra quantas aguardam aprovação. Substitui os pedidos por e-mail.
+- **Liberação automática às 02:00** ([liberacao.md](docs/liberacao.md), `workflows/liberacaoPacientesFaltas.json`): libera quem cumpriu o prazo, **só se o próprio sistema bloqueou** (controle `BLOQUEADO` na falta vigente), grava a auditoria (`AUTOMATICO`), marca `LIBERADO` e encerra solicitações abertas.
+- **`sql/criar_tabelas_solicitacoes.sql`:** `CtlCnnSolicitacao` (uma aberta por paciente, índice único filtrado) e `IdSolicitacao` em `CtlCnnAcaoPaciente`. **Rodar antes** de colar os workflows.
+- Variável `N8N_SOLICITACOES_URL` na Vercel.
+- Detalhe do paciente: seção **Solicitações de desbloqueio**. Histórico: link para a solicitação de cada liberação. Configuração: horário e última liberação automática.
+
+### Alterado
+
+- **Liberar antes do fim do prazo exige solicitação aprovada** (`SOLICITACAO_NECESSARIA`), inclusive para o admin pelo caminho antigo. Depois do prazo (Apto), Editor e Admin liberam direto. O botão **Isentar esta falta** do Editor saiu: a isenção agora é uma solicitação aprovada.
+- **Quem já cumpriu o prazo não é bloqueado**, nem pela rotina das 01:00 nem pelo painel (`PRAZO_CUMPRIDO`). Na lista, uma falta assim aparece como **Liberado**.
+- `sqlRegistrarAcao` grava `IdSolicitacao` e, na mesma transação, marca a solicitação `LIBERADA` ou encerra as que perderam o sentido (liberação por outro caminho, falta nova).
+- `lib/n8n.js`: um 403 do n8n **com `codigo`** é regra do workflow e segue como 403 (só o 401/403 sem código é tratado como chave do webhook errada).
+- Docs: regras R12, R13, R21 a R25, R31, R42, R45, R63 e R65 revistas, mais as regras R70 a R85; visão geral, segurança, arquitetura, banco, operação e o Word atualizados.
+
+### Corrigido
+
+- `bloqueioPacientesFaltas.json` no repositório: o `clinicaNasNuvens-cid` estava com o valor antigo (Ações e Leitura já tinham o de Salvador), faltava a ligação `montar info bloqueio` → `há o que bloquear?`, e havia um nó solto (`GET agenda do ciclo1`).
+
 ## 2026-10-16 — Segurança: cabeçalhos e documentação
 
 ### Adicionado

@@ -32,6 +32,13 @@ if (validar.action === 'bloquear' && !vigenteNoCiclo) {
   return parar(404, 'Paciente sem falta no ciclo atual. O bloqueio só vale para falta registrada no ciclo.');
 }
 
+const parar409 = (codigo, error) => [{ json: { seguir: false, statusCode: 409, response: { error, codigo } } }];
+
+// Quem já cumpriu o prazo da falta vigente não é bloqueado (mesma regra do bloqueio das 01:00).
+if (validar.action === 'bloquear' && !prazoVigente) {
+  return parar409('PRAZO_CUMPRIDO', 'O prazo desta falta já terminou: quem cumpriu o prazo não é bloqueado.');
+}
+
 const paciente = resposta.body && typeof resposta.body === 'object' ? resposta.body : {};
 
 if (resposta.statusCode === 404) {
@@ -40,6 +47,43 @@ if (resposta.statusCode === 404) {
 
 if (!resposta.ok || paciente.id == null) {
   return parar(502, `Não foi possível consultar o paciente no CNN${resposta.statusCode ? ` (HTTP ${resposta.statusCode})` : ''}.`);
+}
+
+// Liberar antes do fim do prazo (liberação antecipada ou isenção de falta ainda não bloqueada) só com uma
+// solicitação de desbloqueio deste paciente e desta falta: APROVADA, ou PENDENTE com "Aprovar e liberar".
+// Depois do prazo (Apto), a liberação segue sem solicitação.
+const comSolicitacao = Boolean(validar.idSolicitacao);
+if (validar.action === 'liberar' && prazoVigente && !comSolicitacao) {
+  return parar409(
+    'SOLICITACAO_NECESSARIA',
+    'Liberar antes do fim do prazo exige uma solicitação de desbloqueio aprovada pelo administrador.'
+  );
+}
+
+if (comSolicitacao) {
+  if (!linha.SolicitacaoId) {
+    return parar(404, 'Solicitação não encontrada.');
+  }
+  if (String(linha.SolicitacaoIdPaciente) !== String(validar.id)) {
+    return parar409('SOLICITACAO_INVALIDA', 'A solicitação é de outro paciente.');
+  }
+  if (String(linha.SolicitacaoIdAgenda ?? '') !== String(linha.IdAgenda ?? '')) {
+    return parar409(
+      'SOLICITACAO_DESATUALIZADA',
+      'O paciente teve uma falta nova depois da solicitação. Abra uma nova solicitação para a falta atual.'
+    );
+  }
+  const statusOk = linha.SolicitacaoStatus === 'APROVADA' || (linha.SolicitacaoStatus === 'PENDENTE' && validar.aprovar);
+  if (!statusOk) {
+    const textos = {
+      PENDENTE: 'A solicitação ainda não foi aprovada pelo administrador.',
+      LIBERADA: 'Esta solicitação já foi usada para liberar o paciente.',
+      RECUSADA: 'A solicitação foi recusada.',
+      CANCELADA: 'A solicitação foi cancelada.',
+      ENCERRADA: 'A solicitação foi encerrada.'
+    };
+    return parar409('SOLICITACAO_INVALIDA', textos[linha.SolicitacaoStatus] || 'Solicitação inválida.');
+  }
 }
 
 const ativoAntes = typeof paciente.ativo === 'boolean' ? paciente.ativo : null;
@@ -57,7 +101,8 @@ const bloqueioRegistrado =
   linha.Situacao === 'BLOQUEADO' && String(linha.IdAgendaReferencia ?? '') === String(linha.IdAgenda ?? '');
 const aindaNaoBloqueado = validar.action === 'liberar' && !bloqueioRegistrado && vigenteNoCiclo;
 
-if (jaNoEstado && !validar.apenasRegistrar) {
+// Com solicitação válida, o CNN já ativo não é dúvida: é isenção (ainda não bloqueado) ou liberação só registrada.
+if (jaNoEstado && !validar.apenasRegistrar && !comSolicitacao) {
   const liberar = validar.action === 'liberar';
   const naoBloqueado = aindaNaoBloqueado;
   return [{
@@ -92,6 +137,9 @@ return [{
     dataInicioBloqueio: dataInicio,
     dataFimBloqueio: dataFim,
     antecipada: validar.action === 'liberar' && prazoVigente,
-    ativoAntes
+    ativoAntes,
+    idSolicitacao: comSolicitacao ? validar.idSolicitacao : null,
+    motivoSolicitacao: comSolicitacao ? linha.SolicitacaoMotivo || null : null,
+    solicitadoPor: comSolicitacao ? linha.SolicitacaoPor || null : null
   }
 }];

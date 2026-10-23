@@ -1,6 +1,7 @@
-import { ACAO, ORIGEM, STATUS, dataBr, dataHoraBr, escapeHtml, hojeSp, inicioCiclo, numero, prazoTexto, selo } from "./formato.js";
+import { ACAO, DECISAO_SOLICITACAO, ORIGEM, STATUS, dataBr, dataHoraBr, escapeHtml, hojeSp, inicioCiclo, numero, prazoTexto, selo, seloSolicitacao } from "./formato.js";
 import { avisar, iniciarPagina, usarCache } from "./pagina.js";
-import { CACHE, clearCache, clearCaches, comCache, getAuth, lerFiltros, pode, prefetchCache, request, salvarFiltros } from "./session.js";
+import { CACHE, comCache, getAuth, lerFiltros, pode, prefetchCache, request, salvarFiltros } from "./session.js";
+import { criarSolicitacao, liberarSolicitacao, limparDepoisDeSolicitacao } from "./solicitacao.js";
 
 const PAGINA = 100;
 const $ = (selector) => document.querySelector(selector);
@@ -118,18 +119,44 @@ const ordenar = (items) => {
   return [...items].sort(comparadores[state.ordem] || comparadores.fim);
 };
 
+// Botões por situação (a API confere de novo o perfil e a regra):
+//   - bloqueado ou aguardando, com o prazo correndo: liberar só por solicitação de desbloqueio.
+//     Sem solicitação: "Solicitar desbloqueio" (todos); o admin tem o atalho "Liberar" (abre, aprova e libera).
+//     Com solicitação aprovada: Editor e Admin liberam. Pendente: aguarda o admin (tela Solicitações).
+//   - apto (prazo cumprido): Editor e Admin liberam direto (a rotina das 02:00 também libera).
+//   - aguardando ou liberado antes do prazo: Editor e Admin podem bloquear na hora.
+const botaoSolicitacao = (sol, idPaciente) => {
+  if (sol.status === "APROVADA" && pode("EDITOR")) {
+    return `<button class="btn btn--sm btn--liberar" type="button" data-liberar-solicitacao="${sol.id}" data-id="${idPaciente}">Liberar</button>`;
+  }
+  if (sol.status === "PENDENTE" && pode("ADMIN")) {
+    return `<button class="btn btn--sm btn--liberar" type="button" data-liberar-solicitacao="${sol.id}" data-aprovar="1" data-id="${idPaciente}">Aprovar e liberar</button>`;
+  }
+  return `<a class="sol-link" href="/solicitacoes?id=${sol.id}">${seloSolicitacao(sol.status, sol.status === "PENDENTE" ? "Solicitado" : "Aprovado")}</a>`;
+};
+
 const botaoAcao = (item) => {
-  // Leitor só visualiza; a API também recusa (403) se alguém chamar a ação direto.
-  if (!pode("EDITOR")) return "";
-  // Bloqueado (ou prazo vencido sem registro, que pode ter sido bloqueado pela automação antiga): Liberar.
-  if (item.status === "bloqueado" || item.status === "apto") {
-    return `<button class="btn btn--sm btn--liberar" type="button" data-acao="liberar" data-id="${item.idPaciente}">Liberar</button>`;
+  const botoes = [];
+  const sol = item.solicitacao?.valida ? item.solicitacao : null;
+  const noPrazo = item.status === "bloqueado" || item.status === "pendente";
+
+  if (noPrazo && sol) {
+    botoes.push(botaoSolicitacao(sol, item.idPaciente));
+  } else if (noPrazo) {
+    botoes.push(
+      pode("ADMIN")
+        ? `<button class="btn btn--sm btn--liberar" type="button" data-acao="liberar-admin" data-id="${item.idPaciente}">Liberar</button>`
+        : `<button class="btn btn--sm" type="button" data-acao="solicitar" data-id="${item.idPaciente}">Solicitar desbloqueio</button>`,
+    );
+  } else if (item.status === "apto" && pode("EDITOR")) {
+    botoes.push(`<button class="btn btn--sm btn--liberar" type="button" data-acao="liberar" data-id="${item.idPaciente}">Liberar</button>`);
   }
+
   // Aguardando bloqueio ou liberado antes do prazo: Bloquear agora, sem esperar as 01:00.
-  if ((item.status === "pendente" || item.status === "liberado_antecipado") && !item.foraDoCiclo) {
-    return `<button class="btn btn--sm btn--bloquear" type="button" data-acao="bloquear" data-id="${item.idPaciente}">Bloquear</button>`;
+  if (pode("EDITOR") && (item.status === "pendente" || item.status === "liberado_antecipado") && !item.foraDoCiclo) {
+    botoes.push(`<button class="btn btn--sm btn--bloquear" type="button" data-acao="bloquear" data-id="${item.idPaciente}">Bloquear</button>`);
   }
-  return "";
+  return botoes.join("");
 };
 
 const ultimaAcaoHtml = (ultima) => {
@@ -225,6 +252,7 @@ const carregar = async ({ forcar }) => {
   const inicioRel = inicioCiclo(hojeRel);
   prefetchCache(`faltas:${inicioRel}:${hojeRel}`, `/api/faltas?${new URLSearchParams({ de: inicioRel, ate: hojeRel })}`, CACHE.faltas);
   prefetchCache("parametros", "/api/parametros", CACHE.parametros);
+  prefetchCache("solicitacoes", "/api/solicitacoes", CACHE.solicitacoes);
   return entrada;
 };
 
@@ -246,7 +274,7 @@ const acaoItemHtml = (acao) => {
       : ""
     : `<span class="falha">Falhou no CNN${acao.httpStatus ? ` (HTTP ${acao.httpStatus})` : ""}: ${escapeHtml(acao.respostaApi || "sem detalhe")}</span>`;
   return `<li class="${classe}">
-    <span><strong>${escapeHtml(ACAO[acao.acao] || acao.acao)}</strong> · ${escapeHtml(quem || "—")}${acao.antecipada ? " · antes do prazo" : ""}</span>
+    <span><strong>${escapeHtml(ACAO[acao.acao] || acao.acao)}</strong> · ${escapeHtml(quem || "—")}${acao.antecipada ? " · antes do prazo" : ""}${acao.idSolicitacao ? ` · solicitação #${acao.idSolicitacao}` : ""}</span>
     <span class="quando">${escapeHtml(dataHoraBr(acao.em))}${acao.numeroFalta ? ` · falta ${acao.numeroFalta}` : ""}${acao.dataFimBloqueio ? ` · prazo ${dataBr(acao.dataFimBloqueio)}` : ""}</span>
     ${acao.motivo ? `<span class="motivo">${escapeHtml(acao.motivo)}</span>` : ""}
     ${resultado}
@@ -258,28 +286,57 @@ const renderDetalhe = (p) => {
   els.detalheNome.textContent = p.nome || "(sem nome)";
   els.detalheSub.textContent = `ID ${p.idPaciente}${p.cpf ? ` · CPF ${p.cpf}` : ""}`;
 
-  const podeLiberar = p.cnn?.ativo !== true && v;
-  // Bloquear vale para qualquer falta do período (ciclo); o prazo só decide a liberação.
+  const hojeDetalhe = p.ciclo.hoje;
+  const prazoCorrendo = Boolean(v) && v.dataFimBloqueio >= hojeDetalhe;
+  // Bloquear vale para falta do período (ciclo) com o prazo ainda correndo.
   const noPeriodo = v && v.noCiclo;
-  const podeBloquear = noPeriodo && p.cnn?.ativo !== false;
+  const podeBloquear = pode("EDITOR") && noPeriodo && prazoCorrendo && p.cnn?.ativo !== false;
+  // Antes do fim do prazo, liberar (ou isentar a falta) só por solicitação de desbloqueio.
+  const precisaSolicitacao = prazoCorrendo && ["BLOQUEADO", "PENDENTE"].includes(v.situacao);
+  const solicitacoes = p.solicitacoes || [];
+  const solAberta = solicitacoes.find((s) => s.valida && ["PENDENTE", "APROVADA"].includes(s.status)) || null;
   // Banco e CNN divergem: alguém mudou o paciente direto na plataforma. Oferece registrar o que o CNN já tem.
   const divergeAtivo = v && v.situacao === "BLOQUEADO" && p.cnn?.ativo === true;
   const divergeInativo = noPeriodo && ["LIBERADO", "PENDENTE"].includes(v.situacao) && p.cnn?.ativo === false;
   // Aguardando bloqueio e ainda ativo no CNN: nada divergiu, o bloqueio só não aconteceu ainda.
-  const aguardando = noPeriodo && v.situacao === "PENDENTE" && p.cnn?.ativo !== false;
-  const botoes = !pode("EDITOR") ? "" : [
-    podeLiberar ? `<button class="btn btn--liberar" type="button" data-acao="liberar" data-id="${p.idPaciente}">Liberar no CNN</button>` : "",
+  const aguardando = noPeriodo && prazoCorrendo && v.situacao === "PENDENTE" && p.cnn?.ativo !== false;
+
+  const botoesLiberar = [];
+  if (precisaSolicitacao && solAberta) {
+    if (solAberta.status === "APROVADA" && pode("EDITOR")) {
+      botoesLiberar.push(`<button class="btn btn--liberar" type="button" data-liberar-solicitacao="${solAberta.id}" data-id="${p.idPaciente}">Liberar no CNN (solicitação #${solAberta.id})</button>`);
+    } else if (solAberta.status === "PENDENTE" && pode("ADMIN")) {
+      botoesLiberar.push(`<button class="btn btn--liberar" type="button" data-liberar-solicitacao="${solAberta.id}" data-aprovar="1" data-id="${p.idPaciente}">Aprovar e liberar (#${solAberta.id})</button>`);
+    }
+  } else if (precisaSolicitacao) {
+    botoesLiberar.push(
+      pode("ADMIN")
+        ? `<button class="btn btn--liberar" type="button" data-acao="liberar-admin" data-id="${p.idPaciente}">${aguardando ? "Isentar esta falta" : "Liberar no CNN"}</button>`
+        : `<button class="btn" type="button" data-acao="solicitar" data-id="${p.idPaciente}">Solicitar desbloqueio</button>`,
+    );
+  } else if (pode("EDITOR") && v && v.situacao === "BLOQUEADO" && p.cnn?.ativo !== true) {
+    // Prazo cumprido (Apto): libera direto, como a rotina das 02:00 faria.
+    botoesLiberar.push(`<button class="btn btn--liberar" type="button" data-acao="liberar" data-id="${p.idPaciente}">Liberar no CNN</button>`);
+  }
+
+  const botoes = [
+    ...botoesLiberar,
     podeBloquear ? `<button class="btn btn--bloquear" type="button" data-acao="bloquear" data-id="${p.idPaciente}">Bloquear no CNN</button>` : "",
-    aguardando ? `<button class="btn" type="button" data-acao="liberar" data-registrar="NAO_BLOQUEADO" data-id="${p.idPaciente}">Isentar esta falta</button>` : "",
-    divergeAtivo ? `<button class="btn btn--liberar" type="button" data-acao="liberar" data-registrar="JA_ATIVO" data-id="${p.idPaciente}">Registrar liberação feita no CNN</button>` : "",
-    divergeInativo ? `<button class="btn btn--bloquear" type="button" data-acao="bloquear" data-registrar="JA_BLOQUEADO" data-id="${p.idPaciente}">Registrar bloqueio feito no CNN</button>` : "",
+    pode("EDITOR") && divergeAtivo && !prazoCorrendo ? `<button class="btn btn--liberar" type="button" data-acao="liberar" data-registrar="JA_ATIVO" data-id="${p.idPaciente}">Registrar liberação feita no CNN</button>` : "",
+    pode("EDITOR") && divergeInativo ? `<button class="btn btn--bloquear" type="button" data-acao="bloquear" data-registrar="JA_BLOQUEADO" data-id="${p.idPaciente}">Registrar bloqueio feito no CNN</button>` : "",
   ].join("");
+
+  const avisoSolicitacao = solAberta
+    ? `<p class="modal__contexto">Solicitação #${solAberta.id} ${solAberta.status === "PENDENTE" ? "aguardando aprovação do administrador" : "aprovada: falta liberar no CNN"} · aberta por ${escapeHtml(solAberta.solicitadoPor || "—")} em ${escapeHtml(dataHoraBr(solAberta.solicitadoEm))}. <a href="/solicitacoes?id=${solAberta.id}">Ver solicitações</a></p>`
+    : "";
   const divergencia = divergeAtivo
-    ? '<p class="modal__alerta">No painel o paciente está bloqueado, mas no CNN ele está ativo: alguém liberou direto na plataforma. Registre a liberação para o bloqueio das 01:00 não bloquear de novo por esta falta.</p>'
+    ? prazoCorrendo
+      ? '<p class="modal__alerta">No painel o paciente está bloqueado, mas no CNN ele está ativo: alguém liberou direto na plataforma, antes do fim do prazo. Para valer, a liberação precisa de uma solicitação aprovada pelo administrador; sem ela, o bloqueio das 01:00 bloqueia de novo.</p>'
+      : '<p class="modal__alerta">No painel o paciente está bloqueado, mas no CNN ele está ativo: alguém liberou direto na plataforma. O prazo já terminou: registre a liberação (ou deixe a rotina das 02:00 registrar).</p>'
     : divergeInativo
       ? `<p class="modal__alerta">${v.situacao === "PENDENTE" ? "O paciente já está inativo no CNN, mas não há bloqueio registrado para esta falta." : "No painel o paciente está liberado, mas no CNN ele está inativo: alguém bloqueou direto na plataforma."} Registre o bloqueio para o painel refletir o CNN (a execução das 01:00 também registra).</p>`
-      : aguardando
-        ? '<p class="modal__alerta">Aguardando bloqueio: a falta está registrada, mas o paciente ainda está ativo no CNN. Bloqueie agora ou espere a execução das 01:00. Se a falta não deve valer, use "Isentar esta falta".</p>'
+      : aguardando && !solAberta
+        ? '<p class="modal__alerta">Aguardando bloqueio: a falta está registrada, mas o paciente ainda está ativo no CNN. A execução das 01:00 bloqueia. Se o paciente justificou a falta, abra uma solicitação de desbloqueio: aprovada, a falta fica isenta.</p>'
         : "";
 
   const vigenteHtml = v
@@ -292,6 +349,7 @@ const renderDetalhe = (p) => {
           <dt>Prazo</dt><dd>${v.diasBloqueio} dias · até ${dataBr(v.dataFimBloqueio)} (${escapeHtml(prazoTexto(v.dataFimBloqueio, p.ciclo.hoje))})</dd>
           ${p.controle ? `<dt>Controle</dt><dd>${escapeHtml(p.controle.situacao)} · ${escapeHtml(ACAO[p.controle.ultimaAcao] || "")} por ${escapeHtml(p.controle.origem === "PAINEL" ? p.controle.usuario : ORIGEM[p.controle.origem] || "")} em ${escapeHtml(dataHoraBr(p.controle.em))}</dd>` : ""}
         </dl>
+        ${avisoSolicitacao}
         ${divergencia}
         ${botoes ? `<div class="cartao__acoes">${botoes}</div>` : ""}
       </div>`
@@ -317,9 +375,24 @@ const renderDetalhe = (p) => {
     ? `<ol class="linha-tempo">${p.acoes.map(acaoItemHtml).join("")}</ol>`
     : '<p class="modal__contexto">Nenhuma ação registrada desde a implantação do painel.</p>';
 
+  const solicitacoesHtml = solicitacoes.length
+    ? `<ol class="linha-tempo">${solicitacoes
+        .map(
+          (s) => `<li class="${s.status === "LIBERADA" ? "is-liberacao" : s.status === "RECUSADA" ? "is-bloqueio" : ""}">
+            <span><strong>#${s.id}</strong> ${seloSolicitacao(s.status)} · ${escapeHtml(s.solicitadoPor || "—")}</span>
+            <span class="quando">${escapeHtml(dataHoraBr(s.solicitadoEm))}${s.numeroFalta ? ` · falta ${s.numeroFalta}` : ""}${!s.valida && ["PENDENTE", "APROVADA"].includes(s.status) ? " · de uma falta anterior" : ""}</span>
+            <span class="motivo">${escapeHtml(s.motivo)}</span>
+            ${s.decididoPor || s.motivoDecisao ? `<span class="quando">${escapeHtml(DECISAO_SOLICITACAO[s.status] || s.status)}${s.decididoPor ? ` por ${escapeHtml(s.decididoPor)}` : ""}${s.decididoEm ? ` em ${escapeHtml(dataHoraBr(s.decididoEm))}` : ""}${s.motivoDecisao ? `: ${escapeHtml(s.motivoDecisao)}` : ""}</span>` : ""}
+            ${s.liberadoPor ? `<span class="quando">Liberado no CNN por ${escapeHtml(s.liberadoPor)} em ${escapeHtml(dataHoraBr(s.liberadoEm))}</span>` : ""}
+          </li>`,
+        )
+        .join("")}</ol>`
+    : '<p class="modal__contexto">Nenhuma solicitação de desbloqueio.</p>';
+
   els.detalheCorpo.innerHTML = `
     <section aria-label="Situação">${vigenteHtml}</section>
     <section><h3>Faltas (${p.faltas.length})</h3>${faltasHtml}</section>
+    <section><h3>Solicitações de desbloqueio (${solicitacoes.length})</h3>${solicitacoesHtml}</section>
     <section><h3>Histórico de ações</h3>${acoesHtml}</section>`;
 
   els.detalhe.dataset.paciente = JSON.stringify({ idPaciente: p.idPaciente, nome: p.nome, vigente: v, hoje: p.ciclo.hoje });
@@ -344,24 +417,59 @@ const abrirDetalhe = async (id) => {
   }
 };
 
-// ---------- liberar / bloquear ----------
+// ---------- liberar / bloquear / solicitar ----------
+// Modos do diálogo de motivo:
+//   solicitar      -> abre uma solicitação de desbloqueio (todos os perfis);
+//   liberar-admin  -> atalho do admin: abre a solicitação, aprova e libera no CNN de uma vez;
+//   liberar        -> liberação direta (prazo cumprido) ou registro do que o CNN já tem;
+//   bloquear       -> bloqueio na hora.
+const MODOS = {
+  solicitar: {
+    kicker: "Solicitar desbloqueio",
+    alerta:
+      "A solicitação vai para o administrador aprovar. Escreva o motivo que o paciente informou (por exemplo, atestado médico). " +
+      "Você acompanha a resposta na tela Solicitações.",
+    botao: "Enviar solicitação",
+    classe: "btn--primario",
+  },
+  "liberar-admin": {
+    kicker: "Liberar paciente (administrador)",
+    alerta:
+      "O prazo ainda não terminou. A liberação fica registrada como uma solicitação de desbloqueio aprovada por você. " +
+      "O bloqueio das 01:00 não volta a bloquear por esta falta; uma falta nova bloqueia de novo.",
+    botao: "Aprovar e liberar",
+    classe: "btn--primario",
+  },
+  liberar: {
+    kicker: "Liberar paciente",
+    alerta: "",
+    botao: "Liberar no CNN",
+    classe: "btn--primario",
+  },
+  bloquear: {
+    kicker: "Bloquear paciente",
+    alerta:
+      "O painel busca as faltas deste paciente na agenda do CNN, grava as novas e bloqueia pela falta vigente " +
+      "(o prazo define quando ele será liberado pela rotina automática).",
+    botao: "Bloquear no CNN",
+    classe: "btn--perigo",
+  },
+};
+
 const abrirAcao = (acao, paciente) => {
-  const liberar = acao === "liberar";
+  const modo = MODOS[acao] || MODOS.liberar;
   const v = paciente.vigente;
-  const antecipada = liberar && v && v.dataFimBloqueio >= paciente.hoje;
 
   state.acao = { acao, id: paciente.idPaciente, apenasRegistrar: false };
-  els.acaoKicker.textContent = liberar ? "Liberar paciente" : "Bloquear paciente";
+  els.acaoKicker.textContent = modo.kicker;
   els.acaoTitulo.textContent = `${paciente.nome || "(sem nome)"} · ID ${paciente.idPaciente}`;
   els.acaoContexto.textContent = v
     ? `Falta vigente: ${v.numeroFalta}ª em ${dataBr(v.dataFalta)} · prazo de ${v.diasBloqueio} dias até ${dataBr(v.dataFimBloqueio)}.`
     : "";
-  els.acaoAlerta.hidden = !(antecipada || !liberar);
-  els.acaoAlerta.textContent = liberar
-    ? "O prazo ainda não terminou: esta é uma liberação antecipada. O bloqueio das 01:00 não volta a bloquear por esta falta; uma falta nova bloqueia de novo."
-    : "O painel busca as faltas deste paciente na agenda do CNN, grava as novas e bloqueia pela falta vigente (o prazo só define quando poderá ser liberado).";
-  els.acaoConfirmar.textContent = liberar ? "Liberar no CNN" : "Bloquear no CNN";
-  els.acaoConfirmar.className = `btn ${liberar ? "btn--primario" : "btn--perigo"}`;
+  els.acaoAlerta.hidden = !modo.alerta;
+  els.acaoAlerta.textContent = modo.alerta;
+  els.acaoConfirmar.textContent = modo.botao;
+  els.acaoConfirmar.className = `btn ${modo.classe}`;
   els.acaoConfirmar.disabled = false;
   els.acaoCancelar.disabled = false;
   els.acaoMotivo.value = "";
@@ -402,14 +510,6 @@ const REGISTRAR = {
       "considerar esta falta e as anteriores. Uma falta nova bloqueia de novo.",
     botao: "Registrar liberação",
   },
-  NAO_BLOQUEADO: {
-    kicker: "Paciente ainda não bloqueado",
-    alerta:
-      "A falta está registrada, mas este paciente ainda NÃO foi bloqueado no CNN (está ativo). Não há o que liberar. " +
-      "Se a falta não deve valer, você pode isentá-la: nada é enviado ao CNN e o bloqueio das 01:00 deixa de bloquear " +
-      "por ela. Uma falta nova bloqueia normalmente. Se a falta vale, cancele e use Bloquear.",
-    botao: "Isentar esta falta",
-  },
   JA_BLOQUEADO: {
     kicker: "Paciente já inativo no CNN",
     alerta:
@@ -448,26 +548,34 @@ const confirmarAcao = async (event) => {
   const textoOriginal = els.acaoConfirmar.textContent;
   els.acaoConfirmar.disabled = true;
   els.acaoCancelar.disabled = true;
-  els.acaoConfirmar.textContent = apenasRegistrar ? "Registrando…" : acao === "liberar" ? "Liberando…" : "Bloqueando…";
+  els.acaoConfirmar.textContent = apenasRegistrar
+    ? "Registrando…"
+    : { solicitar: "Enviando…", "liberar-admin": "Liberando…", liberar: "Liberando…" }[acao] || "Bloqueando…";
   els.acaoErro.hidden = true;
 
   try {
-    const resultado = await request(`/api/pacientes/${id}/${acao}`, {
-      method: "POST",
-      body: JSON.stringify(apenasRegistrar ? { motivo, apenasRegistrar: true } : { motivo }),
-    });
+    let resultado;
+    if (acao === "solicitar" || acao === "liberar-admin") {
+      resultado = await criarSolicitacao(id, motivo, { aprovarELiberar: acao === "liberar-admin" });
+      if (acao === "solicitar") resultado = { mensagem: `Solicitação #${resultado.id} enviada: aguarda a aprovação do administrador.` };
+    } else {
+      resultado = await request(`/api/pacientes/${id}/${acao}`, {
+        method: "POST",
+        body: JSON.stringify(apenasRegistrar ? { motivo, apenasRegistrar: true } : { motivo }),
+      });
+    }
     state.acao = null;
     els.acao.close();
     avisar(resultado.avisoAuditoria ? `${resultado.mensagem} ${resultado.avisoAuditoria}` : resultado.mensagem || "Feito.", {
       erro: Boolean(resultado.avisoAuditoria),
     });
-    // A ação mudou o paciente: lista, detalhe, histórico e relatórios em cache ficaram velhos.
-    clearCache("pacientes");
-    clearCache(`paciente:${id}`);
-    clearCaches("acoes:", "faltas:");
+    // A ação mudou o paciente: lista, detalhe, solicitações, histórico e relatórios em cache ficaram velhos.
+    limparDepoisDeSolicitacao(id, { liberou: acao !== "solicitar" });
     await recarregar(true).catch(() => {});
     if (els.detalhe.open && state.detalheId === id) await abrirDetalhe(id);
   } catch (error) {
+    // O atalho do admin criou a solicitação, mas o CNN falhou: ela ficou aprovada, e a lista precisa mostrar isso.
+    if (error.status && acao === "liberar-admin") limparDepoisDeSolicitacao(id);
     if (REGISTRAR[error.codigo] && !apenasRegistrar) {
       oferecerRegistro(error.codigo);
       return;
@@ -480,11 +588,45 @@ const confirmarAcao = async (event) => {
   }
 };
 
+// Liberar a partir de uma solicitação: aprovada (Editor/Admin) ou "Aprovar e liberar" (Admin, ainda pendente).
+const liberarPorSolicitacao = async (botao) => {
+  const idSolicitacao = Number(botao.dataset.liberarSolicitacao);
+  const idPaciente = Number(botao.dataset.id);
+  const aprovar = botao.dataset.aprovar === "1";
+  const nome = state.dados?.items.find((item) => item.idPaciente === idPaciente)?.nome || `paciente ${idPaciente}`;
+  const pergunta = aprovar
+    ? `Aprovar a solicitação #${idSolicitacao} e liberar ${nome} no CNN agora?`
+    : `Liberar ${nome} no CNN pela solicitação #${idSolicitacao} (já aprovada)?`;
+  if (!window.confirm(pergunta)) return;
+
+  botao.disabled = true;
+  try {
+    const resultado = await liberarSolicitacao(idSolicitacao, idPaciente, { aprovar });
+    avisar(resultado.avisoAuditoria ? `${resultado.mensagem} ${resultado.avisoAuditoria}` : resultado.mensagem || "Paciente liberado.", {
+      erro: Boolean(resultado.avisoAuditoria),
+    });
+    limparDepoisDeSolicitacao(idPaciente, { liberou: true });
+  } catch (error) {
+    if (error.message !== "unauthorized") avisar(error.message || "Falha ao liberar.", { erro: true });
+    limparDepoisDeSolicitacao(idPaciente);
+  } finally {
+    botao.disabled = false;
+  }
+  await recarregar(true).catch(() => {});
+  if (els.detalhe.open && state.detalheId === idPaciente) await abrirDetalhe(idPaciente);
+};
+
 // ---------- eventos ----------
 document.addEventListener("click", (event) => {
   const detalhe = event.target.closest("[data-detalhe]");
   if (detalhe) {
     void abrirDetalhe(Number(detalhe.dataset.detalhe));
+    return;
+  }
+
+  const porSolicitacao = event.target.closest("[data-liberar-solicitacao]");
+  if (porSolicitacao) {
+    void liberarPorSolicitacao(porSolicitacao);
     return;
   }
 

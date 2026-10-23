@@ -11,7 +11,8 @@
     { "source": "/relatorios", "destination": "/relatorios.html" },
     { "source": "/historico", "destination": "/historico.html" },
     { "source": "/configuracao", "destination": "/configuracao.html" },
-    { "source": "/usuarios", "destination": "/usuarios.html" }
+    { "source": "/usuarios", "destination": "/usuarios.html" },
+    { "source": "/solicitacoes", "destination": "/solicitacoes.html" }
   ],
   "headers": [
     {

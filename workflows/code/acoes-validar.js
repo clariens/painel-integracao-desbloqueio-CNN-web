@@ -29,8 +29,20 @@ if (!Number.isSafeInteger(id) || id <= 0) {
   return invalido('Paciente inválido.');
 }
 
+// Liberação a partir de uma solicitação de desbloqueio: o motivo é o da solicitação (decidir confere
+// se ela é deste paciente e desta falta). aprovar = "Aprovar e liberar" do admin (a Vercel conferiu o perfil).
+let idSolicitacao = null;
+if (body.idSolicitacao !== undefined && body.idSolicitacao !== null && body.idSolicitacao !== '') {
+  idSolicitacao = Number(body.idSolicitacao);
+  if (action !== 'liberar' || !Number.isSafeInteger(idSolicitacao) || idSolicitacao <= 0) {
+    return invalido('Solicitação inválida.');
+  }
+}
+const aprovar = idSolicitacao !== null && body.aprovar === true;
+
 const motivo = String(body.motivo || '').replace(/\s+/g, ' ').trim();
-if (motivo.length < 5 || motivo.length > 500) {
+const motivoDaSolicitacao = idSolicitacao !== null && motivo === '';
+if (!motivoDaSolicitacao && (motivo.length < 5 || motivo.length > 500)) {
   return invalido('Informe o motivo (de 5 a 500 caracteres).');
 }
 
@@ -51,6 +63,8 @@ return [{
     motivo,
     usuario,
     apenasRegistrar,
+    idSolicitacao,
+    aprovar,
     inicioCiclo: inicioCiclo(),
     hoje: hojeSp()
   }

@@ -41,11 +41,11 @@ Todo o tráfego é **criptografado** (HTTPS, o "cadeado" do navegador), do compu
 
 Cada pessoa tem **login e senha próprios**. Não existe usuário compartilhado.
 
-| Perfil | Ver as telas | Liberar e bloquear pacientes | Criar e desativar usuários |
-|---|---|---|---|
-| **Leitor** | ✔ | — | — |
-| **Editor** | ✔ | ✔ | — |
-| **Administrador** | ✔ | ✔ | ✔ |
+| Perfil | Ver as telas | Pedir desbloqueio | Liberar e bloquear pacientes | Aprovar pedidos | Criar e desativar usuários |
+|---|---|---|---|---|---|
+| **Leitor** | ✔ | ✔ | — | — | — |
+| **Editor** | ✔ | ✔ | ✔ (pedidos aprovados e prazo cumprido) | — | — |
+| **Administrador** | ✔ | ✔ | ✔ | ✔ | ✔ |
 
 - **A permissão é conferida no servidor**, não só na tela. Mesmo que alguém altere a página no próprio navegador, o sistema recusa o que o perfil não permite.
 - **Senha forte obrigatória:** pelo menos 6 caracteres, com número e caractere especial. A senha é guardada **embaralhada**: nem o administrador nem a equipe técnica conseguem lê-la.
@@ -57,14 +57,16 @@ Cada pessoa tem **login e senha próprios**. Não existe usuário compartilhado.
 
 Cada bloqueio e cada liberação gera um registro **permanente**, que não pode ser apagado pelo painel:
 
-- **quem** fez (o login da pessoa, ou "automação" no bloqueio das 01:00);
+- **quem** fez (o login da pessoa, ou "automação" no bloqueio das 01:00 e na liberação das 02:00);
 - **quando** fez (data e hora);
-- **por quê** (o motivo é obrigatório para liberar e bloquear pelo painel);
+- **por quê** (o motivo é obrigatório para pedir, recusar, liberar e bloquear pelo painel);
 - **o que o CNN respondeu** (se a operação deu certo ou não).
 
 A criação de usuários, as mudanças de perfil, as trocas de senha e as tentativas de login erradas também ficam registradas.
 
-> **Nenhum paciente é liberado sozinho.** A liberação é sempre feita por uma pessoa, com motivo escrito, e fica no histórico.
+Cada **pedido de desbloqueio** também fica registrado: quem pediu, quando, o motivo, quem aprovou ou recusou (e por quê) e quem liberou no CNN. Antes, esses pedidos iam por e-mail e ficavam fora do controle.
+
+> **Ninguém é liberado antes do prazo sem aprovação.** Antes do fim do prazo, liberar exige um pedido aprovado pelo administrador, com motivo, e tudo fica no histórico. Depois do prazo, a automação libera sozinha e também registra.
 
 ## Proteção de dados (LGPD)
 
@@ -89,6 +91,8 @@ Os dados dos pacientes também **não ficam no código do sistema**: ali há uma
 | **É preciso cortar todos os acessos de uma vez** | A equipe técnica troca a chave das sessões, e todo mundo é desconectado na hora |
 | **Alguém tenta abrir o painel dentro de outro site** | O navegador bloqueia (proteção contra páginas falsas que imitam o painel) |
 | **Um computador da equipe fica aberto** | O acesso expira em 8 horas; fechar a aba encerra a sessão |
+| **Alguém tenta liberar um paciente antes do prazo sem pedido** | O sistema recusa, inclusive para o administrador pelo caminho comum: é preciso um pedido aprovado, e ele fica registrado |
+| **Alguém libera o paciente direto no CNN, fora do painel** | Se o prazo ainda corre, a automação da madrugada bloqueia de novo, porque não houve aprovação |
 | **Uma versão de teste do painel é publicada** | A versão de teste não consegue liberar nem bloquear pacientes: só a versão oficial tem essa permissão |
 
 ## O que já está implantado
@@ -102,7 +106,9 @@ Os dados dos pacientes também **não ficam no código do sistema**: ali há uma
 | Tráfego criptografado (HTTPS) e proteções do navegador | ✔ Implantado |
 | CPF mascarado; telefone e e-mail fora do painel | ✔ Implantado |
 | Registro permanente de bloqueios, liberações e usuários | ✔ Implantado |
-| Liberação sempre feita por uma pessoa, com motivo | ✔ Implantado |
+| Liberação antes do prazo só com pedido aprovado pelo administrador | ✔ Implantado |
+| Pedidos de desbloqueio registrados no painel (fim do e-mail) | ✔ Implantado |
+| Liberação automática só de quem o próprio sistema bloqueou | ✔ Implantado |
 | Versão de teste sem poder de alterar pacientes | ✔ Implantado |
 
 ## Próximos passos recomendados

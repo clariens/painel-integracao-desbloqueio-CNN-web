@@ -1982,3 +1982,155 @@ dl.dados dd {
     animation: none;
   }
 }
+
+/* ---------- solicitações de desbloqueio ---------- */
+/* Contador do menu: quantas aguardam aprovação (em destaque para o admin, que aprova). */
+.sidebar__nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar__badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.sidebar__badge:empty {
+  display: none;
+}
+
+.sidebar__badge.is-destaque {
+  border-color: var(--pendente);
+  background: var(--pendente);
+  color: #fff;
+}
+
+.selo--sol-pendente {
+  --cor: var(--pendente);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--pendente) 10%, transparent);
+}
+
+.selo--sol-aprovada {
+  --cor: var(--apto);
+}
+
+.selo--sol-liberada {
+  --cor: var(--ok-strong);
+}
+
+.selo--sol-recusada {
+  --cor: var(--alert-strong);
+}
+
+.selo--sol-cancelada,
+.selo--sol-encerrada {
+  --cor: var(--muted);
+}
+
+/* Na lista de Pacientes: o selo da solicitação aberta leva à tela Solicitações. */
+.sol-link {
+  text-decoration: none;
+}
+
+.sol-link:hover .selo,
+.sol-link:focus-visible .selo {
+  background: color-mix(in srgb, var(--cor) 14%, transparent);
+}
+
+.sol-aviso {
+  display: block;
+  max-width: 260px;
+  margin-top: 4px;
+  color: var(--alert-strong);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.tabela .motivo-cel {
+  min-width: 220px;
+  max-width: 340px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Até quatro botões por solicitação: quebram em duas linhas em vez de espremer o motivo. */
+.tabela--solicitacoes .acoes-cel {
+  width: 1%;
+  min-width: 200px;
+  white-space: normal;
+}
+
+.tabela--solicitacoes .acoes-cel .btn {
+  margin: 0 0 6px 6px;
+}
+
+.tabela .acoes-cel .sol-link + .btn,
+.tabela .acoes-cel .btn + .sol-link {
+  margin-left: 6px;
+}
+
+.tabela .linha--destaque td {
+  background: color-mix(in srgb, var(--pendente) 10%, transparent);
+}
+
+.toolbar .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+/* Escolha do paciente na "Nova solicitação". */
+.escolha {
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.escolha button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.escolha button:hover,
+.escolha button:focus-visible,
+.escolha button[aria-selected="true"] {
+  border-color: var(--brass);
+  outline: 0;
+}
+
+.escolha button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--brass) 10%, transparent);
+}
+
+.escolha .sub {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.escolha__vazio {
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}

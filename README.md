@@ -1,36 +1,33 @@
 # CNN — Bloqueio por falta e painel de liberação
 
-Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e deixa a **liberação manual**, num painel web com rastreabilidade.
+Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e libera quando o prazo termina. Antes do prazo, só com uma **solicitação de desbloqueio** aprovada pelo administrador, num painel web com rastreabilidade.
 
 | Peça | Onde | O que faz |
 |---|---|---|
 | Bloqueio automático | n8n, `workflows/bloqueioPacientesFaltas.json`, 01:00 | Grava as faltas, bloqueia (`{ "ativo": false }`) e registra cada PATCH na auditoria |
-| Painel | Vercel (HTML estático + `api/`) | Lista os bloqueados, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
+| Painel | Vercel (HTML estático + `api/`) | Lista os bloqueados, recebe e decide solicitações de desbloqueio, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
 | CNN Painel - Leitura | n8n, `workflows/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
 | CNN Painel - Ações | n8n, `workflows/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
 | CNN Painel - Usuários | n8n, `workflows/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |
-| Liberação automática | n8n, `workflows/liberacaoPacientesFaltasautomaticas--Desativado.json` | **Desativada.** Substituída pela liberação manual |
-| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnFaltaProcedimento` (procedimentos), `CtlCnnCadastro` (nomes do CNN), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários) |
+| CNN Painel - Solicitações | n8n, `workflows/cnn-painel-solicitacoes.json` (webhook) | Pedidos de desbloqueio: abrir, aprovar, recusar, cancelar |
+| Liberação automática | n8n, `workflows/liberacaoPacientesFaltas.json`, 02:00 | Libera quem cumpriu o prazo (só quem o sistema bloqueou), com auditoria |
+| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnFaltaProcedimento` (procedimentos), `CtlCnnCadastro` (nomes do CNN), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnSolicitacao` (solicitações de desbloqueio), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários) |
 
 ```mermaid
 flowchart LR
     U["Navegador"] -- "Bearer (sessão assinada)" --> V["Vercel /api"]
-    V -- "POST { action } + X-Monitor-Key" --> L["n8n Leitura"]
-    V -- "POST { action } + X-Monitor-Key" --> A["n8n Ações"]
-    V -- "POST { action } + X-Monitor-Key" --> US["n8n Usuários"]
-    US --> DB
-    B["n8n Bloqueio 01:00"] --> CNN["API CNN"]
-    A --> CNN
-    L --> DB[("SQL Server")]
-    A --> DB
+    V -- "POST { action } + X-Monitor-Key" --> W["n8n webhooks<br/>Leitura · Ações<br/>Usuários · Solicitações"]
+    W --> DB[("SQL Server")]
+    W -- "Ações" --> CNN["API CNN"]
+    B["n8n Bloqueio 01:00<br/>e Liberação 02:00"] --> CNN
     B --> DB
 ```
 
 ## Regra
 
-**Bloqueio:** todo paciente com falta no período analisado (do início do ciclo até hoje) é bloqueado se estiver ativo no CNN. Quem já está inativo não recebe PATCH, só é registrado.
+**Bloqueio:** todo paciente com falta no período analisado (do início do ciclo até hoje) e com o prazo ainda correndo é bloqueado se estiver ativo no CNN. Quem já está inativo não recebe PATCH, só é registrado. Quem já cumpriu o prazo não é bloqueado.
 
-**Liberação (manual, pelo painel):** o prazo conta da falta vigente e diz a partir de quando o paciente pode ser liberado.
+**Liberação:** o prazo conta da falta vigente. Quando ele termina, a rotina das 02:00 libera. Antes disso, só com uma solicitação de desbloqueio aprovada pelo administrador.
 
 | Falta vigente no ciclo | Pode ser liberado após |
 |---|---|
@@ -55,9 +52,9 @@ Sem dependências de npm: Node 20.6 ou mais novo.
 
 | Perfil | Pode |
 |---|---|
-| Leitor | Ver pacientes, relatórios, histórico e configuração |
-| Editor | Tudo do leitor, mais liberar, bloquear, isentar e registrar |
-| Admin | Tudo do editor, mais a tela **Usuários** (criar, mudar perfil, desativar, redefinir senha) |
+| Leitor | Ver pacientes, relatórios, histórico e configuração; **abrir solicitações de desbloqueio** |
+| Editor | Tudo do leitor, mais bloquear, registrar, liberar quem cumpriu o prazo e liberar solicitações aprovadas |
+| Admin | Tudo do editor, mais **aprovar e recusar solicitações** e a tela **Usuários** (criar, mudar perfil, desativar, redefinir senha) |
 
 Os usuários ficam no banco (`CtlCnnUsuario`), não em variável de ambiente. O primeiro admin é inserido à mão (`npm run admin`); os demais, pela tela. Ver [docs/operacao.md](docs/operacao.md#usuários-do-painel).
 
@@ -67,4 +64,4 @@ Os usuários ficam no banco (`CtlCnnUsuario`), não em variável de ambiente. O 
 - **Segurança:** [docs/seguranca-resumo.md](docs/seguranca-resumo.md) (para a liderança) e [docs/seguranca.md](docs/seguranca.md) (técnica: segredos, chaves, testes e riscos).
 - **Word:** [docs/word/](docs/word/), gerado com `npm run word`.
 
-[docs/README.md](docs/README.md): índice, arquitetura, banco, painel, um documento por workflow e operação (instalação, corte da liberação automática, deploy).
+[docs/README.md](docs/README.md): índice, arquitetura, banco, painel, um documento por workflow e operação (instalação, solicitações, liberação automática, deploy).

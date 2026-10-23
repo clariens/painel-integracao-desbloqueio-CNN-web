@@ -29,6 +29,16 @@ export const targets = {
     Preparar: [SQL, "usuarios-preparar.js"],
     "Montar resposta": [SQL, "usuarios-montar-resposta.js"],
   },
+  "cnn-painel-solicitacoes.json": {
+    Preparar: [REGRA, SQL, "solicitacoes-preparar.js"],
+    "Montar resposta": [SQL, "solicitacoes-montar-resposta.js"],
+  },
+  "liberacaoPacientesFaltas.json": {
+    "preparar consulta": [REGRA, SQL, "liberacao-preparar-consulta.js"],
+    "montar candidatos": [REGRA, SQL, "liberacao-montar-candidatos.js"],
+    decidir: [SQL, "liberacao-decidir.js"],
+    "montar registro": [REGRA, SQL, "liberacao-montar-registro.js"],
+  },
   "cnn-painel-acoes.json": {
     Validar: [REGRA, "acoes-validar.js"],
     "separar faltas": [REGRA, "bloqueio-separar-faltas.js"],
