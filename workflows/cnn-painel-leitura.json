@@ -147,7 +147,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $('Preparar consulta').first().json.query }}"
+        "query": "={{ $json.query || $('Preparar consulta').first().json.query }}"
       },
       "id": "0bb70c12-eb6e-4878-a6f0-32a680579222",
       "name": "Consultar",

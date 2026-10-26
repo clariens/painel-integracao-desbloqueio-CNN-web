@@ -73,7 +73,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "={{ $('Preparar').first().json.query }}"
+        "query": "={{ $json.query }}"
       },
       "id": "05c950bf-8a9d-424e-ba5a-1b0c93356294",
       "name": "Executar",
