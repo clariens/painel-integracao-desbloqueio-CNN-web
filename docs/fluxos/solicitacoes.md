@@ -46,6 +46,10 @@ flowchart LR
     M --> R(["Respond to Webhook<br/>statusCode + response"])
 ```
 
+## Unidade
+
+Toda solicitação é de uma unidade (`IdUnidade`). Listar, criar, aprovar, recusar e cancelar recebem `idUnidade` e `codigoUnidade` e só enxergam a unidade do pedido: um número de solicitação de outra unidade responde `NAO_ENCONTRADA`. A regra "uma solicitação aberta por paciente" vale **dentro de cada unidade**. Ver [unidades.md](../unidades.md).
+
 ## Situações da solicitação
 
 ```mermaid

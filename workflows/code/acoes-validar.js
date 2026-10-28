@@ -29,6 +29,15 @@ if (!Number.isSafeInteger(id) || id <= 0) {
   return invalido('Paciente inválido.');
 }
 
+// Unidade escolhida no painel (a Vercel conferiu que o usuário tem acesso). Sem CID configurado, nem chama o CNN.
+const unidade = lerUnidade(body);
+if (!unidade) {
+  return invalido('Unidade inválida.');
+}
+if (!cidDaUnidade(unidade.codigoUnidade)) {
+  return [{ json: { valido: false, statusCode: 500, response: { error: semCidMensagem(unidade.codigoUnidade) } } }];
+}
+
 // Liberação a partir de uma solicitação de desbloqueio: o motivo é o da solicitação (decidir confere
 // se ela é deste paciente e desta falta). aprovar = "Aprovar e liberar" do admin (a Vercel conferiu o perfil).
 let idSolicitacao = null;
@@ -60,6 +69,7 @@ return [{
     valido: true,
     action,
     id,
+    ...unidade,
     motivo,
     usuario,
     apenasRegistrar,

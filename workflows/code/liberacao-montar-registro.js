@@ -16,6 +16,7 @@ const resposta = decisao.falhaConsulta
     : lerRespostaHttp($input.first().json);
 
 const query = sqlRegistrarAcao({
+  idUnidade: decisao.idUnidade,
   idPaciente: decisao.idPaciente,
   nomePaciente: decisao.nomePaciente,
   acao: 'LIBERACAO',
@@ -37,6 +38,7 @@ const query = sqlRegistrarAcao({
 return [{
   json: {
     query,
+    idUnidade: decisao.idUnidade,
     idPaciente: decisao.idPaciente,
     apenasRegistrar: Boolean(decisao.apenasRegistrar),
     sucesso: resposta.ok,

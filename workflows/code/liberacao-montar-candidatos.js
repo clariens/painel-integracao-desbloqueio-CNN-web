@@ -1,5 +1,6 @@
 // Nó "montar candidatos" (liberação automática às 02:00). Um item por paciente com o prazo cumprido.
 // Ninguém (ou falha no SQL): um item { nadaALiberar: true } com o motivo, para a execução mostrar e terminar.
+// Unidade sem CID configurado no n8n fica de fora (sem CID o CNN recusa) e aparece no resumo.
 const consulta = $input.all();
 const falha = erroSql(consulta);
 const hoje = $('preparar consulta').first().json.hoje;
@@ -10,13 +11,21 @@ if (falha) {
 
 const vistos = new Set();
 const saida = [];
+const semCid = new Set();
 
 for (const linha of linhasSql(consulta)) {
   const idPaciente = Number(linha.IdPaciente);
-  if (!Number.isSafeInteger(idPaciente) || idPaciente <= 0 || vistos.has(idPaciente)) {
+  const unidade = lerUnidade({ idUnidade: linha.IdUnidade, codigoUnidade: linha.CodigoUnidade });
+  const chave = `${unidade?.idUnidade}:${idPaciente}`;
+  if (!unidade || !Number.isSafeInteger(idPaciente) || idPaciente <= 0 || vistos.has(chave)) {
     continue;
   }
-  vistos.add(idPaciente);
+  vistos.add(chave);
+
+  if (!cidDaUnidade(unidade.codigoUnidade)) {
+    semCid.add(unidade.codigoUnidade);
+    continue;
+  }
 
   const numeroFalta = Number(linha.NumeroFalta) || 1;
   const diasBloqueio = Number(linha.DiasBloqueio) || diasPorFalta(numeroFalta);
@@ -24,6 +33,7 @@ for (const linha of linhasSql(consulta)) {
 
   saida.push({
     json: {
+      ...unidade,
       idPaciente,
       nomePaciente: linha.NomePaciente || null,
       idAgenda: linha.IdAgenda ?? null,
@@ -36,8 +46,10 @@ for (const linha of linhasSql(consulta)) {
   });
 }
 
+const avisoCid = semCid.size ? ` Unidades sem CID (não liberadas): ${[...semCid].map(semCidMensagem).join(' ')}` : '';
+
 if (!saida.length) {
-  return [{ json: { nadaALiberar: true, hoje, mensagem: `Ninguém com o prazo cumprido hoje (${hoje}).` } }];
+  return [{ json: { nadaALiberar: true, hoje, semCid: [...semCid], mensagem: `Ninguém com o prazo cumprido hoje (${hoje}).${avisoCid}` } }];
 }
 
 return saida;

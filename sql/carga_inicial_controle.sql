@@ -10,6 +10,7 @@
   Origem = CARGA_INICIAL, sem linha de auditoria (não houve PATCH).
 
   Só insere quem ainda não tem linha no controle: rodar de novo não muda nada.
+  Por unidade: rode depois de sql/criar_tabelas_unidades.sql (cada unidade tem o seu ciclo de faltas).
   Prazos 60/90/180 e início do ciclo em 1/10: os mesmos de workflows/code/_regra.js.
 */
 
@@ -20,13 +21,14 @@ DECLARE @inicio DATE = DATEFROMPARTS(CASE WHEN MONTH(@hoje) >= 10 THEN YEAR(@hoj
 
 ;WITH Ciclo AS (
     SELECT
+        f.IdUnidade,
         f.IdPaciente,
         f.IdAgenda,
         f.NomePaciente,
         f.DataFalta,
         f.NumeroFalta,
         ROW_NUMBER() OVER (
-            PARTITION BY f.IdPaciente
+            PARTITION BY f.IdUnidade, f.IdPaciente
             ORDER BY f.NumeroFalta DESC, f.DataFalta DESC, f.IdAgenda DESC
         ) AS Ordem
     FROM dbo.CtlCnnFaltaPaciente f
@@ -34,6 +36,7 @@ DECLARE @inicio DATE = DATEFROMPARTS(CASE WHEN MONTH(@hoje) >= 10 THEN YEAR(@hoj
 ),
 Vigente AS (
     SELECT
+        IdUnidade,
         IdPaciente,
         IdAgenda,
         NomePaciente,
@@ -48,6 +51,7 @@ Vigente AS (
     WHERE Ordem = 1
 )
 INSERT INTO dbo.CtlCnnControlePaciente (
+    IdUnidade,
     IdPaciente,
     NomePaciente,
     Situacao,
@@ -61,6 +65,7 @@ INSERT INTO dbo.CtlCnnControlePaciente (
     MotivoUltimaAcao
 )
 SELECT
+    v.IdUnidade,
     v.IdPaciente,
     v.NomePaciente,
     CASE WHEN v.DataFimBloqueio >= @hoje THEN N'BLOQUEADO' ELSE N'LIBERADO' END,
@@ -76,11 +81,11 @@ FROM Vigente v
 WHERE NOT EXISTS (
     SELECT 1
     FROM dbo.CtlCnnControlePaciente c
-    WHERE c.IdPaciente = v.IdPaciente
+    WHERE c.IdUnidade = v.IdUnidade
+      AND c.IdPaciente = v.IdPaciente
 );
 
-SELECT Situacao, COUNT(*) AS Pacientes
+SELECT IdUnidade, Situacao, COUNT(*) AS Pacientes
 FROM dbo.CtlCnnControlePaciente
-GROUP BY Situacao
-
-ORDER BY Situacao;
+GROUP BY IdUnidade, Situacao
+ORDER BY IdUnidade, Situacao;

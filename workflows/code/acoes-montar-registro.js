@@ -19,6 +19,7 @@ const motivo = validar.motivo || (decisao.idSolicitacao
   : '');
 
 const query = sqlRegistrarAcao({
+  idUnidade: validar.idUnidade,
   idPaciente: decisao.idPaciente,
   nomePaciente: decisao.nomePaciente,
   acao: decisao.acao,

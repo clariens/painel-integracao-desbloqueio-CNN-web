@@ -1,12 +1,12 @@
 # Fluxo de bloqueio por falta
 
-Voltar ao [índice](README.md). Arquivo: [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json). Código dos nós: `workflows/code/bloqueio-*.js`, com a regra em [`_regra.js`](../workflows/code/_regra.js).
+Voltar ao [índice](README.md). Arquivos: [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json) (fluxo principal, 01:00) e [workflows/bloqueioPacientesFaltasUnidade.json](../workflows/bloqueioPacientesFaltasUnidade.json) (subfluxo, uma unidade). Código dos nós: `workflows/code/bloqueio-*.js`, com a regra em [`_regra.js`](../workflows/code/_regra.js) e a unidade em [`_unidade.js`](../workflows/code/_unidade.js).
 
 ## Para que serve
 
 Acha os agendamentos com status `FALTOU` no ciclo, grava cada falta nova em `dbo.CtlCnnFaltaPaciente` e bloqueia no CNN (`{ "ativo": false }`) **todo paciente com falta no período que esteja ativo**. O prazo 60/90/180 não entra nessa decisão. Cada PATCH vira uma linha na auditoria (`dbo.CtlCnnAcaoPaciente`, `Origem = AUTOMATICO`) e atualiza a tabela de controle.
 
-Não libera ninguém. A liberação é manual, pelo painel ([fluxos/acoes.md](fluxos/acoes.md)). Quem foi liberado pelo painel **não é bloqueado de novo pela mesma falta vigente**; uma falta nova bloqueia normalmente.
+Não libera ninguém. Quem cumpriu o prazo é liberado às 02:00 ([liberacao.md](liberacao.md)); antes do prazo, só pelo painel com solicitação aprovada ([fluxos/acoes.md](fluxos/acoes.md)). Quem foi liberado pelo painel **não é bloqueado de novo pela mesma falta vigente**; uma falta nova bloqueia normalmente.
 
 O botão **Bloquear** do painel reutiliza o código deste fluxo (`separar faltas`, `preparar insert SQL`) para um paciente só.
 
@@ -15,6 +15,24 @@ O botão **Bloquear** do painel reutiliza o código deste fluxo (`separar faltas
 - Todo dia à 01:00, pelo nó `Todo dia 01:00` (cron `0 1 * * *`).
 - Não há gatilho manual no workflow. Para testar, execute pelo editor do n8n.
 - O horário do cron segue o fuso do n8n, que precisa ser `America/Sao_Paulo`.
+
+## Uma unidade por vez
+
+O bloqueio roda para **cada unidade ativa** (Salvador e Pouso Alegre), uma depois da outra:
+
+```mermaid
+flowchart LR
+    T["Todo dia 01:00"] --> U[("unidades ativas<br/>dbo.CtlCnnUnidade")]
+    U --> M["montar unidades<br/>um item por unidade"]
+    M --> X["bloquear unidade<br/>(Execute Workflow, um por item)"]
+    X -.-> S["subfluxo Bloqueio por unidade<br/>Unidade → conferir unidade → ..."]
+```
+
+- **Fluxo principal** (`bloqueioPacientesFaltas.json`): o cron, a consulta das unidades ativas e o nó `bloquear unidade`, que chama o subfluxo uma vez por unidade e espera terminar. Com "continuar com erro", a falha numa unidade não para a outra.
+- **Subfluxo** (`bloqueioPacientesFaltasUnidade.json`): tudo o que está descrito abaixo, para a unidade que chega no nó `Unidade` (`{ idUnidade, codigoUnidade }`). O nó `conferir unidade` para logo se o CID da unidade não estiver configurado.
+- Os nós HTTP usam o CID da unidade: `={{ $vars['CNN_CID_' + $('Unidade').first().json.codigoUnidade] || $env[…] }}`.
+- Toda gravação leva o `IdUnidade` (faltas, procedimentos, cadastros, controle e auditoria).
+- **Ao importar:** crie o subfluxo como um workflow próprio e, no nó `bloquear unidade` do principal, escolha esse workflow. Ver [unidades.md](unidades.md#implantação-desta-mudança).
 
 ## Regra
 
@@ -191,7 +209,9 @@ Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 | Lote do PATCH | `batchSize: 1`, `batchInterval: 3000` ms | `PATCH status paciente` |
 | Corpo do PATCH | `={{ { ativo: false } }}` | `PATCH status paciente` |
 | Prazos e ciclo | `REGRA` em [`_regra.js`](../workflows/code/_regra.js) | Nós Code (via `npm run inject`) e URL de `GET agenda do ciclo` (1/10 escrito na expressão) |
-| Credenciais | `API CNN AUTH`, `TST Araguari` | Nós HTTP e SQL |
+| Credenciais | `API CNN AUTH`, `TST Araguari - Integracao` | Nós HTTP e SQL |
+| CID de cada unidade | Variables do n8n, `CNN_CID_<código>` | Header `clinicaNasNuvens-cid` dos nós HTTP do subfluxo |
+| Subfluxo chamado | `bloqueioPacientesFaltasUnidade` (escolhido à mão depois de importar) | `bloquear unidade` (fluxo principal) |
 
 O corpo do PATCH precisa ser uma expressão inteira. Colocar `{{ }}` no meio de um JSON estático quebra o envio.
 

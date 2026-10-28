@@ -98,13 +98,18 @@ const lerRespostaHttp = (json) => {
 };
 
 // Grava uma ação na auditoria e, se deu certo, atualiza a tabela de controle. Devolve o SQL completo.
+// acao.idUnidade é obrigatório: o mesmo IdPaciente pode existir em duas unidades.
 const sqlRegistrarAcao = (acao) => {
+  const unidade = sqlN(acao.idUnidade);
+  if (unidade === 'NULL') {
+    throw new Error('sqlRegistrarAcao: idUnidade não informado.');
+  }
   const situacao = acao.acao === 'LIBERACAO' ? 'LIBERADO' : 'BLOQUEADO';
   const merge = acao.sucesso
     ? `
 MERGE dbo.CtlCnnControlePaciente WITH (HOLDLOCK) AS destino
-USING (SELECT ${sqlN(acao.idPaciente)} AS IdPaciente) AS origem
-    ON destino.IdPaciente = origem.IdPaciente
+USING (SELECT ${unidade} AS IdUnidade, ${sqlN(acao.idPaciente)} AS IdPaciente) AS origem
+    ON destino.IdUnidade = origem.IdUnidade AND destino.IdPaciente = origem.IdPaciente
 WHEN MATCHED THEN
     UPDATE SET
         NomePaciente = COALESCE(${sqlS(acao.nomePaciente, 200)}, destino.NomePaciente),
@@ -121,12 +126,12 @@ WHEN MATCHED THEN
         UltimaAcaoEm = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN
     INSERT (
-        IdPaciente, NomePaciente, Situacao, IdAgendaReferencia, NumeroFalta,
+        IdUnidade, IdPaciente, NomePaciente, Situacao, IdAgendaReferencia, NumeroFalta,
         DataInicioBloqueio, DataFimBloqueio, UltimaAcao, OrigemUltimaAcao,
         UltimaAcaoPor, MotivoUltimaAcao, IdUltimaAcao
     )
     VALUES (
-        ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(situacao, 20)}, ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)},
+        ${unidade}, ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(situacao, 20)}, ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)},
         ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)},
         ${sqlS(acao.usuario, 100)}, ${sqlS(acao.motivo, 500)}, @IdAcao
     );`
@@ -150,6 +155,7 @@ SET Status = N'LIBERADA',
     DecididoEm = COALESCE(DecididoEm, CASE WHEN ${sqlS(acao.aprovador, 100)} IS NULL THEN NULL ELSE SYSUTCDATETIME() END),
     AtualizadoEm = SYSUTCDATETIME()
 WHERE Id = ${idSolicitacao}
+  AND IdUnidade = ${unidade}
   AND Status IN (N'PENDENTE', N'APROVADA');`);
   } else if (temSolicitacao && acao.aprovador) {
     // "Aprovar e liberar" com o CNN fora do ar: a aprovação vale; a liberação pode ser tentada de novo.
@@ -160,6 +166,7 @@ SET Status = N'APROVADA',
     DecididoEm = SYSUTCDATETIME(),
     AtualizadoEm = SYSUTCDATETIME()
 WHERE Id = ${idSolicitacao}
+  AND IdUnidade = ${unidade}
   AND Status = N'PENDENTE';`);
   }
 
@@ -174,7 +181,8 @@ SET Status = N'ENCERRADA',
     MotivoDecisao = ${sqlS(motivoEncerramento, 500)},
     DecididoEm = SYSUTCDATETIME(),
     AtualizadoEm = SYSUTCDATETIME()
-WHERE IdPaciente = ${sqlN(acao.idPaciente)}
+WHERE IdUnidade = ${unidade}
+  AND IdPaciente = ${sqlN(acao.idPaciente)}
   AND Status IN (N'PENDENTE', N'APROVADA')${temSolicitacao ? `\n  AND Id <> ${idSolicitacao}` : ''};`);
   }
 
@@ -186,7 +194,8 @@ SET Status = N'ENCERRADA',
     MotivoDecisao = N'Nova falta registrada: a solicitação era da falta anterior.',
     DecididoEm = SYSUTCDATETIME(),
     AtualizadoEm = SYSUTCDATETIME()
-WHERE IdPaciente = ${sqlN(acao.idPaciente)}
+WHERE IdUnidade = ${unidade}
+  AND IdPaciente = ${sqlN(acao.idPaciente)}
   AND Status IN (N'PENDENTE', N'APROVADA')
   AND IdAgendaReferencia <> ${sqlN(acao.idAgenda)};`);
   }
@@ -197,12 +206,12 @@ SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
 INSERT INTO dbo.CtlCnnAcaoPaciente (
-    IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,
+    IdUnidade, IdPaciente, NomePaciente, Acao, Origem, Usuario, Motivo,
     IdAgendaReferencia, NumeroFalta, DataInicioBloqueio, DataFimBloqueio,
     Antecipada, AtivoAntes, Sucesso, HttpStatus, RespostaApi, IdExecucaoN8n, IdSolicitacao
 )
 VALUES (
-    ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},
+    ${unidade}, ${sqlN(acao.idPaciente)}, ${sqlS(acao.nomePaciente, 200)}, ${sqlS(acao.acao, 20)}, ${sqlS(acao.origem, 20)}, ${sqlS(acao.usuario || 'desconhecido', 100)}, ${sqlS(acao.motivo, 500)},
     ${sqlN(acao.idAgenda)}, ${sqlN(acao.numeroFalta)}, ${sqlDate(acao.dataInicioBloqueio)}, ${sqlDate(acao.dataFimBloqueio)},
     ${sqlBit(Boolean(acao.antecipada))}, ${sqlBit(acao.ativoAntes)}, ${sqlBit(Boolean(acao.sucesso))}, ${sqlN(acao.httpStatus)}, ${sqlS(acao.respostaApi, 1000)}, ${sqlS(acao.idExecucao, 50)}, ${idSolicitacao}
 );
@@ -239,8 +248,13 @@ const itensDoNo = (nome) => {
   }
 };
 
-// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra }. Blocos de 500 (VALUES aceita até 1000 linhas).
-const sqlCadastros = (linhas) => {
+// MERGE em dbo.CtlCnnCadastro: linhas { tipo, id, nome, extra } da unidade. Blocos de 500 (VALUES aceita até 1000 linhas).
+// Os ids das listas do CNN são de cada clínica: a chave é (IdUnidade, Tipo, Id).
+const sqlCadastros = (linhas, idUnidade) => {
+  const unidade = sqlN(idUnidade);
+  if (unidade === 'NULL') {
+    throw new Error('sqlCadastros: idUnidade não informado.');
+  }
   const validas = [];
   const vistos = new Set();
 
@@ -261,11 +275,11 @@ MERGE dbo.CtlCnnCadastro WITH (HOLDLOCK) AS destino
 USING (VALUES
     ${validas.slice(i, i + 500).join(',\n    ')}
 ) AS origem (Tipo, Id, Nome, Extra)
-    ON destino.Tipo = origem.Tipo AND destino.Id = origem.Id
+    ON destino.IdUnidade = ${unidade} AND destino.Tipo = origem.Tipo AND destino.Id = origem.Id
 WHEN MATCHED AND (ISNULL(destino.Nome, N'') <> ISNULL(origem.Nome, N'') OR ISNULL(destino.Extra, N'') <> ISNULL(origem.Extra, N'')) THEN
     UPDATE SET Nome = origem.Nome, Extra = origem.Extra, AtualizadoEm = SYSUTCDATETIME()
 WHEN NOT MATCHED THEN
-    INSERT (Tipo, Id, Nome, Extra) VALUES (origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);
+    INSERT (IdUnidade, Tipo, Id, Nome, Extra) VALUES (${unidade}, origem.Tipo, origem.Id, origem.Nome, origem.Extra);`);
   }
 
   return blocos.join('\n');

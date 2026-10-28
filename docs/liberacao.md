@@ -23,6 +23,8 @@ Um paciente inativo no CNN por outro motivo (por exemplo, baixa cadastral) não 
 
 Quem teve uma falta nova depois do bloqueio também não entra: a falta vigente mudou, o prazo recomeçou, e o bloqueio das 01:00 cuida dele.
 
+**Unidades.** Uma consulta só traz os pacientes de **todas as unidades ativas**, cada um com o `IdUnidade` e o código da unidade. O GET e o PATCH de cada paciente usam o CID da unidade dele (`={{ $vars['CNN_CID_' + $json.codigoUnidade] || $env[…] }}`), e a auditoria grava a unidade. Unidade sem o CID configurado fica de fora da rodada (aparece no resumo da execução) e as outras seguem. Ver [unidades.md](unidades.md).
+
 ## Fluxograma
 
 ```mermaid
@@ -75,7 +77,7 @@ flowchart TD
 
 ## Settings e implantação
 
-- **Credenciais:** `API CNN AUTH` nos nós HTTP e `TST Araguari` nos nós SQL.
+- **Credenciais:** `API CNN AUTH` nos nós HTTP e `TST Araguari - Integracao` nos nós SQL. CID de cada unidade nas Variables do n8n, `CNN_CID_<código>`.
 - **Settings:** salvar todas as execuções (é o rastro da rotina) e o Error workflow do monitoramento.
 - **Ativar:** só depois de rodar [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) (a auditoria ganha `IdSolicitacao`).
 - **Na primeira execução:** são liberados todos que estão **Apto a liberar** no painel. Confira a lista antes de ativar ([operacao.md](operacao.md)).

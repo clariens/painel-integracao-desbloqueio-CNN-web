@@ -138,6 +138,17 @@ Regras simples:
 - **Um pedido aberto por paciente.** Se já existe um, o painel avisa.
 - **Uma falta nova invalida o pedido.** O pedido vale para a falta de quando foi aberto; com uma falta nova, é preciso pedir de novo.
 
+## Unidades
+
+O sistema atende duas clínicas: **Clínica Escola Zarns Salvador** e **Clínica Escola Zarns Pouso Alegre**. Cada uma tem os seus pacientes, faltas, bloqueios e pedidos, e **uma não vê a outra**. As regras (prazos e horários) são as mesmas nas duas.
+
+- **Ao entrar,** quem trabalha nas duas escolhe em qual vai trabalhar agora. Quem trabalha numa só entra direto.
+- **A unidade atual** fica no topo da tela e no menu. Dá para **trocar** a qualquer momento, sem sair.
+- **O administrador** acessa as duas e troca entre elas. Os outros acessam as unidades que o administrador marcou no cadastro.
+- **Toda madrugada,** o bloqueio e a liberação rodam para as duas unidades, uma de cada vez. Se der problema numa, a outra segue normalmente.
+
+Detalhes em [unidades.md](unidades.md).
+
 ## Quem pode fazer o quê no painel
 
 Cada pessoa tem o **próprio login e senha**. Nada de usuário compartilhado: o histórico mostra o nome de quem fez cada ação.
@@ -155,6 +166,7 @@ Cada pessoa tem o **próprio login e senha**. Nada de usuário compartilhado: o 
 ## Garantias do sistema
 
 - **Rastreabilidade:** todo bloqueio, todo pedido e toda liberação ficam registrados, com quem fez, quando, por quê e o que o CNN respondeu.
+- **Cada unidade vê só o que é dela:** a unidade é conferida no servidor em todo pedido. Quem é de uma unidade não vê nem altera paciente da outra.
 - **Ninguém é liberado antes do prazo sem aprovação:** liberar antes do fim do prazo exige um pedido aprovado pelo administrador. Depois do prazo, a automação libera sozinha.
 - **Uma liberação feita no painel é respeitada:** a automação das 01:00 não bloqueia de novo pela mesma falta. Só uma falta nova bloqueia outra vez.
 - **A automação só reativa quem ela mesma bloqueou:** um paciente inativo no CNN por outro motivo nunca é reativado.

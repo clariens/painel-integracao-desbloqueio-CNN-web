@@ -11,18 +11,25 @@ const workflowsDir = join(codeDir, "..");
 
 const REGRA = "_regra.js";
 const SQL = "_sql.js";
+const UNIDADE = "_unidade.js";
 
 export const targets = {
+  // Fluxo principal das 01:00: uma execução do subfluxo por unidade ativa.
   "bloqueioPacientesFaltas.json": {
+    "montar unidades": [SQL, UNIDADE, "bloqueio-montar-unidades.js"],
+  },
+  // Subfluxo: o bloqueio de uma unidade (nó "Unidade" = { idUnidade, codigoUnidade }).
+  "bloqueioPacientesFaltasUnidade.json": {
+    "conferir unidade": [UNIDADE, "bloqueio-conferir-unidade.js"],
     "separar faltas": [REGRA, "bloqueio-separar-faltas.js"],
     "pacientes únicos": ["bloqueio-pacientes-unicos.js"],
-    "preparar insert SQL": [REGRA, SQL, "bloqueio-preparar-insert.js"],
-    "ids da consulta": [REGRA, "bloqueio-ids-consulta.js"],
+    "preparar insert SQL": [REGRA, SQL, UNIDADE, "bloqueio-preparar-insert.js"],
+    "ids da consulta": [REGRA, SQL, UNIDADE, "bloqueio-ids-consulta.js"],
     "montar info bloqueio": [REGRA, SQL, "bloqueio-montar-info.js"],
-    "montar registro": [REGRA, SQL, "bloqueio-montar-registro.js"],
+    "montar registro": [REGRA, SQL, UNIDADE, "bloqueio-montar-registro.js"],
   },
   "cnn-painel-leitura.json": {
-    "Preparar consulta": [REGRA, SQL, "leitura-preparar.js"],
+    "Preparar consulta": [REGRA, SQL, UNIDADE, "leitura-preparar.js"],
     "Montar resposta": [REGRA, SQL, "leitura-montar-resposta.js"],
   },
   "cnn-painel-usuarios.json": {
@@ -30,20 +37,20 @@ export const targets = {
     "Montar resposta": [SQL, "usuarios-montar-resposta.js"],
   },
   "cnn-painel-solicitacoes.json": {
-    Preparar: [REGRA, SQL, "solicitacoes-preparar.js"],
+    Preparar: [REGRA, SQL, UNIDADE, "solicitacoes-preparar.js"],
     "Montar resposta": [SQL, "solicitacoes-montar-resposta.js"],
   },
   "liberacaoPacientesFaltas.json": {
     "preparar consulta": [REGRA, SQL, "liberacao-preparar-consulta.js"],
-    "montar candidatos": [REGRA, SQL, "liberacao-montar-candidatos.js"],
+    "montar candidatos": [REGRA, SQL, UNIDADE, "liberacao-montar-candidatos.js"],
     decidir: [SQL, "liberacao-decidir.js"],
     "montar registro": [REGRA, SQL, "liberacao-montar-registro.js"],
   },
   "cnn-painel-acoes.json": {
-    Validar: [REGRA, "acoes-validar.js"],
+    Validar: [REGRA, UNIDADE, "acoes-validar.js"],
     "separar faltas": [REGRA, "bloqueio-separar-faltas.js"],
     "pacientes únicos": ["bloqueio-pacientes-unicos.js"],
-    "preparar insert SQL": [REGRA, SQL, "bloqueio-preparar-insert.js"],
+    "preparar insert SQL": [REGRA, SQL, UNIDADE, "bloqueio-preparar-insert.js"],
     "consultar situação": [REGRA, SQL, "acoes-consultar-situacao.js"],
     decidir: [REGRA, SQL, "acoes-decidir.js"],
     "montar registro": [REGRA, SQL, "acoes-montar-registro.js"],

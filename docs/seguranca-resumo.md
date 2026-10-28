@@ -39,6 +39,8 @@ Todo o tráfego é **criptografado** (HTTPS, o "cadeado" do navegador), do compu
 
 ## Quem pode fazer o quê
 
+**Cada unidade vê só o que é dela.** O sistema atende Salvador e Pouso Alegre. Cada pessoa acessa só as unidades marcadas no cadastro (o administrador, todas). A unidade é conferida no servidor em todo pedido, e não só escondida na tela: quem é de Pouso Alegre não vê nem altera paciente de Salvador, mesmo tentando pelo endereço.
+
 Cada pessoa tem **login e senha próprios**. Não existe usuário compartilhado.
 
 | Perfil | Ver as telas | Pedir desbloqueio | Liberar e bloquear pacientes | Aprovar pedidos | Criar e desativar usuários |

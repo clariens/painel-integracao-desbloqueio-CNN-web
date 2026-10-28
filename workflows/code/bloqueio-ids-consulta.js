@@ -18,8 +18,11 @@ if (!listaIds) {
 }
 
 const inicioPeriodo = fonteInsert.first()?.json?.dataInicioPeriodo || inicioCiclo();
+const { idUnidade } = unidadeAtual();
 
 const query = `USE INTEGRACAO;
+
+DECLARE @unidade SMALLINT = ${sqlN(idUnidade)};
 
 SELECT
     f.IdAgenda,
@@ -31,23 +34,27 @@ SELECT
     ctl.IdAgendaReferencia
 FROM dbo.CtlCnnFaltaPaciente f
 LEFT JOIN dbo.CtlCnnControlePaciente ctl
-    ON ctl.IdPaciente = f.IdPaciente
+    ON ctl.IdUnidade = f.IdUnidade
+   AND ctl.IdPaciente = f.IdPaciente
 INNER JOIN (
     SELECT
         IdPaciente,
         MAX(NumeroFalta) AS NumeroFalta
     FROM dbo.CtlCnnFaltaPaciente
-    WHERE IdPaciente IN (${listaIds})
+    WHERE IdUnidade = @unidade
+      AND IdPaciente IN (${listaIds})
       AND DataFalta >= CONVERT(date, '${inicioPeriodo}', 23)
     GROUP BY IdPaciente
 ) atual
     ON atual.IdPaciente = f.IdPaciente
    AND atual.NumeroFalta = f.NumeroFalta
-WHERE f.DataFalta >= CONVERT(date, '${inicioPeriodo}', 23)
+WHERE f.IdUnidade = @unidade
+  AND f.DataFalta >= CONVERT(date, '${inicioPeriodo}', 23)
   AND NOT EXISTS (
         SELECT 1
         FROM dbo.CtlCnnControlePaciente c
-        WHERE c.IdPaciente = f.IdPaciente
+        WHERE c.IdUnidade = f.IdUnidade
+          AND c.IdPaciente = f.IdPaciente
           AND c.Situacao = N'LIBERADO'
           AND c.IdAgendaReferencia = f.IdAgenda
   );`;
@@ -55,6 +62,7 @@ WHERE f.DataFalta >= CONVERT(date, '${inicioPeriodo}', 23)
 return [{
   json: {
     query,
+    idUnidade,
     listaIds,
     idsPacientes: ids,
     dataInicioPeriodo: inicioPeriodo

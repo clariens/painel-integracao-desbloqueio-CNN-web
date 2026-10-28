@@ -29,6 +29,10 @@ flowchart LR
 
 O SQL recebe sempre **um** item (o do GET ou o do IF) e lê a consulta de `$('Preparar consulta')`. Cada `SELECT` leva a coluna `_secao`: o nó SQL junta os resultados num array só e `Montar resposta` separa por ela.
 
+## Unidade
+
+Toda ação recebe `idUnidade` e `codigoUnidade`. O `Preparar consulta` declara `@unidade` no começo do SQL, e **toda** tabela lida é filtrada por ela, inclusive os nomes de cadastro e os procedimentos. O detalhe do paciente (`paciente`) consulta o CNN com o CID da unidade; sem o CID configurado, responde 500. Ver [unidades.md](../unidades.md).
+
 ## Ações
 
 | `action` | Parâmetros | Devolve |

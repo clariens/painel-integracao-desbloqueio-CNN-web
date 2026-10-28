@@ -2,6 +2,7 @@
 // A Vercel já conferiu login e perfil (aprovar e recusar: admin); aqui valida de novo, porque o webhook é a fronteira.
 // Escritas devolvem uma linha { Resultado, ... } (OK, JA_EXISTE, NAO_ENCONTRADA, STATUS_INVALIDO...).
 // Liberar não passa por aqui: é o workflow Ações, com idSolicitacao, que reativa no CNN e fecha a solicitação.
+// Tudo na unidade escolhida no painel (@unidade): solicitação de outra unidade dá NAO_ENCONTRADA.
 const unwrap = (valor) => {
   if (typeof valor === 'string') {
     try {
@@ -22,6 +23,11 @@ const erro = (statusCode, mensagem) => [{
   json: { action: 'error', statusCode, response: { error: mensagem } }
 }];
 
+const unidade = lerUnidade(body);
+if (!unidade) {
+  return erro(400, 'Unidade inválida.');
+}
+
 const LOGIN = /^[A-Za-z0-9._-]{2,50}$/;
 const usuario = String(body.usuario || '').trim();
 const motivo = String(body.motivo || '').replace(/\s+/g, ' ').trim();
@@ -37,6 +43,7 @@ const cabecalho = `USE INTEGRACAO;
 SET NOCOUNT ON;
 DECLARE @inicio DATE = ${sqlDate(inicio)};
 DECLARE @hoje DATE = ${sqlDate(hoje)};
+DECLARE @unidade SMALLINT = ${sqlN(unidade.idUnidade)};
 DECLARE @usuario NVARCHAR(100) = ${sqlS(usuario, 100)};`;
 
 const escrita = (corpo) => `${cabecalho}
@@ -54,16 +61,18 @@ SELECT TOP (1)
     @dataFalta = f.DataFalta,
     @numero = f.NumeroFalta
 FROM dbo.CtlCnnFaltaPaciente f
-WHERE f.IdPaciente = @paciente
+WHERE f.IdUnidade = @unidade
+  AND f.IdPaciente = @paciente
 ORDER BY CASE WHEN f.DataFalta >= @inicio THEN 0 ELSE 1 END, f.NumeroFalta DESC, f.DataFalta DESC, f.IdAgenda DESC;
 SET @fim = DATEADD(DAY, ${sqlDiasCase('@numero')}, @dataFalta);
 
 DECLARE @situacao NVARCHAR(20), @referencia BIGINT;
 SELECT @situacao = Situacao, @referencia = IdAgendaReferencia
 FROM dbo.CtlCnnControlePaciente
-WHERE IdPaciente = @paciente;`;
+WHERE IdUnidade = @unidade
+  AND IdPaciente = @paciente;`;
 
-const ok = (query, extra = {}) => [{ json: { action, query, hoje, ...extra } }];
+const ok = (query, extra = {}) => [{ json: { action, query, hoje, ...unidade, ...extra } }];
 
 if (action === 'listar') {
   // Todas as abertas e as 300 fechadas mais recentes, com a situação atual do paciente
@@ -73,7 +82,8 @@ if (action === 'listar') {
 ;WITH Ultimas AS (
     SELECT TOP (300) Id
     FROM dbo.CtlCnnSolicitacao
-    WHERE Status NOT IN (N'PENDENTE', N'APROVADA')
+    WHERE IdUnidade = @unidade
+      AND Status NOT IN (N'PENDENTE', N'APROVADA')
     ORDER BY AtualizadoEm DESC, Id DESC
 )
 SELECT
@@ -102,17 +112,20 @@ FROM dbo.CtlCnnSolicitacao s
 OUTER APPLY (
     SELECT TOP (1) f.IdAgenda
     FROM dbo.CtlCnnFaltaPaciente f
-    WHERE f.IdPaciente = s.IdPaciente
+    WHERE f.IdUnidade = s.IdUnidade
+      AND f.IdPaciente = s.IdPaciente
     ORDER BY CASE WHEN f.DataFalta >= @inicio THEN 0 ELSE 1 END, f.NumeroFalta DESC, f.DataFalta DESC, f.IdAgenda DESC
 ) v
 LEFT JOIN dbo.CtlCnnControlePaciente c
-    ON c.IdPaciente = s.IdPaciente
-WHERE s.Status IN (N'PENDENTE', N'APROVADA')
-   OR s.Id IN (SELECT Id FROM Ultimas)
+    ON c.IdUnidade = s.IdUnidade
+   AND c.IdPaciente = s.IdPaciente
+WHERE s.IdUnidade = @unidade
+  AND (s.Status IN (N'PENDENTE', N'APROVADA') OR s.Id IN (SELECT Id FROM Ultimas))
 ORDER BY s.SolicitadoEm DESC, s.Id DESC;
 
 SELECT N'contagem' AS _secao, Status, COUNT(*) AS Quantidade
 FROM dbo.CtlCnnSolicitacao
+WHERE IdUnidade = @unidade
 GROUP BY Status;`);
 }
 
@@ -132,7 +145,7 @@ ${faltaVigente}
 
 DECLARE @aberta BIGINT = (
     SELECT TOP (1) Id FROM dbo.CtlCnnSolicitacao WITH (UPDLOCK, HOLDLOCK)
-    WHERE IdPaciente = @paciente AND Status IN (N'PENDENTE', N'APROVADA')
+    WHERE IdUnidade = @unidade AND IdPaciente = @paciente AND Status IN (N'PENDENTE', N'APROVADA')
 );
 
 IF @idAgenda IS NULL
@@ -148,9 +161,9 @@ ELSE IF @aberta IS NOT NULL
 ELSE
 BEGIN
     INSERT INTO dbo.CtlCnnSolicitacao (
-        IdPaciente, NomePaciente, IdAgendaReferencia, NumeroFalta, DataFalta, DataFimBloqueio, Motivo, SolicitadoPor
+        IdUnidade, IdPaciente, NomePaciente, IdAgendaReferencia, NumeroFalta, DataFalta, DataFimBloqueio, Motivo, SolicitadoPor
     )
-    VALUES (@paciente, @nome, @idAgenda, @numero, @dataFalta, @fim, ${sqlS(motivo, 500)}, @usuario);
+    VALUES (@unidade, @paciente, @nome, @idAgenda, @numero, @dataFalta, @fim, ${sqlS(motivo, 500)}, @usuario);
 
     SELECT N'OK' AS Resultado, CONVERT(BIGINT, SCOPE_IDENTITY()) AS Id, @paciente AS IdPaciente, N'PENDENTE' AS Status;
 END;`), { idPaciente: paciente });
@@ -170,7 +183,8 @@ SELECT
     @referenciaSolicitacao = IdAgendaReferencia,
     @solicitadoPor = SolicitadoPor
 FROM dbo.CtlCnnSolicitacao WITH (UPDLOCK, HOLDLOCK)
-WHERE Id = @id;`;
+WHERE Id = @id
+  AND IdUnidade = @unidade;`;
 
 if (action === 'aprovar') {
   return ok(escrita(`${travar}

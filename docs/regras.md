@@ -162,3 +162,20 @@ Detalhes em [liberacao.md](liberacao.md).
 | R83 | Paciente que já está ativo no CNN (liberado direto na plataforma) não recebe comando: a liberação é só **registrada** | `liberacao-decidir.js` |
 | R84 | Toda liberação automática vai para a **auditoria** (Origem `AUTOMATICO`), marca **LIBERADO** no controle e encerra as solicitações abertas do paciente. Se o CNN falhar, a falha fica registrada e a rotina tenta de novo na noite seguinte | `liberacao-montar-registro.js`, `sqlRegistrarAcao` |
 | R85 | Com o controle `LIBERADO` para aquela falta, o bloqueio da 01:00 não bloqueia de novo. Só uma falta nova bloqueia | Consequência de R14 |
+
+## 15. Unidades
+
+Detalhes em [unidades.md](unidades.md).
+
+| # | Regra | Onde |
+|---|---|---|
+| R86 | O sistema atende **mais de uma unidade** (clínica do CNN): hoje Clínica Escola Zarns **Salvador** (1) e **Pouso Alegre** (2). Faltas, bloqueios, liberações, solicitações e cadastros de uma unidade **nunca** aparecem na outra | `dbo.CtlCnnUnidade`; `IdUnidade` em todas as tabelas de dados |
+| R87 | As **regras são as mesmas** para todas as unidades: prazos, ciclo, horários das 01:00 e 02:00 | [`_regra.js`](../workflows/code/_regra.js) |
+| R88 | O **Admin** acessa **todas** as unidades ativas, sem precisar marcar. **Leitor e Editor** acessam só as marcadas no cadastro, pelo menos uma | `unidadesDoLogin` ([usuarios-preparar.js](../workflows/code/usuarios-preparar.js)); `dbo.CtlCnnUsuarioUnidade` |
+| R89 | Quem tem **mais de uma unidade escolhe** em qual vai trabalhar **logo depois do login, antes de carregar os dados**. Quem tem uma só entra direto | `garantirUnidade` ([js/pagina.js](../js/pagina.js)) |
+| R90 | **Tudo o que a tela mostra** é da unidade escolhida, e dá para **trocar** pelo topo da tela ou pelo menu | `X-Unidade` ([js/session.js](../js/session.js)); cache por unidade |
+| R91 | A API **confere a unidade em todo pedido** (tem que estar na sessão) e, nas escritas, confere de novo no banco. O n8n filtra toda consulta pela unidade: id de outra unidade não é encontrado | `lerUnidade`, `revalidarSessao`; `@unidade` nos nós `Preparar`/`Validar` |
+| R92 | Mudar as unidades de uma pessoa fica nos eventos (**Unidades alteradas**) e encerra as ações da sessão dela | `alterar` ([usuarios-preparar.js](../workflows/code/usuarios-preparar.js)) |
+| R93 | O **CID** de cada unidade fica nas **Variables do n8n**, `CNN_CID_<código>`. Nunca no fluxo, no banco ou no Git | [`_unidade.js`](../workflows/code/_unidade.js); `npm run check` |
+| R94 | O bloqueio das 01:00 roda **uma unidade por vez**, num subfluxo. Erro numa unidade (por exemplo, sem CID) **não para** a outra. A liberação das 02:00 pula a unidade sem CID e segue com as outras | `bloquear unidade`; `montar candidatos` |
+| R95 | Unidade nova entra **já bloqueando** na primeira madrugada (sem modo de simulação). Unidade com `Ativa = 0` sai da escolha, do bloqueio e da liberação, sem apagar dados | [unidades.md](unidades.md#incluir-uma-unidade-nova) |

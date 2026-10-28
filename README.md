@@ -4,14 +4,14 @@ Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e libera quando o pr
 
 | Peça | Onde | O que faz |
 |---|---|---|
-| Bloqueio automático | n8n, `workflows/bloqueioPacientesFaltas.json`, 01:00 | Grava as faltas, bloqueia (`{ "ativo": false }`) e registra cada PATCH na auditoria |
+| Bloqueio automático | n8n, `workflows/bloqueioPacientesFaltas.json` (01:00) e o subfluxo `workflows/bloqueioPacientesFaltasUnidade.json` (uma unidade por vez) | Grava as faltas, bloqueia (`{ "ativo": false }`) e registra cada PATCH na auditoria |
 | Painel | Vercel (HTML estático + `api/`) | Dashboard com indicadores e gráficos (Chart.js servido pelo próprio site), lista os bloqueados, recebe e decide solicitações de desbloqueio, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
 | CNN Painel - Leitura | n8n, `workflows/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
 | CNN Painel - Ações | n8n, `workflows/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
 | CNN Painel - Usuários | n8n, `workflows/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |
 | CNN Painel - Solicitações | n8n, `workflows/cnn-painel-solicitacoes.json` (webhook) | Pedidos de desbloqueio: abrir, aprovar, recusar, cancelar |
 | Liberação automática | n8n, `workflows/liberacaoPacientesFaltas.json`, 02:00 | Libera quem cumpriu o prazo (só quem o sistema bloqueou), com auditoria |
-| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnFaltaProcedimento` (procedimentos), `CtlCnnCadastro` (nomes do CNN), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnSolicitacao` (solicitações de desbloqueio), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários) |
+| Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnFaltaProcedimento` (procedimentos), `CtlCnnCadastro` (nomes do CNN), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnSolicitacao` (solicitações de desbloqueio), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários), `CtlCnnUnidade` e `CtlCnnUsuarioUnidade` (unidades) |
 
 ```mermaid
 flowchart LR
@@ -22,6 +22,10 @@ flowchart LR
     B["n8n Bloqueio 01:00<br/>e Liberação 02:00"] --> CNN
     B --> DB
 ```
+
+## Unidades
+
+Atende **Clínica Escola Zarns Salvador** e **Clínica Escola Zarns Pouso Alegre**. Cada unidade tem os seus dados e uma não vê a outra. Quem tem mais de uma escolhe ao entrar e troca pelo topo da tela; o Admin acessa todas. O CID do CNN de cada unidade fica nas Variables do n8n, `CNN_CID_<código>`. Ver [docs/unidades.md](docs/unidades.md).
 
 ## Regra
 

@@ -126,6 +126,7 @@
               <tr>
                 <th scope="col">Usuário</th>
                 <th scope="col">Perfil</th>
+                <th scope="col">Unidades</th>
                 <th scope="col">Situação</th>
                 <th scope="col">Último acesso</th>
                 <th scope="col">Criado</th>
@@ -176,6 +177,11 @@
             <option value="ADMIN">Admin · também gerencia usuários</option>
           </select>
         </label>
+        <fieldset class="unidades-campo">
+          <legend>Unidades que a pessoa acessa</legend>
+          <div class="unidades-campo__lista" id="usuario-unidades"></div>
+          <p class="modal__contexto" id="usuario-unidades-admin" hidden>O admin acessa todas as unidades e troca entre elas pelo menu.</p>
+        </fieldset>
         <p class="modal__contexto" id="usuario-dica">Uma senha temporária é gerada ao salvar. A pessoa define a própria senha no primeiro acesso.</p>
         <p class="modal__erro" id="usuario-erro" hidden role="alert"></p>
         <div class="modal__acoes">

@@ -58,6 +58,7 @@ const DOCUMENTOS = [
   { arquivo: "seguranca.md", titulo: "Segurança (técnica)", saida: "16 - Segurança (técnica).docx" },
   { arquivo: "liberacao.md", titulo: "Liberação automática (02:00)", saida: "17 - Liberação automática (02h).docx" },
   { arquivo: "../CHANGELOG.md", titulo: "Histórico de mudanças", saida: "18 - Histórico de mudanças.docx" },
+  { arquivo: "unidades.md", titulo: "Unidades (Salvador e Pouso Alegre)", saida: "19 - Unidades.docx" },
 ];
 const COMPLETO = "00 - Documentação completa.docx";
 

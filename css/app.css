@@ -388,6 +388,33 @@ body.is-nav-open .sidebar {
   white-space: nowrap;
 }
 
+/* Unidade escolhida (js/pagina.js). Com mais de uma unidade é botão e abre a troca. */
+.statusbar__unidade {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 3px 10px;
+  border: 1px solid var(--brass);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.statusbar__unidade {
+  cursor: pointer;
+}
+
+button.statusbar__unidade:hover,
+button.statusbar__unidade:focus-visible {
+  color: var(--brass);
+  outline: 0;
+}
+
 .nav-toggle {
   display: inline-flex;
   align-items: center;
@@ -1722,6 +1749,89 @@ dl.dados dd {
 
 .sidebar__perfil:empty {
   display: none;
+}
+
+/* Unidade escolhida (js/pagina.js monta a linha no topo de .sidebar__user). */
+.sidebar__unidade {
+  margin: 0 0 10px !important;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+  line-height: 1.45;
+}
+
+.sidebar__unidade-rotulo {
+  display: block;
+  color: var(--brass);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar__unidade strong {
+  color: var(--text);
+}
+
+.sidebar__unidade button {
+  margin-left: 4px;
+}
+
+/* Unidades no cadastro de usuário (tela Usuários). */
+.unidades-campo {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+}
+
+/* Mesmo visual dos rótulos do formulário (LOGIN, NOME, PERFIL). */
+.unidades-campo legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.unidades-campo__lista {
+  display: grid;
+  gap: 6px;
+}
+
+.unidades-campo__lista[hidden] {
+  display: none;
+}
+
+/* O nome da unidade é conteúdo, não rótulo: sem a caixa alta dos labels do .modal. */
+.modal .unidades-campo__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.unidades-campo__item input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brass);
+}
+
+/* Escolha da unidade: botões maiores, um por unidade. */
+.escolha--unidade {
+  max-height: none;
+  gap: 8px;
+}
+
+.escolha--unidade button {
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .selo--perfil-admin {

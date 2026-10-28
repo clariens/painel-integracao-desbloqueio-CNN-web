@@ -9,7 +9,9 @@
 //   6. renumera NumeroFalta por data no ciclo, para os pacientes lidos.
 // Profissional: a agenda traz idPessoaExecutor, que é o "idpessoa" da lista /executor-agenda/lista
 // (não o "id" do executor; por isso o GET /executor-agenda/{id} antigo nunca achava ninguém).
+// Tudo na unidade desta execução (subfluxo do bloqueio ou Validar do workflow Ações).
 const inicioPeriodo = inicioCiclo();
+const { idUnidade } = unidadeAtual();
 const faltas = $('separar faltas').all().filter((item) => !item.json.semFaltas).map((item) => item.json ?? {});
 
 if (!faltas.length) {
@@ -109,7 +111,7 @@ const emBlocos = (linhas, tamanho, montar) => {
 const linhasFaltas = [...porAgenda.values()].map(linhaFalta);
 const linhasProcedimentos = [...porAgenda.values()].flatMap((falta) =>
   procedimentosDe(falta).map((proc) =>
-    `(${sqlN(falta.id)}, ${sqlN(proc.idTipo)}, ${sqlS(proc.nome, 200)}, ${sqlN(proc.idEspecialidade)}, ${sqlN(proc.quantidade)})`
+    `(${sqlN(idUnidade)}, ${sqlN(falta.id)}, ${sqlN(proc.idTipo)}, ${sqlS(proc.nome, 200)}, ${sqlN(proc.idEspecialidade)}, ${sqlN(proc.quantidade)})`
   )
 );
 
@@ -119,7 +121,9 @@ const query = `USE INTEGRACAO;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
-${sqlCadastros(cadastros)}
+
+DECLARE @unidade SMALLINT = ${sqlN(idUnidade)};
+${sqlCadastros(cadastros, idUnidade)}
 
 IF OBJECT_ID(N'tempdb..#faltas') IS NOT NULL
     DROP TABLE #faltas;
@@ -166,22 +170,23 @@ SET
     TelefonePaciente = COALESCE(destino.TelefonePaciente, origem.TelefonePaciente)
 FROM dbo.CtlCnnFaltaPaciente AS destino
 INNER JOIN #faltas AS origem
-    ON origem.IdAgenda = destino.IdAgenda;
+    ON origem.IdAgenda = destino.IdAgenda
+WHERE destino.IdUnidade = @unidade;
 
 INSERT INTO dbo.CtlCnnFaltaPaciente (
-    IdAgenda, IdPaciente, NomePaciente, CpfCnpj, EmailPaciente, TelefonePaciente,
+    IdUnidade, IdAgenda, IdPaciente, NomePaciente, CpfCnpj, EmailPaciente, TelefonePaciente,
     DataFalta, HoraInicio, HoraFim, StatusAgenda,
     IdPessoaExecutor, IdExecutorAgenda, NomeExecutor, TipoExecutor,
     IdLocalAgenda, IdTipoConsulta, IdRotulo, Observacoes, NumeroFalta
 )
 SELECT
-    origem.IdAgenda, origem.IdPaciente, origem.NomePaciente, origem.CpfCnpj, origem.EmailPaciente, origem.TelefonePaciente,
+    @unidade, origem.IdAgenda, origem.IdPaciente, origem.NomePaciente, origem.CpfCnpj, origem.EmailPaciente, origem.TelefonePaciente,
     origem.DataFalta, origem.HoraInicio, origem.HoraFim, origem.StatusAgenda,
     origem.IdPessoaExecutor, origem.IdExecutorAgenda, origem.NomeExecutor, origem.TipoExecutor,
     origem.IdLocalAgenda, origem.IdTipoConsulta, origem.IdRotulo, origem.Observacoes, 0
 FROM #faltas AS origem
 WHERE NOT EXISTS (
-    SELECT 1 FROM dbo.CtlCnnFaltaPaciente f WHERE f.IdAgenda = origem.IdAgenda
+    SELECT 1 FROM dbo.CtlCnnFaltaPaciente f WHERE f.IdUnidade = @unidade AND f.IdAgenda = origem.IdAgenda
 );
 
 DECLARE @novas INT = @@ROWCOUNT;
@@ -189,9 +194,10 @@ DECLARE @novas INT = @@ROWCOUNT;
 DELETE p
 FROM dbo.CtlCnnFaltaProcedimento AS p
 INNER JOIN #faltas AS origem
-    ON origem.IdAgenda = p.IdAgenda;
+    ON origem.IdAgenda = p.IdAgenda
+WHERE p.IdUnidade = @unidade;
 
-${emBlocos(linhasProcedimentos, 1000, (bloco) => `INSERT INTO dbo.CtlCnnFaltaProcedimento (IdAgenda, IdTipoProcedimento, NomeProcedimento, IdEspecialidade, Quantidade)
+${emBlocos(linhasProcedimentos, 1000, (bloco) => `INSERT INTO dbo.CtlCnnFaltaProcedimento (IdUnidade, IdAgenda, IdTipoProcedimento, NomeProcedimento, IdEspecialidade, Quantidade)
 VALUES
     ${bloco.join(',\n    ')};`)}
 
@@ -204,7 +210,8 @@ VALUES
             ORDER BY DataFalta, IdAgenda
         ) AS NumeroCalculado
     FROM dbo.CtlCnnFaltaPaciente
-    WHERE IdPaciente IN (SELECT DISTINCT IdPaciente FROM #faltas)
+    WHERE IdUnidade = @unidade
+      AND IdPaciente IN (SELECT DISTINCT IdPaciente FROM #faltas)
       AND DataFalta >= CONVERT(date, '${inicioPeriodo}', 23)
 )
 UPDATE destino
@@ -223,6 +230,7 @@ SELECT CAST(${porAgenda.size} AS int) AS faltasLidas, @novas AS faltasNovas, CAS
 return [{
   json: {
     query,
+    idUnidade,
     quantidadeFaltas: porAgenda.size,
     quantidadeCadastros: cadastros.length,
     dataInicioPeriodo: inicioPeriodo,

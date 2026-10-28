@@ -12,6 +12,8 @@ Além do painel, há dois workflows agendados: o bloqueio das 01:00 e a liberaç
 
 ## Onde cada peça está
 
+**Unidades.** Tudo abaixo vale para cada unidade (Salvador e Pouso Alegre): o navegador manda a unidade escolhida em `X-Unidade`, a Vercel confere se ela está na sessão e repassa `idUnidade` e `codigoUnidade` ao n8n, e o n8n filtra o SQL e escolhe o CID do CNN por ela. O bloqueio das 01:00 roda um subfluxo por unidade. Detalhes em [unidades.md](unidades.md).
+
 | Peça | Onde roda | No repositório |
 |---|---|---|
 | Painel (páginas, css, js) | Vercel (estático) | `*.html`, [css/](../css/), [js/](../js/) |
@@ -71,7 +73,7 @@ As credenciais do n8n e os workflows que usam cada uma:
 flowchart LR
     HK[["Header Auth<br/>X-Monitor-Key"]]
     C1[["API CNN AUTH<br/>(Basic)"]]
-    C2[["TST Araguari<br/>(Microsoft SQL)"]]
+    C2[["TST Araguari - Integracao<br/>(Microsoft SQL)"]]
     W["Leitura · Usuários<br/>Solicitações"]
     A["Ações"]
     R["Bloqueio 01:00<br/>Liberação 02:00"]
@@ -239,10 +241,10 @@ Resumo abaixo; o detalhe (segredos, como criar e trocar as chaves, testes e risc
 | Camada | Como é protegida | Cuidados |
 |---|---|---|
 | Navegador | Login individual. A aba guarda só o token da sessão (8 h) no `sessionStorage`, nunca a senha. Fechou a aba, saiu | Use HTTPS (padrão da Vercel). Não compartilhe usuários: a auditoria grava o nome |
-| Vercel | Senha conferida com scrypt e comparação em tempo constante; sessão assinada com `SESSION_SECRET` (HMAC-SHA256); perfil conferido em cada rota; escritas revalidam o usuário no banco (ativo, perfil, `VersaoSessao`); 5 senhas erradas bloqueiam o login por 15 min. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`, resultados de execução) ficam fora do deploy (`.vercelignore`). Cabeçalhos de segurança em todas as respostas (`vercel.json`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
+| Vercel | Senha conferida com scrypt e comparação em tempo constante; sessão assinada com `SESSION_SECRET` (HMAC-SHA256), com as unidades da pessoa; perfil e unidade (`X-Unidade`) conferidos em cada rota; escritas revalidam o usuário no banco (ativo, perfil, `VersaoSessao`); 5 senhas erradas bloqueiam o login por 15 min. Arquivos internos (`workflows/`, `sql/`, `docs/`, `.env*`, resultados de execução) ficam fora do deploy (`.vercelignore`). Cabeçalhos de segurança em todas as respostas (`vercel.json`) | `N8N_ACOES_URL` só em Production; Preview não deve alterar paciente |
 | Webhooks n8n | Credencial Header Auth (`X-Monitor-Key`), path UUID. O n8n valida a entrada de novo | Segredo novo, sem reaproveitar o do monitoramento |
-| API CNN | Credencial `API CNN AUTH` e header `clinicaNasNuvens-cid` | O `clinicaNasNuvens-cid` está escrito nos nós e, por isso, nos JSON do repositório. Repositório interno |
-| SQL Server | Credencial `TST Araguari`. SQL montado por texto com `sqlN`/`sqlS`/`sqlDate` ([`_sql.js`](../workflows/code/_sql.js)); listas de IDs só com números | Permissões: `SELECT/INSERT/UPDATE` nas tabelas do sistema (inclusive `CtlCnnSolicitacao`); `DELETE` só em `CtlCnnFaltaProcedimento` |
+| API CNN | Credencial `API CNN AUTH` e header `clinicaNasNuvens-cid` da unidade, lido de `$vars['CNN_CID_' + código]` | O CID fica nas Variables do n8n (ou no ambiente do servidor), não nos fluxos. O `npm run check` recusa CID escrito no nó |
+| SQL Server | Credencial `TST Araguari - Integracao`. Todo SQL filtra `IdUnidade = @unidade`. SQL montado por texto com `sqlN`/`sqlS`/`sqlDate` ([`_sql.js`](../workflows/code/_sql.js)); listas de IDs só com números | Permissões: `SELECT/INSERT/UPDATE` nas tabelas do sistema (inclusive `CtlCnnSolicitacao`); `DELETE` só em `CtlCnnFaltaProcedimento` |
 | Dados pessoais | CPF mascarado no n8n; e-mail e telefone não saem do banco; CSV sem contato | Dado de saúde (LGPD). Nada de paciente em logs, no repositório ou em tickets |
 
 ## Configuração
@@ -254,7 +256,8 @@ Resumo abaixo; o detalhe (segredos, como criar e trocar as chaves, testes e risc
 | Usuários do painel | Tabela `dbo.CtlCnnUsuario`, pela tela Usuários (admin). Sessão: `SESSION_SECRET` (Vercel) |
 | Webhooks | `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_SOLICITACOES_URL`, `N8N_WEBHOOK_SECRET` (Vercel) |
 | Duração das funções | `vercel.json` → `maxDuration: 60` |
-| Credenciais | n8n: `API CNN AUTH`, `TST Araguari`, Header Auth do painel |
+| Credenciais | n8n: `API CNN AUTH`, `TST Araguari - Integracao`, Header Auth do painel |
+| Unidades | Tabela `dbo.CtlCnnUnidade`; CID de cada uma nas Variables do n8n, `CNN_CID_<código>` ([unidades.md](unidades.md)) |
 
 Lista das variáveis em [.env.example](../.env.example).
 

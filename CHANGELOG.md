@@ -2,6 +2,49 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-10-28 — Multiunidade: Salvador e Pouso Alegre
+
+### Adicionado
+
+- **Unidades** ([docs/unidades.md](docs/unidades.md)):
+  - o painel atende a Clínica Escola Zarns **Salvador** e a de **Pouso Alegre**;
+  - cada unidade tem os seus pacientes, faltas, bloqueios, solicitações e cadastros, e uma não vê a outra.
+- **Escolha da unidade ao entrar** para quem tem mais de uma, antes de carregar os dados. A unidade atual aparece no topo da tela e no menu, com **Trocar**. Cada unidade tem o seu cache na aba.
+- **Tela Usuários:**
+  - marcar as unidades de cada pessoa ao criar ou editar;
+  - coluna **Unidades**;
+  - evento **Unidades alteradas**.
+  
+  O Admin acessa todas as unidades sem marcar.
+- **Banco:** `sql/criar_tabelas_unidades.sql`.
+  - Tabelas novas: `CtlCnnUnidade` e `CtlCnnUsuarioUnidade`.
+  - `IdUnidade` em todas as tabelas de dados.
+  - Chaves e índices com a unidade na frente.
+- **Bloqueio das 01:00 por unidade:** o fluxo principal chama o subfluxo novo `bloqueioPacientesFaltasUnidade.json` uma vez por unidade ativa. Erro numa unidade não para a outra.
+- **API:**
+  - o token da sessão leva as unidades da pessoa;
+  - toda rota de dados exige o header `X-Unidade` e confere o acesso (400 `UNIDADE_OBRIGATORIA`, 403 `UNIDADE_SEM_ACESSO`);
+  - as escritas conferem de novo no banco.
+- **`npm run check`** passou a acusar:
+  - laço sem a ligação de volta;
+  - nó sem saída;
+  - data fixa na URL da agenda;
+  - query SQL em modo Expression;
+  - CID escrito direto no nó.
+
+### Alterado
+
+- **O CID do CNN saiu dos fluxos e do Git.** Agora fica nas **Variables** do n8n, `CNN_CID_<código>` (`CNN_CID_ZARNS_SALVADOR`, `CNN_CID_ZARNS_POUSO_ALEGRE`). Os headers `clinicaNasNuvens-cid` são expressões.
+- **Liberação das 02:00:** uma consulta com todas as unidades ativas; cada paciente usa o CID da sua unidade. Unidade sem CID fica de fora da rodada.
+- **Credencial SQL do n8n:** `TST Araguari - Integracao`, apontando para o banco de integração. A anterior apontava para o banco Lyceum, que ficou fora do ar durante um backup.
+- **Login** de Leitor ou Editor sem unidade é recusado ("Seu usuário não tem nenhuma unidade liberada"). Quem estava logado antes desta versão entra de novo.
+
+### Corrigido
+
+- **Bloqueio das 01:00 bloqueava só o primeiro paciente:** a ligação `registrar bloqueio → loop bloqueios` tinha sumido ao copiar o fluxo do n8n.
+- **Liberação das 02:00 não liberava ninguém:** faltava a ligação `montar candidatos → há o que liberar?`.
+- **O bloqueio só via as faltas de 01/10 a 08/10/2026:** as datas do nó `GET agenda do ciclo` estavam fixas. Voltou a ser do início do ciclo até hoje.
+
 ## 2026-10-23 — Deploy na Vercel: 9 funções (limite do plano Hobby)
 
 ### Corrigido

@@ -1,8 +1,8 @@
 # Banco de dados
 
-Voltar ao [índice](README.md). Scripts: [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql), [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) , [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql), [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) e [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) (detalhes em [script-sql.md](script-sql.md)).
+Voltar ao [índice](README.md). Scripts: [sql/criar_tabelas_bloqueio.sql](../sql/criar_tabelas_bloqueio.sql), [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) , [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql), [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql), [sql/criar_tabelas_unidades.sql](../sql/criar_tabelas_unidades.sql) e [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) (detalhes em [script-sql.md](script-sql.md)).
 
-SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credencial `TST Araguari` do n8n.
+SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credencial `TST Araguari - Integracao` do n8n.
 
 ## Resumo
 
@@ -15,15 +15,62 @@ SQL Server, banco `INTEGRACAO`, schema `dbo`. Os workflows acessam pela credenci
 | `dbo.CtlCnnCadastro` | Nomes das listas do CNN: tipo de consulta, profissional (por `idpessoa`), rótulo, local, especialidade | Bloqueio (`gravar faltas`, `MERGE`); Ações só os profissionais | Leitura | Sem prazo. `MERGE` por `(Tipo, Id)` |
 | `dbo.CtlCnnSolicitacao` | **Solicitações de desbloqueio**: quem pediu, motivo, falta de referência, situação (`PENDENTE` a `ENCERRADA`), decisão e liberação | [Solicitações](fluxos/solicitacoes.md) (abrir, aprovar, recusar, cancelar); `sqlRegistrarAcao` (liberada, encerrada) nas Ações, no bloqueio e na liberação | Solicitações, Leitura, Ações | Sem prazo. Ninguém apaga; uma aberta por paciente |
 | `dbo.CtlCnnUsuario` | Usuários do painel: perfil, ativo, hash da senha, tentativas de login | [Usuários](fluxos/usuarios.md); o primeiro admin, à mão (`npm run admin`) | Usuários | Sem prazo. Ninguém é excluído, só desativado |
-| `dbo.CtlCnnUsuarioEvento` | Eventos de usuário: criação, perfil, senha, falhas de login | Usuários | Usuários (tela) | Sem prazo. Só `INSERT` |
+| `dbo.CtlCnnUsuarioEvento` | Eventos de usuário: criação, perfil, senha, unidades, falhas de login | Usuários | Usuários (tela) | Sem prazo. Só `INSERT` |
+| `dbo.CtlCnnUnidade` | As **unidades** (clínicas do CNN): `IdUnidade`, `Codigo`, `Nome`, `Ativa` | À mão (script ou SSMS) | Todos os workflows | Sem prazo. Desativar com `Ativa = 0` |
+| `dbo.CtlCnnUsuarioUnidade` | Unidades de cada Leitor e Editor (o Admin acessa todas e não tem linha) | Usuários (`criar`, `alterar`) | Usuários (login, sessão, lista) | Acompanha o usuário |
 
 Tabelas que **não** existem mais (`criar_tabelas_bloqueio.sql` apaga se encontrar): `dbo.CtlCnnBloqueioPaciente` e `dbo.CtlCnnRegraBloqueioFalta`. Não há tabela de regra: os prazos e o ciclo ficam em [`workflows/code/_regra.js`](../workflows/code/_regra.js).
 
 O prazo de bloqueio não é coluna. `DiasBloqueio` e `DataFimBloqueio` são calculados na hora a partir de `NumeroFalta` e `DataFalta`.
 
+## Unidades
+
+Script: [sql/criar_tabelas_unidades.sql](../sql/criar_tabelas_unidades.sql). Visão geral em [unidades.md](unidades.md).
+
+- **`IdUnidade SMALLINT NOT NULL DEFAULT 1`** em `CtlCnnFaltaPaciente`, `CtlCnnFaltaProcedimento`, `CtlCnnCadastro`, `CtlCnnControlePaciente`, `CtlCnnAcaoPaciente` e `CtlCnnSolicitacao`, com chave estrangeira para `CtlCnnUnidade`. O que existia antes ficou em Salvador (1).
+- **Toda consulta filtra a unidade.** O mesmo `IdPaciente`, `IdAgenda` ou id de cadastro pode existir nas duas clínicas, por isso as chaves começam por `IdUnidade`:
+
+| Chave ou índice | Colunas |
+|---|---|
+| `UQ_CtlCnnFaltaPaciente_IdAgenda` | `(IdUnidade, IdAgenda)` |
+| `IX_CtlCnnFaltaPaciente_IdPaciente_NumeroFalta` | `(IdUnidade, IdPaciente, NumeroFalta)` |
+| `IX_CtlCnnFaltaPaciente_DataFalta` | `(IdUnidade, DataFalta)` |
+| `PK_CtlCnnFaltaProcedimento` | `(IdUnidade, IdAgenda, IdTipoProcedimento)` |
+| `PK_CtlCnnCadastro` | `(IdUnidade, Tipo, Id)` |
+| `PK_CtlCnnControlePaciente` | `(IdUnidade, IdPaciente)` |
+| `IX_CtlCnnControlePaciente_Situacao` | `(IdUnidade, Situacao)` |
+| `IX_CtlCnnAcaoPaciente_IdPaciente_CriadoEm` | `(IdUnidade, IdPaciente, CriadoEm DESC)` |
+| `IX_CtlCnnAcaoPaciente_CriadoEm` | `(IdUnidade, CriadoEm DESC)` |
+| `UX_CtlCnnSolicitacao_Aberta` | `(IdUnidade, IdPaciente)`, só `PENDENTE` e `APROVADA`: uma aberta por paciente **em cada unidade** |
+| `IX_CtlCnnSolicitacao_Status_SolicitadoEm` | `(IdUnidade, Status, SolicitadoEm DESC)` |
+| `IX_CtlCnnSolicitacao_IdPaciente_SolicitadoEm` | `(IdUnidade, IdPaciente, SolicitadoEm DESC)` |
+
+**`dbo.CtlCnnUnidade`**
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `IdUnidade` | `SMALLINT` | PK. 1 = Salvador, 2 = Pouso Alegre |
+| `Codigo` | `NVARCHAR(40)` | Único. Só `A–Z`, `0–9` e `_` (CHECK): vira o nome da variável `CNN_CID_<Codigo>` no n8n |
+| `Nome` | `NVARCHAR(100)` | Nome mostrado no painel |
+| `Ativa` | `BIT` | `0` tira a unidade da escolha, do bloqueio e da liberação, sem apagar nada |
+| `CriadoEm` | `DATETIME2(0)` | UTC |
+
+**`dbo.CtlCnnUsuarioUnidade`**: `IdUsuario` + `IdUnidade` (PK composta, chaves estrangeiras para `CtlCnnUsuario` e `CtlCnnUnidade`).
+
+Consulta útil, quem acessa cada unidade:
+
+```sql
+SELECT un.Nome AS Unidade, u.Login, u.Perfil
+FROM dbo.CtlCnnUnidade un
+LEFT JOIN dbo.CtlCnnUsuarioUnidade uu ON uu.IdUnidade = un.IdUnidade
+LEFT JOIN dbo.CtlCnnUsuario u ON u.IdUsuario = uu.IdUsuario AND u.Ativo = 1
+ORDER BY un.Nome, u.Login;
+-- O Admin não aparece aqui: ele acessa todas as unidades ativas.
+```
+
 ## Diagrama
 
-As tabelas não têm chave estrangeira: as ligações abaixo são lógicas. Para ficar legível, o modelo está em três partes; uma tabela que aparece sem colunas está detalhada em outra parte. Os diagramas mostram só as colunas principais; a lista completa está no dicionário de dados.
+Fora as ligações com `CtlCnnUnidade` (e de `CtlCnnUsuarioUnidade`), as tabelas não têm chave estrangeira: as ligações abaixo são lógicas, e todas também passam pelo `IdUnidade`. Para ficar legível, o modelo está em três partes; uma tabela que aparece sem colunas está detalhada em outra parte. Os diagramas mostram só as colunas principais; a lista completa está no dicionário de dados.
 
 ### Faltas e cadastros
 

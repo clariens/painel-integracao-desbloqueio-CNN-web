@@ -25,6 +25,8 @@ const els = {
   login: $("#usuario-login"),
   nome: $("#usuario-nome-campo"),
   perfil: $("#usuario-perfil-campo"),
+  unidades: $("#usuario-unidades"),
+  unidadesAdmin: $("#usuario-unidades-admin"),
   dica: $("#usuario-dica"),
   erro: $("#usuario-erro"),
   cancelar: $("#usuario-cancelar"),
@@ -59,10 +61,19 @@ const botoes = (u) => {
   return lista.join("");
 };
 
+// Unidades de cada pessoa: o admin acessa todas; os outros, as marcadas no cadastro.
+const nomeUnidade = (id) => state.dados?.unidades?.find((u) => Number(u.id) === Number(id))?.nome || `Unidade ${id}`;
+const unidadesHtml = (u) => {
+  if (u.perfil === "ADMIN") return '<span class="sub-inline">Todas</span>';
+  const ids = u.unidades || [];
+  return ids.length ? ids.map((id) => escapeHtml(nomeUnidade(id))).join("<br />") : selo("falha", "Nenhuma");
+};
+
 const linhaHtml = (u) => `
   <tr class="${u.ativo ? "" : "linha--inativa"}">
     <td>${escapeHtml(u.nome)}${euMesmo(u.login) ? ' <span class="sub-inline">(você)</span>' : ""}<span class="sub mono">${escapeHtml(u.login)}</span></td>
     <td>${seloPerfil(u.perfil)}</td>
+    <td>${unidadesHtml(u)}</td>
     <td>${situacao(u)}</td>
     <td class="mono">${u.ultimoAcessoEm ? escapeHtml(dataHoraBr(u.ultimoAcessoEm)) : "nunca"}</td>
     <td class="mono">${escapeHtml(dataHoraBr(u.criadoEm))}<span class="sub">${escapeHtml(u.criadoPor || "")}</span></td>
@@ -115,6 +126,33 @@ const mostrarSenhaTemporaria = (login, senha) => {
 };
 
 // ---------- novo / editar ----------
+// Caixas das unidades: as ativas do catálogo e as que a pessoa já tem (mesmo desativadas, para poder tirar).
+const montarUnidades = (marcadas) => {
+  const catalogo = (state.dados?.unidades || []).filter((u) => u.ativa !== false || marcadas.includes(Number(u.id)));
+  els.unidades.innerHTML = catalogo
+    .map(
+      (u) => `<label class="unidades-campo__item">
+        <input type="checkbox" name="unidade" value="${Number(u.id)}" ${marcadas.includes(Number(u.id)) ? "checked" : ""} />
+        <span>${escapeHtml(u.nome)}</span>
+      </label>`,
+    )
+    .join("");
+};
+const unidadesMarcadas = () => [...els.unidades.querySelectorAll("input:checked")].map((input) => Number(input.value));
+const mesmasUnidades = (a, b) => a.length === b.length && a.every((id) => b.includes(id));
+
+// Admin acessa todas: as caixas ficam desligadas e o aviso aparece.
+const ajustarUnidadesAoPerfil = () => {
+  const admin = els.perfil.value === "ADMIN";
+  els.unidadesAdmin.hidden = !admin;
+  els.unidades.hidden = admin;
+};
+els.perfil.addEventListener("change", ajustarUnidadesAoPerfil);
+// Marcou uma unidade: some o aviso "Marque ao menos uma unidade".
+els.unidades.addEventListener("change", () => {
+  if (unidadesMarcadas().length) els.erro.hidden = true;
+});
+
 const abrirDialogo = (usuario = null) => {
   state.editando = usuario;
   els.form.reset();
@@ -127,10 +165,14 @@ const abrirDialogo = (usuario = null) => {
   els.perfil.value = usuario?.perfil || "LEITOR";
   // O próprio perfil de admin não muda por aqui (outro admin muda).
   els.perfil.disabled = Boolean(usuario && euMesmo(usuario.login));
+  // Pessoa nova: com uma unidade só no catálogo, ela já vem marcada.
+  const ativas = (state.dados?.unidades || []).filter((u) => u.ativa !== false);
+  montarUnidades(usuario ? (usuario.unidades || []).map(Number) : ativas.length === 1 ? [Number(ativas[0].id)] : []);
+  ajustarUnidadesAoPerfil();
   els.dica.textContent = usuario
     ? euMesmo(usuario.login)
       ? "Você pode mudar o seu nome. Perfil e acesso de admin só outro admin altera."
-      : "Mudar o perfil encerra as ações da sessão aberta da pessoa: ela entra de novo para continuar."
+      : "Mudar o perfil ou as unidades encerra as ações da sessão aberta da pessoa: ela entra de novo para continuar."
     : "Uma senha temporária é gerada ao salvar. A pessoa define a própria senha no primeiro acesso.";
   els.dialogo.showModal();
   (usuario ? els.nome : els.login).focus();
@@ -146,6 +188,16 @@ els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (els.salvar.disabled) return;
   els.erro.hidden = true;
+
+  // Quem não é admin precisa de ao menos uma unidade (a API e o banco conferem de novo).
+  const admin = els.perfil.value === "ADMIN";
+  const unidades = unidadesMarcadas();
+  if (!admin && !unidades.length) {
+    els.erro.textContent = "Marque ao menos uma unidade.";
+    els.erro.hidden = false;
+    return;
+  }
+
   const fim = ocupado(els.salvar, "Salvando…", { outros: [els.cancelar] });
 
   const editando = state.editando;
@@ -154,6 +206,7 @@ els.form.addEventListener("submit", async (event) => {
       const alteracao = {};
       if (els.nome.value.trim() !== editando.nome) alteracao.nome = els.nome.value;
       if (!els.perfil.disabled && els.perfil.value !== editando.perfil) alteracao.perfil = els.perfil.value;
+      if (!admin && !mesmasUnidades(unidades, (editando.unidades || []).map(Number))) alteracao.unidades = unidades;
       if (Object.keys(alteracao).length) {
         await request(`/api/usuarios/${encodeURIComponent(editando.login)}`, { method: "PATCH", body: JSON.stringify(alteracao) });
         avisar(`${editando.login} atualizado.`);
@@ -162,7 +215,7 @@ els.form.addEventListener("submit", async (event) => {
     } else {
       const criado = await request("/api/usuarios", {
         method: "POST",
-        body: JSON.stringify({ login: els.login.value, nome: els.nome.value, perfil: els.perfil.value }),
+        body: JSON.stringify({ login: els.login.value, nome: els.nome.value, perfil: els.perfil.value, unidades: admin ? [] : unidades }),
       });
       els.dialogo.close();
       mostrarSenhaTemporaria(criado.login, criado.senhaTemporaria);

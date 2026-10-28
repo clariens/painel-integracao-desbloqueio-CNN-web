@@ -1,4 +1,4 @@
-import { json, requireAuth, requireMethod } from "../lib/auth.js";
+import { json, requireMethod, requireUnidade } from "../lib/auth.js";
 import { callN8n } from "../lib/n8n.js";
 
 export const config = { runtime: "nodejs" };
@@ -9,7 +9,8 @@ const safeDate = (value) => (/^\d{4}-\d{2}-\d{2}$/.test(String(value || "")) ? S
 // faltas por dia, mapa de calor, período anterior, bloqueios e liberações, solicitações. Qualquer perfil.
 export default async function handler(req, res) {
   if (!requireMethod(req, res, "GET")) return;
-  if (!requireAuth(req, res)) return;
+  const acesso = requireUnidade(req, res);
+  if (!acesso) return;
 
   const de = safeDate(req.query.de);
   const ate = safeDate(req.query.ate);
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const data = await callN8n(res, "leitura", { action: "dashboard", de, ate });
+  const data = await callN8n(res, "leitura", { action: "dashboard", ...acesso.unidade, de, ate });
   if (!data) return;
 
   json(res, 200, data);

@@ -1,5 +1,6 @@
 // Nó "Preparar consulta" (workflow CNN Painel - Leitura). Lê body.action, valida os parâmetros e monta o SQL.
 // Cada SELECT leva a coluna _secao: o nó SQL junta os resultados num só array, e a resposta separa por ela.
+// Tudo é da unidade escolhida no painel (@unidade): nenhuma consulta lê linha de outra unidade.
 const unwrap = (valor) => {
   if (typeof valor === 'string') {
     try {
@@ -19,6 +20,11 @@ const action = String(body.action || '').trim();
 const erro = (statusCode, mensagem) => [{
   json: { action: 'error', statusCode, response: { error: mensagem } }
 }];
+const unidade = lerUnidade(body);
+if (!unidade) {
+  return erro(400, 'Unidade inválida.');
+}
+
 const safeDate = (valor) => (/^\d{4}-\d{2}-\d{2}$/.test(String(valor || '')) ? String(valor) : '');
 const escolha = (valor, permitidos) => (permitidos.includes(String(valor || '')) ? String(valor) : '');
 
@@ -28,13 +34,13 @@ const dias = (coluna) => sqlDiasCase(coluna);
 
 // Nomes gravados pelo bloqueio (01:00) a partir das listas da API. Executor: Id = idpessoa da agenda.
 const nomeCadastro = (tipo, coluna) =>
-  `(SELECT TOP (1) cad.Nome FROM dbo.CtlCnnCadastro cad WHERE cad.Tipo = N'${tipo}' AND cad.Id = ${coluna})`;
+  `(SELECT TOP (1) cad.Nome FROM dbo.CtlCnnCadastro cad WHERE cad.IdUnidade = @unidade AND cad.Tipo = N'${tipo}' AND cad.Id = ${coluna})`;
 const profissionalDe = (alias) => `COALESCE(${nomeCadastro('EXECUTOR', `${alias}.IdPessoaExecutor`)}, ${alias}.NomeExecutor)`;
 // Procedimentos da falta numa string ("Retorno, Exame"). FOR XML PATH funciona em qualquer versão (STRING_AGG só a partir de 2017).
 const procedimentosDe = (colunaAgenda) => `STUFF((
         SELECT N', ' + ISNULL(fp.NomeProcedimento, N'Procedimento ' + CAST(fp.IdTipoProcedimento AS nvarchar(20)))
         FROM dbo.CtlCnnFaltaProcedimento fp
-        WHERE fp.IdAgenda = ${colunaAgenda}
+        WHERE fp.IdUnidade = @unidade AND fp.IdAgenda = ${colunaAgenda}
         ORDER BY fp.NomeProcedimento
         FOR XML PATH(''), TYPE
     ).value('.', 'nvarchar(max)'), 1, 2, N'')`;
@@ -42,8 +48,10 @@ const camposAgenda = (alias) => `${profissionalDe(alias)} AS Profissional,
     ${nomeCadastro('TIPO_CONSULTA', `${alias}.IdTipoConsulta`)} AS TipoConsulta,
     ${nomeCadastro('ROTULO', `${alias}.IdRotulo`)} AS Rotulo,
     ${procedimentosDe(`${alias}.IdAgenda`)} AS Procedimentos`;
+const declararUnidade = `DECLARE @unidade SMALLINT = ${sqlN(unidade.idUnidade)};`;
 const cabecalho = `USE INTEGRACAO;
 SET NOCOUNT ON;
+${declararUnidade}
 DECLARE @inicio DATE = ${sqlDate(inicio)};
 DECLARE @hoje DATE = ${sqlDate(hoje)};`;
 
@@ -52,9 +60,9 @@ if (action === 'pacientes') {
 DECLARE @inicioMes DATE = DATEFROMPARTS(YEAR(@hoje), MONTH(@hoje), 1);
 
 ;WITH Alvo AS (
-    SELECT IdPaciente FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @inicio
+    SELECT IdPaciente FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade AND DataFalta >= @inicio
     UNION
-    SELECT IdPaciente FROM dbo.CtlCnnControlePaciente WHERE Situacao = N'BLOQUEADO'
+    SELECT IdPaciente FROM dbo.CtlCnnControlePaciente WHERE IdUnidade = @unidade AND Situacao = N'BLOQUEADO'
 ),
 Faltas AS (
     SELECT
@@ -76,6 +84,7 @@ Faltas AS (
     FROM dbo.CtlCnnFaltaPaciente f
     INNER JOIN Alvo a
         ON a.IdPaciente = f.IdPaciente
+    WHERE f.IdUnidade = @unidade
 )
 SELECT
     N'paciente' AS _secao,
@@ -102,30 +111,36 @@ SELECT
     s.SolicitadoEm AS SolicitacaoEm
 FROM Faltas v
 LEFT JOIN dbo.CtlCnnControlePaciente c
-    ON c.IdPaciente = v.IdPaciente
+    ON c.IdUnidade = @unidade
+   AND c.IdPaciente = v.IdPaciente
 LEFT JOIN dbo.CtlCnnSolicitacao s
-    ON s.IdPaciente = v.IdPaciente
+    ON s.IdUnidade = @unidade
+   AND s.IdPaciente = v.IdPaciente
    AND s.Status IN (N'PENDENTE', N'APROVADA')
 WHERE v.Ordem = 1;
 
 SELECT
     N'totais' AS _secao,
-    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @inicio) AS FaltasCiclo,
-    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @inicioMes) AS FaltasMes,
-    (SELECT MAX(DataColeta) FROM dbo.CtlCnnFaltaPaciente) AS UltimaColeta,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'BLOQUEIO') AS UltimoBloqueioAutomatico,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'LIBERACAO') AS UltimaLiberacaoAutomatica,
-    (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente) AS LinhasControle,
-    (SELECT COUNT(*) FROM dbo.CtlCnnSolicitacao WHERE Status = N'PENDENTE') AS SolicitacoesPendentes,
-    (SELECT COUNT(*) FROM dbo.CtlCnnSolicitacao WHERE Status = N'APROVADA') AS SolicitacoesAprovadas;`;
+    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade AND DataFalta >= @inicio) AS FaltasCiclo,
+    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade AND DataFalta >= @inicioMes) AS FaltasMes,
+    (SELECT MAX(DataColeta) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade) AS UltimaColeta,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE IdUnidade = @unidade AND Origem = N'AUTOMATICO' AND Acao = N'BLOQUEIO') AS UltimoBloqueioAutomatico,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE IdUnidade = @unidade AND Origem = N'AUTOMATICO' AND Acao = N'LIBERACAO') AS UltimaLiberacaoAutomatica,
+    (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente WHERE IdUnidade = @unidade) AS LinhasControle,
+    (SELECT COUNT(*) FROM dbo.CtlCnnSolicitacao WHERE IdUnidade = @unidade AND Status = N'PENDENTE') AS SolicitacoesPendentes,
+    (SELECT COUNT(*) FROM dbo.CtlCnnSolicitacao WHERE IdUnidade = @unidade AND Status = N'APROVADA') AS SolicitacoesAprovadas;`;
 
-  return [{ json: { action, query, inicio, hoje } }];
+  return [{ json: { action, ...unidade, query, inicio, hoje } }];
 }
 
 if (action === 'paciente') {
   const id = Number(body.id);
   if (!Number.isSafeInteger(id) || id <= 0) {
     return erro(400, 'Paciente inválido.');
+  }
+  // O detalhe consulta o paciente no CNN (nó "GET paciente CNN"), com o CID da unidade.
+  if (!cidDaUnidade(unidade.codigoUnidade)) {
+    return erro(500, semCidMensagem(unidade.codigoUnidade));
   }
 
   const query = `${cabecalho}
@@ -144,7 +159,7 @@ SELECT
     StatusAgenda,
     DataColeta
 FROM dbo.CtlCnnFaltaPaciente f
-WHERE IdPaciente = @id
+WHERE IdUnidade = @unidade AND IdPaciente = @id
 ORDER BY DataFalta DESC, IdAgenda DESC;
 
 SELECT TOP (200)
@@ -165,7 +180,7 @@ SELECT TOP (200)
     IdSolicitacao,
     CriadoEm
 FROM dbo.CtlCnnAcaoPaciente
-WHERE IdPaciente = @id
+WHERE IdUnidade = @unidade AND IdPaciente = @id
 ORDER BY CriadoEm DESC, Id DESC;
 
 SELECT TOP (50)
@@ -183,7 +198,7 @@ SELECT TOP (50)
     LiberadoPor,
     LiberadoEm
 FROM dbo.CtlCnnSolicitacao
-WHERE IdPaciente = @id
+WHERE IdUnidade = @unidade AND IdPaciente = @id
 ORDER BY SolicitadoEm DESC, Id DESC;
 
 SELECT
@@ -198,19 +213,19 @@ SELECT
     MotivoUltimaAcao,
     UltimaAcaoEm
 FROM dbo.CtlCnnControlePaciente
-WHERE IdPaciente = @id;`;
+WHERE IdUnidade = @unidade AND IdPaciente = @id;`;
 
-  return [{ json: { action, query, id, inicio, hoje } }];
+  return [{ json: { action, ...unidade, query, id, inicio, hoje } }];
 }
 
 // Agrupa as faltas por um cadastro: nome do CNN, ou "(sem ...)" quando a falta não tem o campo, ou o id quando o nome
-// ainda não veio. Usado pelas ações faltas e dashboard.
+// ainda não veio. Usado pelas ações faltas e dashboard (filtroF já traz f.IdUnidade = @unidade).
 const porCadastroSql = (secao, tipo, coluna, vazio, top, filtroF) => `SELECT TOP (${top}) N'${secao}' AS _secao,
        CASE WHEN f.${coluna} IS NULL THEN N'${vazio}' ELSE ISNULL(cad.Nome, N'Código ' + CAST(f.${coluna} AS nvarchar(20))) END AS Nome,
        COUNT(*) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
 FROM dbo.CtlCnnFaltaPaciente f
 LEFT JOIN dbo.CtlCnnCadastro cad
-    ON cad.Tipo = N'${tipo}' AND cad.Id = f.${coluna}
+    ON cad.IdUnidade = f.IdUnidade AND cad.Tipo = N'${tipo}' AND cad.Id = f.${coluna}
 WHERE ${filtroF}
 GROUP BY f.${coluna}, cad.Nome
 ORDER BY COUNT(*) DESC;`;
@@ -231,10 +246,11 @@ if (action === 'dashboard') {
   }
 
   const anterior = periodoAnterior(de, ate);
-  const filtroF = `f.DataFalta >= @de AND f.DataFalta <= @ate`;
+  const filtroF = `f.IdUnidade = @unidade AND f.DataFalta >= @de AND f.DataFalta <= @ate`;
   // CriadoEm e SolicitadoEm são UTC; São Paulo é UTC-3 o ano todo (sem horário de verão desde 2019).
+  // Filtra também a unidade do alias da coluna ("a.CriadoEm" -> a.IdUnidade).
   const noPeriodo = (coluna) =>
-    `${coluna} >= DATEADD(HOUR, 3, CAST(@de AS datetime2)) AND ${coluna} < DATEADD(HOUR, 3, DATEADD(DAY, 1, CAST(@ate AS datetime2)))`;
+    `${coluna.split('.')[0]}.IdUnidade = @unidade AND ${coluna} >= DATEADD(HOUR, 3, CAST(@de AS datetime2)) AND ${coluna} < DATEADD(HOUR, 3, DATEADD(DAY, 1, CAST(@ate AS datetime2)))`;
   const local = (coluna) => `DATEADD(HOUR, -3, ${coluna})`;
   const tipoAcao = `CASE
         WHEN a.Acao = N'BLOQUEIO' AND a.Origem = N'AUTOMATICO' THEN N'BLOQUEIO_AUTO'
@@ -256,11 +272,11 @@ WHERE ${filtroF}
 GROUP BY f.DataFalta;
 
 SELECT N'anterior' AS _secao,
-       (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @deAnterior AND DataFalta <= @ateAnterior) AS Faltas,
-       (SELECT COUNT(DISTINCT IdPaciente) FROM dbo.CtlCnnFaltaPaciente WHERE DataFalta >= @deAnterior AND DataFalta <= @ateAnterior) AS Pacientes,
+       (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade AND DataFalta >= @deAnterior AND DataFalta <= @ateAnterior) AS Faltas,
+       (SELECT COUNT(DISTINCT IdPaciente) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade AND DataFalta >= @deAnterior AND DataFalta <= @ateAnterior) AS Pacientes,
        (SELECT COUNT(*) FROM (
             SELECT IdPaciente FROM dbo.CtlCnnFaltaPaciente
-            WHERE DataFalta >= @deAnterior AND DataFalta <= @ateAnterior
+            WHERE IdUnidade = @unidade AND DataFalta >= @deAnterior AND DataFalta <= @ateAnterior
             GROUP BY IdPaciente HAVING COUNT(*) >= 2
         ) r) AS Reincidentes;
 
@@ -287,9 +303,9 @@ SELECT TOP (15) N'especialidade' AS _secao,
        COUNT(DISTINCT f.IdAgenda) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
 FROM dbo.CtlCnnFaltaProcedimento fp
 INNER JOIN dbo.CtlCnnFaltaPaciente f
-    ON f.IdAgenda = fp.IdAgenda
+    ON f.IdUnidade = fp.IdUnidade AND f.IdAgenda = fp.IdAgenda
 LEFT JOIN dbo.CtlCnnCadastro cad
-    ON cad.Tipo = N'ESPECIALIDADE' AND cad.Id = fp.IdEspecialidade
+    ON cad.IdUnidade = fp.IdUnidade AND cad.Tipo = N'ESPECIALIDADE' AND cad.Id = fp.IdEspecialidade
 WHERE ${filtroF}
 GROUP BY fp.IdEspecialidade, cad.Nome
 ORDER BY COUNT(DISTINCT f.IdAgenda) DESC;
@@ -352,7 +368,7 @@ WHERE ${noPeriodo('s.SolicitadoEm')}
 GROUP BY s.SolicitadoPor
 ORDER BY COUNT(*) DESC;`;
 
-  return [{ json: { action, query, de, ate, anterior, inicio, hoje } }];
+  return [{ json: { action, ...unidade, query, de, ate, anterior, inicio, hoje } }];
 }
 
 if (action === 'faltas') {
@@ -363,8 +379,8 @@ if (action === 'faltas') {
     return erro(400, 'A data inicial é depois da final.');
   }
 
-  const filtro = `DataFalta >= @de AND DataFalta <= @ate`;
-  const filtroF = `f.DataFalta >= @de AND f.DataFalta <= @ate`;
+  const filtro = `IdUnidade = @unidade AND DataFalta >= @de AND DataFalta <= @ate`;
+  const filtroF = `f.IdUnidade = @unidade AND f.DataFalta >= @de AND f.DataFalta <= @ate`;
   const porCadastro = (secao, tipo, coluna, vazio, top) => porCadastroSql(secao, tipo, coluna, vazio, top, filtroF);
   // 1900-01-01 foi segunda-feira: (dias desde então) % 7 dá 0 = segunda ... 6 = domingo, sem depender de DATEFIRST.
   const query = `${cabecalho}
@@ -375,8 +391,8 @@ DECLARE @ate DATE = ${sqlDate(ate)};
 SELECT N'total' AS _secao, COUNT(*) AS Faltas, COUNT(DISTINCT IdPaciente) AS Pacientes,
        (SELECT COUNT(*)
         FROM dbo.CtlCnnFaltaPaciente fc
-        WHERE fc.DataFalta >= @de AND fc.DataFalta <= @ate
-          AND EXISTS (SELECT 1 FROM dbo.CtlCnnFaltaProcedimento fp WHERE fp.IdAgenda = fc.IdAgenda)) AS ComProcedimento
+        WHERE fc.IdUnidade = @unidade AND fc.DataFalta >= @de AND fc.DataFalta <= @ate
+          AND EXISTS (SELECT 1 FROM dbo.CtlCnnFaltaProcedimento fp WHERE fp.IdUnidade = fc.IdUnidade AND fp.IdAgenda = fc.IdAgenda)) AS ComProcedimento
 FROM dbo.CtlCnnFaltaPaciente
 WHERE ${filtro};
 
@@ -397,7 +413,7 @@ FROM (
                 ELSE COALESCE(cad.Nome, f.NomeExecutor, N'Código ' + CAST(f.IdPessoaExecutor AS nvarchar(20))) END AS Profissional
     FROM dbo.CtlCnnFaltaPaciente f
     LEFT JOIN dbo.CtlCnnCadastro cad
-        ON cad.Tipo = N'EXECUTOR' AND cad.Id = f.IdPessoaExecutor
+        ON cad.IdUnidade = f.IdUnidade AND cad.Tipo = N'EXECUTOR' AND cad.Id = f.IdPessoaExecutor
     WHERE ${filtroF}
 ) porProfissional
 GROUP BY Profissional
@@ -412,7 +428,7 @@ SELECT TOP (30) N'procedimento' AS _secao,
        COUNT(DISTINCT f.IdAgenda) AS Faltas, COUNT(DISTINCT f.IdPaciente) AS Pacientes
 FROM dbo.CtlCnnFaltaProcedimento fp
 INNER JOIN dbo.CtlCnnFaltaPaciente f
-    ON f.IdAgenda = fp.IdAgenda
+    ON f.IdUnidade = fp.IdUnidade AND f.IdAgenda = fp.IdAgenda
 WHERE ${filtroF}
 GROUP BY fp.IdTipoProcedimento
 ORDER BY COUNT(DISTINCT f.IdAgenda) DESC;
@@ -458,7 +474,7 @@ FROM dbo.CtlCnnFaltaPaciente f
 WHERE ${filtroF}
 ORDER BY DataFalta DESC, IdAgenda DESC;`;
 
-  return [{ json: { action, query, de, ate, inicio, hoje } }];
+  return [{ json: { action, ...unidade, query, de, ate, inicio, hoje } }];
 }
 
 if (action === 'acoes') {
@@ -477,7 +493,7 @@ if (action === 'acoes') {
   }
 
   // CriadoEm é UTC; São Paulo é UTC-3 o ano todo (sem horário de verão desde 2019).
-  const condicoes = ['1 = 1'];
+  const condicoes = ['IdUnidade = @unidade'];
   if (de) condicoes.push(`CriadoEm >= DATEADD(HOUR, 3, CAST(${sqlDate(de)} AS datetime2))`);
   if (ate) condicoes.push(`CriadoEm < DATEADD(HOUR, 3, DATEADD(DAY, 1, CAST(${sqlDate(ate)} AS datetime2)))`);
   if (acao) condicoes.push(`Acao = ${sqlS(acao)}`);
@@ -489,6 +505,7 @@ if (action === 'acoes') {
 
   const query = `USE INTEGRACAO;
 SET NOCOUNT ON;
+${declararUnidade}
 
 SELECT
     N'contagem' AS _secao,
@@ -526,30 +543,33 @@ OFFSET ${(page - 1) * pageSize} ROWS FETCH NEXT ${pageSize} ROWS ONLY;
 
 SELECT N'usuario' AS _secao, Usuario, COUNT(*) AS Acoes
 FROM dbo.CtlCnnAcaoPaciente
+WHERE IdUnidade = @unidade
 GROUP BY Usuario
 ORDER BY Usuario;`;
 
-  return [{ json: { action, query, page, pageSize } }];
+  return [{ json: { action, ...unidade, query, page, pageSize } }];
 }
 
 if (action === 'parametros') {
   const query = `USE INTEGRACAO;
 SET NOCOUNT ON;
+${declararUnidade}
 
 SELECT
     N'status' AS _secao,
-    (SELECT MAX(DataColeta) FROM dbo.CtlCnnFaltaPaciente) AS UltimaColeta,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'BLOQUEIO') AS UltimoBloqueioAutomatico,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'AUTOMATICO' AND Acao = N'LIBERACAO') AS UltimaLiberacaoAutomatica,
-    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE Origem = N'PAINEL') AS UltimaAcaoPainel,
-    (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente) AS LinhasControle,
-    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente) AS LinhasFaltas;
+    (SELECT MAX(DataColeta) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade) AS UltimaColeta,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE IdUnidade = @unidade AND Origem = N'AUTOMATICO' AND Acao = N'BLOQUEIO') AS UltimoBloqueioAutomatico,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE IdUnidade = @unidade AND Origem = N'AUTOMATICO' AND Acao = N'LIBERACAO') AS UltimaLiberacaoAutomatica,
+    (SELECT MAX(CriadoEm) FROM dbo.CtlCnnAcaoPaciente WHERE IdUnidade = @unidade AND Origem = N'PAINEL') AS UltimaAcaoPainel,
+    (SELECT COUNT(*) FROM dbo.CtlCnnControlePaciente WHERE IdUnidade = @unidade) AS LinhasControle,
+    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = @unidade) AS LinhasFaltas;
 
 SELECT N'cadastro' AS _secao, Tipo, COUNT(*) AS Quantidade, MAX(AtualizadoEm) AS AtualizadoEm
 FROM dbo.CtlCnnCadastro
+WHERE IdUnidade = @unidade
 GROUP BY Tipo;`;
 
-  return [{ json: { action, query, inicio, hoje } }];
+  return [{ json: { action, ...unidade, query, inicio, hoje } }];
 }
 
 return erro(400, 'Ação desconhecida.');

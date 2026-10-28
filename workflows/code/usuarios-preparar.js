@@ -31,9 +31,49 @@ const nome = body.nome === undefined || body.nome === null ? null : String(body.
 const perfil = body.perfil === undefined || body.perfil === null ? null : String(body.perfil).toUpperCase();
 const ativo = typeof body.ativo === 'boolean' ? body.ativo : null;
 
+// Unidades do usuário (LEITOR/EDITOR): lista de IdUnidade. null = não mexer (alterar); o ADMIN acessa todas e não usa.
+const unidades = Array.isArray(body.unidades)
+  ? [...new Set(body.unidades.map(Number))]
+  : null;
+const unidadesValidas = () => unidades !== null && unidades.every((id) => Number.isSafeInteger(id) && id > 0 && id <= 32767);
+
 const loginValido = () => LOGIN.test(login);
 const senhaValida = () => /^[0-9a-f]{32}$/.test(salt) && /^[0-9a-f]{128}$/.test(hash);
 const nomeValido = () => nome !== null && nome.length >= 2 && nome.length <= 100;
+
+// Unidades que o usuário @login acessa: o ADMIN, todas as ativas; os outros, as ligadas a ele.
+const unidadesDoLogin = `
+SELECT N'unidade' AS _secao, u.IdUnidade, u.Codigo, u.Nome
+FROM dbo.CtlCnnUnidade u
+WHERE u.Ativa = 1
+  AND (
+        EXISTS (SELECT 1 FROM dbo.CtlCnnUsuario x WHERE x.Login = @login AND x.Perfil = N'ADMIN')
+     OR EXISTS (
+            SELECT 1
+            FROM dbo.CtlCnnUsuarioUnidade uu
+            INNER JOIN dbo.CtlCnnUsuario x ON x.IdUsuario = uu.IdUsuario
+            WHERE x.Login = @login AND uu.IdUnidade = u.IdUnidade
+        )
+  )
+ORDER BY u.Nome;`;
+
+// @novas = unidades pedidas. Confere se todas existem e estão ativas (senão UNIDADE_INVALIDA).
+const declararNovas = (lista) => `DECLARE @novas TABLE (IdUnidade SMALLINT PRIMARY KEY);
+${lista.length ? `INSERT INTO @novas (IdUnidade) VALUES ${lista.map((id) => `(${sqlN(id)})`).join(', ')};` : ''}
+DECLARE @unidadesInvalidas INT = (
+    SELECT COUNT(*) FROM @novas n
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.CtlCnnUnidade u WHERE u.IdUnidade = n.IdUnidade AND u.Ativa = 1)
+);`;
+
+// Códigos das unidades de um usuário, para o detalhe do evento ("ZARNS_SALVADOR, ZARNS_POUSO_ALEGRE").
+const codigosDe = (idUsuario) => `ISNULL(STUFF((
+        SELECT N', ' + u.Codigo
+        FROM dbo.CtlCnnUsuarioUnidade uu
+        INNER JOIN dbo.CtlCnnUnidade u ON u.IdUnidade = uu.IdUnidade
+        WHERE uu.IdUsuario = ${idUsuario}
+        ORDER BY u.Codigo
+        FOR XML PATH(''), TYPE
+    ).value('.', 'nvarchar(max)'), 1, 2, N''), N'(nenhuma)')`;
 
 const cabecalho = `USE INTEGRACAO;
 SET NOCOUNT ON;
@@ -55,6 +95,14 @@ SELECT
     UltimoAcessoEm, CriadoEm, CriadoPor, AlteradoEm, AlteradoPor
 FROM dbo.CtlCnnUsuario;
 
+SELECT N'vinculo' AS _secao, x.Login, uu.IdUnidade
+FROM dbo.CtlCnnUsuarioUnidade uu
+INNER JOIN dbo.CtlCnnUsuario x ON x.IdUsuario = uu.IdUsuario;
+
+SELECT N'unidade' AS _secao, IdUnidade, Codigo, Nome, Ativa
+FROM dbo.CtlCnnUnidade
+ORDER BY Nome;
+
 SELECT TOP (100)
     N'evento' AS _secao, Id, Login, Evento, Detalhe, Por, CriadoEm
 FROM dbo.CtlCnnUsuarioEvento
@@ -71,14 +119,16 @@ SELECT TOP (1)
     Login, Nome, Perfil, Ativo, SenhaSalt, SenhaHash, TrocarSenha, VersaoSessao, BloqueadoAte,
     CASE WHEN BloqueadoAte > SYSUTCDATETIME() THEN 1 ELSE 0 END AS Bloqueado
 FROM dbo.CtlCnnUsuario
-WHERE Login = @login;`);
+WHERE Login = @login;
+${unidadesDoLogin}`);
 }
 
 if (action === 'sessao') {
   return ok(`${cabecalho}
 SELECT TOP (1) Login, Nome, Perfil, Ativo, VersaoSessao
 FROM dbo.CtlCnnUsuario
-WHERE Login = @login;`);
+WHERE Login = @login;
+${unidadesDoLogin}`);
 }
 
 if (action === 'login-resultado') {
@@ -119,18 +169,30 @@ if (action === 'criar') {
   if (!PERFIS.includes(perfil)) return erro(400, 'Perfil inválido.');
   if (!senhaValida()) return erro(400, 'Senha inválida.');
   if (!LOGIN.test(por)) return erro(400, 'Usuário responsável inválido.');
+  const admin = perfil === 'ADMIN';
+  if (!admin && (!unidadesValidas() || !unidades.length)) return erro(400, 'Escolha ao menos uma unidade.');
 
-  return ok(escrita(`IF EXISTS (SELECT 1 FROM dbo.CtlCnnUsuario WITH (UPDLOCK, HOLDLOCK) WHERE Login = @login)
+  return ok(escrita(`${declararNovas(admin ? [] : unidades)}
+
+IF EXISTS (SELECT 1 FROM dbo.CtlCnnUsuario WITH (UPDLOCK, HOLDLOCK) WHERE Login = @login)
 BEGIN
     SELECT N'LOGIN_EXISTE' AS Resultado;
+END
+ELSE IF @unidadesInvalidas > 0
+BEGIN
+    SELECT N'UNIDADE_INVALIDA' AS Resultado;
 END
 ELSE
 BEGIN
     INSERT INTO dbo.CtlCnnUsuario (Login, Nome, Perfil, Ativo, SenhaSalt, SenhaHash, TrocarSenha, CriadoPor)
     VALUES (@login, ${sqlS(nome, 100)}, ${sqlS(perfil, 10)}, 1, '${salt}', '${hash}', 1, ${sqlS(por, 50)});
 
+    DECLARE @idUsuario INT = CONVERT(INT, SCOPE_IDENTITY());
+    INSERT INTO dbo.CtlCnnUsuarioUnidade (IdUsuario, IdUnidade)
+    SELECT @idUsuario, IdUnidade FROM @novas;
+
     INSERT INTO dbo.CtlCnnUsuarioEvento (Login, Evento, Detalhe, Por)
-    VALUES (@login, N'CRIADO', ${sqlS(`Perfil ${perfil}`, 500)}, ${sqlS(por, 50)});
+    VALUES (@login, N'CRIADO', LEFT(${sqlS(`Perfil ${perfil}`, 100)}${admin ? '' : ` + N' · unidades: ' + ${codigosDe('@idUsuario')}`}, 500), ${sqlS(por, 50)});
 
     SELECT N'OK' AS Resultado;
 END;`));
@@ -139,22 +201,35 @@ END;`));
 if (action === 'alterar') {
   if (nome !== null && !nomeValido()) return erro(400, 'Informe o nome (2 a 100 caracteres).');
   if (perfil !== null && !PERFIS.includes(perfil)) return erro(400, 'Perfil inválido.');
-  if (nome === null && perfil === null && ativo === null) return erro(400, 'Nada para alterar.');
+  if (unidades !== null && !unidadesValidas()) return erro(400, 'Unidades inválidas.');
+  if (nome === null && perfil === null && ativo === null && unidades === null) return erro(400, 'Nada para alterar.');
   if (!LOGIN.test(por)) return erro(400, 'Usuário responsável inválido.');
+  const trocarUnidades = unidades !== null;
 
-  // Mudar perfil ou desativar sobe VersaoSessao: a sessão aberta da pessoa deixa de valer nas ações.
+  // Mudar perfil, unidades ou desativar sobe VersaoSessao: a sessão aberta da pessoa deixa de valer nas ações.
+  // Quem não é ADMIN precisa ficar com ao menos uma unidade (SEM_UNIDADE). Virar ADMIN não apaga as unidades:
+  // elas só deixam de importar (o admin acessa todas).
   return ok(escrita(`DECLARE @nome NVARCHAR(100) = ${sqlS(nome, 100)};
 DECLARE @perfil NVARCHAR(10) = ${sqlS(perfil, 10)};
 DECLARE @ativo BIT = ${sqlBit(ativo)};
 DECLARE @por NVARCHAR(50) = ${sqlS(por, 50)};
-DECLARE @nomeAtual NVARCHAR(100), @perfilAtual NVARCHAR(10), @ativoAtual BIT;
+DECLARE @trocarUnidades BIT = ${sqlBit(trocarUnidades)};
+DECLARE @idUsuario INT, @nomeAtual NVARCHAR(100), @perfilAtual NVARCHAR(10), @ativoAtual BIT;
+${declararNovas(trocarUnidades ? unidades : [])}
 
-SELECT @nomeAtual = Nome, @perfilAtual = Perfil, @ativoAtual = Ativo
+SELECT @idUsuario = IdUsuario, @nomeAtual = Nome, @perfilAtual = Perfil, @ativoAtual = Ativo
 FROM dbo.CtlCnnUsuario WITH (UPDLOCK, HOLDLOCK)
 WHERE Login = @login;
 
 DECLARE @perfilNovo NVARCHAR(10) = COALESCE(@perfil, @perfilAtual);
 DECLARE @ativoNovo BIT = COALESCE(@ativo, @ativoAtual);
+DECLARE @mudouUnidades BIT = CASE WHEN @trocarUnidades = 1 AND (
+        EXISTS (SELECT IdUnidade FROM @novas EXCEPT SELECT IdUnidade FROM dbo.CtlCnnUsuarioUnidade WHERE IdUsuario = @idUsuario)
+     OR EXISTS (SELECT IdUnidade FROM dbo.CtlCnnUsuarioUnidade WHERE IdUsuario = @idUsuario EXCEPT SELECT IdUnidade FROM @novas)
+    ) THEN 1 ELSE 0 END;
+DECLARE @unidadesFinais INT = CASE WHEN @trocarUnidades = 1
+    THEN (SELECT COUNT(*) FROM @novas)
+    ELSE (SELECT COUNT(*) FROM dbo.CtlCnnUsuarioUnidade WHERE IdUsuario = @idUsuario) END;
 
 IF @perfilAtual IS NULL
 BEGIN
@@ -165,8 +240,26 @@ ELSE IF @perfilAtual = N'ADMIN' AND @ativoAtual = 1 AND (@perfilNovo <> N'ADMIN'
 BEGIN
     SELECT N'ULTIMO_ADMIN' AS Resultado;
 END
+ELSE IF @unidadesInvalidas > 0
+BEGIN
+    SELECT N'UNIDADE_INVALIDA' AS Resultado;
+END
+ELSE IF @perfilNovo <> N'ADMIN' AND @unidadesFinais = 0
+BEGIN
+    SELECT N'SEM_UNIDADE' AS Resultado;
+END
 ELSE
 BEGIN
+    IF @mudouUnidades = 1
+    BEGIN
+        DELETE FROM dbo.CtlCnnUsuarioUnidade WHERE IdUsuario = @idUsuario;
+        INSERT INTO dbo.CtlCnnUsuarioUnidade (IdUsuario, IdUnidade)
+        SELECT @idUsuario, IdUnidade FROM @novas;
+
+        INSERT INTO dbo.CtlCnnUsuarioEvento (Login, Evento, Detalhe, Por)
+        VALUES (@login, N'UNIDADES_ALTERADAS', LEFT(${codigosDe('@idUsuario')}, 500), @por);
+    END;
+
     UPDATE dbo.CtlCnnUsuario
     SET
         Nome = COALESCE(@nome, Nome),
@@ -174,7 +267,7 @@ BEGIN
         Ativo = @ativoNovo,
         TentativasFalhas = CASE WHEN @ativoNovo = 1 AND @ativoAtual = 0 THEN 0 ELSE TentativasFalhas END,
         BloqueadoAte = CASE WHEN @ativoNovo = 1 AND @ativoAtual = 0 THEN NULL ELSE BloqueadoAte END,
-        VersaoSessao = VersaoSessao + CASE WHEN @perfilNovo <> @perfilAtual OR @ativoNovo <> @ativoAtual THEN 1 ELSE 0 END,
+        VersaoSessao = VersaoSessao + CASE WHEN @perfilNovo <> @perfilAtual OR @ativoNovo <> @ativoAtual OR @mudouUnidades = 1 THEN 1 ELSE 0 END,
         AlteradoEm = SYSUTCDATETIME(),
         AlteradoPor = @por
     WHERE Login = @login;

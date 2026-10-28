@@ -8,9 +8,10 @@ Voltar ao [índice](README.md).
 | [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql) | Cria `dbo.CtlCnnControlePaciente`, `dbo.CtlCnnAcaoPaciente` e os índices do painel | Implantação do painel e sempre que mudar |
 | [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) | Cria `dbo.CtlCnnUsuario` e `dbo.CtlCnnUsuarioEvento` (usuários do painel) | Implantação da gestão de usuários e sempre que mudar. Depois, o `INSERT` do primeiro admin (`npm run admin`) |
 | [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) | Cria `dbo.CtlCnnSolicitacao` (solicitações de desbloqueio) e a coluna `IdSolicitacao` na auditoria | Implantação das solicitações, **antes** de colar os workflows novos, e sempre que mudar |
+| [sql/criar_tabelas_unidades.sql](../sql/criar_tabelas_unidades.sql) | Cria `dbo.CtlCnnUnidade` e `dbo.CtlCnnUsuarioUnidade`, põe `IdUnidade` em todas as tabelas de dados e refaz as chaves com a unidade | Implantação das unidades, **depois** dos outros scripts e **antes** de colar os workflows novos |
 | [sql/carga_inicial_controle.sql](../sql/carga_inicial_controle.sql) | Preenche o controle com a situação deixada pela automação | **Uma vez**, no corte da liberação automática (histórico) |
 
-Os cinco rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
+Os seis rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
 
 ## criar_tabelas_bloqueio.sql
 
@@ -113,7 +114,7 @@ Numa instalação nova, espere três linhas:
 
 - `CREATE TABLE` não "afeta linhas". No n8n o nó mostra 0 linhas afetadas. O `SELECT` do fim é que confirma.
 - Não há script de volta (rollback).
-- Não cria permissões. O login da credencial `TST Araguari` precisa de `SELECT`, `INSERT` e `UPDATE` nas três tabelas, e também de `DELETE` em `CtlCnnFaltaProcedimento`.
+- Não cria permissões. O login da credencial `TST Araguari - Integracao` precisa de `SELECT`, `INSERT` e `UPDATE` nas três tabelas, e também de `DELETE` em `CtlCnnFaltaProcedimento`.
 
 ## criar_tabelas_painel.sql
 
@@ -125,7 +126,7 @@ Cria as duas tabelas do painel. Pode rodar mais de uma vez: cada passo confere a
 | 2 | Cria `dbo.CtlCnnAcaoPaciente` (`Id IDENTITY`, CHECK em `Acao` e `Origem`, defaults de `Antecipada` e `CriadoEm`) |
 | 3 | Índices `IX_CtlCnnAcaoPaciente_IdPaciente_CriadoEm`, `IX_CtlCnnAcaoPaciente_CriadoEm`, `IX_CtlCnnControlePaciente_Situacao` |
 | 4 | Índice `IX_CtlCnnFaltaPaciente_DataFalta` na tabela de faltas (relatórios por período) |
-| 5 | Comentário com os `GRANT` para o usuário da credencial `TST Araguari` (troque o nome e rode à mão) |
+| 5 | Comentário com os `GRANT` para o usuário da credencial `TST Araguari - Integracao` (troque o nome e rode à mão) |
 | 6 | `SELECT` de conferência: as duas tabelas e o número de colunas (controle = 13, auditoria = 19) |
 
 Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnncontrolepaciente).
@@ -138,7 +139,7 @@ Cria as tabelas de usuários. Pode rodar mais de uma vez e **nada é apagado**.
 |---|---|
 | 1 | Cria `dbo.CtlCnnUsuario` (`IdUsuario IDENTITY`, `Login` único, CHECK em `Perfil`, defaults de `Ativo`, `TrocarSenha`, `VersaoSessao`, `TentativasFalhas`, `CriadoEm`) |
 | 2 | Cria `dbo.CtlCnnUsuarioEvento` (`Id IDENTITY`, CHECK em `Evento`) e o índice `IX_CtlCnnUsuarioEvento_CriadoEm` |
-| 3 | Comentário com os `GRANT` para o usuário da credencial `TST Araguari` |
+| 3 | Comentário com os `GRANT` para o usuário da credencial `TST Araguari - Integracao` |
 | 4 | `SELECT` de conferência: as duas tabelas e o número de colunas (usuário = 16, evento = 6) |
 
 O script não cria usuário nenhum. O primeiro admin sai de `npm run admin` ([scripts/criar-admin.mjs](../scripts/criar-admin.mjs)): senha aleatória impressa uma vez e um `INSERT` para colar no SSMS. Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnnusuario).
@@ -153,10 +154,27 @@ Cria a tabela das solicitações de desbloqueio. Pode rodar mais de uma vez e **
 | 2 | Índice único filtrado `UX_CtlCnnSolicitacao_Aberta` em `IdPaciente` só para `PENDENTE` e `APROVADA`: uma solicitação aberta por paciente. Fica dentro de `EXEC (N'…')` |
 | 3 | Índices `IX_CtlCnnSolicitacao_Status_SolicitadoEm` e `IX_CtlCnnSolicitacao_IdPaciente_SolicitadoEm` |
 | 4 | `ALTER TABLE dbo.CtlCnnAcaoPaciente ADD IdSolicitacao BIGINT NULL`, se não existir |
-| 5 | Comentário com o `GRANT` (`SELECT, INSERT, UPDATE` em `CtlCnnSolicitacao`) para o usuário da credencial `TST Araguari` |
+| 5 | Comentário com o `GRANT` (`SELECT, INSERT, UPDATE` em `CtlCnnSolicitacao`) para o usuário da credencial `TST Araguari - Integracao` |
 | 6 | `SELECT` de conferência: `CtlCnnSolicitacao` (19 colunas), `CtlCnnAcaoPaciente` e `BytesIdSolicitacaoNaAuditoria` = 8 |
 
 **Rode antes de colar os workflows novos.** O `sqlRegistrarAcao` (Ações, Bloqueio e Liberação automática) grava `IdSolicitacao` e atualiza `CtlCnnSolicitacao`. Sem a tabela, o registro da auditoria falha. Colunas: [banco-de-dados.md](banco-de-dados.md#dboctlcnnsolicitacao).
+
+## criar_tabelas_unidades.sql
+
+Multiunidade ([unidades.md](unidades.md)). Pode rodar mais de uma vez e **nada é apagado**. Usa `SET XACT_ABORT ON`; cada troca de chave roda numa transação.
+
+| # | O que faz |
+|---|---|
+| 1 | Cria `dbo.CtlCnnUnidade` e insere Salvador (1, `ZARNS_SALVADOR`) e Pouso Alegre (2, `ZARNS_POUSO_ALEGRE`), se não existirem |
+| 2 | Cria `dbo.CtlCnnUsuarioUnidade` |
+| 3 | Em `CtlCnnFaltaPaciente`, `CtlCnnFaltaProcedimento`, `CtlCnnCadastro`, `CtlCnnControlePaciente`, `CtlCnnAcaoPaciente` e `CtlCnnSolicitacao`: coluna `IdUnidade SMALLINT NOT NULL DEFAULT 1` (o que existe fica em Salvador) e chave estrangeira para `CtlCnnUnidade` |
+| 4 | Refaz as chaves e os índices com `IdUnidade` na frente, **com os mesmos nomes** (os scripts antigos conferem pelo nome e não recriam a versão sem unidade). Se o índice já tem `IdUnidade`, não mexe. Lista em [banco-de-dados.md](banco-de-dados.md#unidades) |
+| 5 | Inclui `UNIDADES_ALTERADAS` no CHECK de `CtlCnnUsuarioEvento.Evento` |
+| 6 | Liga a Salvador quem é Leitor ou Editor e ainda não tem unidade |
+| 7 | Comentário com os `GRANT` (`SELECT` em `CtlCnnUnidade`; `SELECT, INSERT, DELETE` em `CtlCnnUsuarioUnidade`) |
+| 8 | `SELECT` de conferência: as unidades, o nome da variável do CID no n8n e quantos usuários cada uma tem |
+
+**Rode antes de colar os workflows novos.** Eles gravam e filtram `IdUnidade`. Com o `DEFAULT 1`, os workflows antigos continuam funcionando enquanto isso (tudo em Salvador).
 
 ## carga_inicial_controle.sql
 
@@ -168,6 +186,7 @@ Roda no corte da liberação automática, **depois** da última execução manua
 - Para cada paciente com falta no ciclo, pega a falta vigente (maior `NumeroFalta`) e o prazo 60/90/180.
 - Prazo correndo → `BLOQUEADO`; vencido → `LIBERADO`. `OrigemUltimaAcao = CARGA_INICIAL`, `UltimaAcaoPor = carga-inicial`.
 - Só insere quem ainda não tem linha no controle. Não grava auditoria (não houve PATCH).
-- Termina com a contagem por situação.
+- Por unidade: a falta vigente é calculada dentro de cada unidade e a linha de controle leva o `IdUnidade` da falta. Por isso precisa rodar **depois** de `criar_tabelas_unidades.sql`.
+- Termina com a contagem por unidade e situação.
 
 Os prazos e o ciclo estão escritos no script: se mudarem em `workflows/code/_regra.js`, mude aqui também.

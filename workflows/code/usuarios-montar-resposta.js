@@ -20,6 +20,10 @@ const iso = (valor) => {
   return Number.isNaN(data.getTime()) ? String(valor) : data.toISOString();
 };
 const responder = (statusCode, response) => [{ json: { statusCode, response } }];
+// Unidades que o usuário acessa (login-buscar e sessao): [{ id, codigo, nome }].
+const unidades = linhas
+  .filter((linha) => linha._secao === 'unidade')
+  .map((u) => ({ id: Number(u.IdUnidade), codigo: u.Codigo, nome: u.Nome, ...(u.Ativa !== undefined ? { ativa: bool(u.Ativa) } : {}) }));
 
 if (meta.action === 'login-buscar') {
   const u = linhas.find((linha) => linha.Login);
@@ -36,6 +40,7 @@ if (meta.action === 'login-buscar') {
           versaoSessao: Number(u.VersaoSessao || 1),
           bloqueado: bool(u.Bloqueado),
           bloqueadoAte: iso(u.BloqueadoAte),
+          unidades,
         }
       : null,
   });
@@ -44,7 +49,7 @@ if (meta.action === 'login-buscar') {
 if (meta.action === 'sessao') {
   const u = linhas.find((linha) => linha.Login);
   return responder(200, {
-    usuario: u ? { login: u.Login, nome: u.Nome, perfil: u.Perfil, ativo: bool(u.Ativo), versaoSessao: Number(u.VersaoSessao || 1) } : null,
+    usuario: u ? { login: u.Login, nome: u.Nome, perfil: u.Perfil, ativo: bool(u.Ativo), versaoSessao: Number(u.VersaoSessao || 1), unidades } : null,
   });
 }
 
@@ -54,6 +59,11 @@ if (meta.action === 'login-resultado') {
 }
 
 if (meta.action === 'listar') {
+  // Unidades de cada LEITOR/EDITOR (o ADMIN acessa todas: a tela mostra "Todas").
+  const vinculos = new Map();
+  for (const v of linhas.filter((linha) => linha._secao === 'vinculo')) {
+    vinculos.set(v.Login, [...(vinculos.get(v.Login) || []), Number(v.IdUnidade)]);
+  }
   const usuarios = linhas
     .filter((linha) => linha._secao === 'usuario')
     .map((u) => ({
@@ -68,12 +78,13 @@ if (meta.action === 'listar') {
       criadoPor: u.CriadoPor || null,
       alteradoEm: iso(u.AlteradoEm),
       alteradoPor: u.AlteradoPor || null,
+      unidades: (vinculos.get(u.Login) || []).sort((a, b) => a - b),
     }))
     .sort((a, b) => Number(b.ativo) - Number(a.ativo) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   const eventos = linhas
     .filter((linha) => linha._secao === 'evento')
     .map((e) => ({ id: Number(e.Id), login: e.Login, evento: e.Evento, detalhe: e.Detalhe || null, por: e.Por || null, em: iso(e.CriadoEm) }));
-  return responder(200, { asOf: new Date().toISOString(), usuarios, eventos });
+  return responder(200, { asOf: new Date().toISOString(), usuarios, unidades, eventos });
 }
 
 // Escritas: criar, alterar, redefinir-senha, trocar-senha.
@@ -83,6 +94,8 @@ const RESULTADOS = {
   LOGIN_EXISTE: [409, 'Já existe um usuário com esse login.'],
   NAO_ENCONTRADO: [404, 'Usuário não encontrado (ou desativado).'],
   ULTIMO_ADMIN: [409, 'Este é o único admin ativo: crie ou promova outro admin antes.'],
+  UNIDADE_INVALIDA: [400, 'Unidade inexistente ou desativada.'],
+  SEM_UNIDADE: [409, 'Escolha ao menos uma unidade para este usuário (só o admin acessa todas sem escolher).'],
 };
 const [statusCode, mensagem] = RESULTADOS[r.Resultado] || [502, 'O banco não confirmou a alteração.'];
 

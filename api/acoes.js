@@ -1,4 +1,4 @@
-import { json, requireAuth, requireMethod } from "../lib/auth.js";
+import { json, requireMethod, requireUnidade } from "../lib/auth.js";
 import { callN8n } from "../lib/n8n.js";
 
 export const config = { runtime: "nodejs" };
@@ -8,13 +8,15 @@ const pick = (value, allowed) => (allowed.includes(String(value || "")) ? String
 
 export default async function handler(req, res) {
   if (!requireMethod(req, res, "GET")) return;
-  if (!requireAuth(req, res)) return;
+  const acesso = requireUnidade(req, res);
+  if (!acesso) return;
 
   const page = Number.parseInt(String(req.query.page || "1"), 10);
   const paciente = String(req.query.paciente || "");
 
   const data = await callN8n(res, "leitura", {
     action: "acoes",
+    ...acesso.unidade,
     de: safeDate(req.query.de),
     ate: safeDate(req.query.ate),
     acao: pick(req.query.acao, ["BLOQUEIO", "LIBERACAO"]),

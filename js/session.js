@@ -1,6 +1,7 @@
 // Login na aba, chamadas para /api e cache curto. Base: js/session.js do painel de monitoramento.
 const AUTH_KEY = "clariens.cnn.auth";
 const USER_KEY = "clariens.cnn.usuario";
+const UNIDADE_KEY = "clariens.cnn.unidade";
 const CACHE_PREFIX = "clariens.cnn.cache:";
 
 const storage = {
@@ -27,7 +28,7 @@ const storage = {
   },
 };
 
-// AUTH_KEY guarda o token da sessão (assinado pela Vercel); USER_KEY, { login, nome, perfil } para a tela.
+// AUTH_KEY guarda o token da sessão (assinado pela Vercel); USER_KEY, { login, nome, perfil, unidades } para a tela.
 export const getAuth = () => storage.get(AUTH_KEY);
 export const getUsuario = () => {
   try {
@@ -36,10 +37,27 @@ export const getUsuario = () => {
     return null;
   }
 };
+
+// Unidades que a pessoa acessa ([{ id, codigo, nome }]) e a escolhida nesta aba (UNIDADE_KEY = id).
+// Tudo o que a tela mostra é da unidade escolhida: a API recebe o id em X-Unidade e confere o acesso.
+export const unidadesDoUsuario = () => (Array.isArray(getUsuario()?.unidades) ? getUsuario().unidades : []);
+export const getUnidade = () => {
+  const id = Number(storage.get(UNIDADE_KEY));
+  return unidadesDoUsuario().find((unidade) => Number(unidade.id) === id) || null;
+};
+export const setUnidade = (id) => {
+  storage.set(UNIDADE_KEY, String(id));
+  document.documentElement.dataset.unidade = String(id);
+};
+
 export const setAuth = (token, usuario) => {
   storage.set(AUTH_KEY, token);
   storage.set(USER_KEY, JSON.stringify(usuario));
   document.documentElement.dataset.perfil = usuario?.perfil || "";
+  // A unidade guardada só vale se ainda for da pessoa; com uma unidade só, ela já fica escolhida.
+  const unidades = unidadesDoUsuario();
+  if (!getUnidade()) storage.remove(UNIDADE_KEY);
+  if (unidades.length === 1) setUnidade(unidades[0].id);
 };
 
 // Só para mostrar ou esconder botões: quem decide a permissão é a API.
@@ -48,8 +66,10 @@ export const pode = (perfil) => (NIVEL[getUsuario()?.perfil] || 0) >= NIVEL[perf
 export const clearAuth = () => {
   storage.remove(AUTH_KEY);
   storage.remove(USER_KEY);
+  storage.remove(UNIDADE_KEY);
   limparFiltros();
   document.documentElement.dataset.perfil = "";
+  delete document.documentElement.dataset.unidade;
 };
 
 // Prazo do cache de cada tela. Dentro do prazo, trocar de tela não chama a API (nem o n8n).
@@ -67,9 +87,12 @@ export const CACHE = {
 export const PACIENTES_CACHE_KEY = "pacientes";
 export const PACIENTES_TTL_MS = CACHE.pacientes;
 
+// Cada unidade tem o seu cache ("clariens.cnn.cache:u2:pacientes"): voltar para uma unidade já vista é instantâneo.
+const prefixoUnidade = () => `${CACHE_PREFIX}u${getUnidade()?.id ?? 0}:`;
+
 export const readCache = (key, maxAgeMs) => {
   try {
-    const raw = storage.get(CACHE_PREFIX + key);
+    const raw = storage.get(prefixoUnidade() + key);
     if (!raw) return null;
     const entry = JSON.parse(raw);
     if (!entry?.savedAt || Date.now() - entry.savedAt >= maxAgeMs) return null;
@@ -82,19 +105,20 @@ export const readCache = (key, maxAgeMs) => {
 export const writeCache = (key, data) => {
   const entry = { savedAt: Date.now(), data };
   try {
-    sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify(entry));
+    sessionStorage.setItem(prefixoUnidade() + key, JSON.stringify(entry));
   } catch {
     // Cota cheia ou storage bloqueado: a página só busca de novo na próxima entrada.
   }
   return entry;
 };
 
-export const clearCache = (key) => storage.remove(CACHE_PREFIX + key);
+export const clearCache = (key) => storage.remove(prefixoUnidade() + key);
 
-// Apaga as entradas cujas chaves começam com um dos prefixos (ex.: "acoes:", "faltas:"). Sem prefixo, apaga todas.
+// Apaga as entradas da unidade atual cujas chaves começam com um dos prefixos (ex.: "acoes:", "faltas:").
+// Sem prefixo, apaga todas, de todas as unidades (login e saída).
 export const clearCaches = (...prefixos) => {
   try {
-    const alvo = prefixos.length ? prefixos.map((prefixo) => CACHE_PREFIX + prefixo) : [CACHE_PREFIX];
+    const alvo = prefixos.length ? prefixos.map((prefixo) => prefixoUnidade() + prefixo) : [CACHE_PREFIX];
     Object.keys(sessionStorage)
       .filter((key) => alvo.some((inicio) => key.startsWith(inicio)))
       .forEach((key) => sessionStorage.removeItem(key));
@@ -138,9 +162,13 @@ export const request = async (path, options = {}) => {
     ...(options.headers || {}),
   };
   const auth = getAuth();
+  const unidade = getUnidade();
 
   if (auth) {
     headers.Authorization = `Bearer ${auth}`;
+  }
+  if (unidade) {
+    headers["X-Unidade"] = String(unidade.id);
   }
 
   const response = await fetch(path, { ...options, headers });
@@ -167,6 +195,10 @@ export const request = async (path, options = {}) => {
     if (payload.codigo === "TROCAR_SENHA") {
       document.dispatchEvent(new CustomEvent("cnn:trocar-senha"));
     }
+    // Sem unidade escolhida (ou sem acesso a ela): a página abre a escolha de unidade.
+    if (payload.codigo === "UNIDADE_OBRIGATORIA") {
+      document.dispatchEvent(new CustomEvent("cnn:escolher-unidade"));
+    }
     throw new ApiError(payload.error || "Falha na API", response.status, payload.codigo || null);
   }
 
@@ -186,14 +218,18 @@ export const comCache = async (key, path, maxAgeMs, { forcar = false, aoAtualiza
 
     const velha = aoAtualizar ? readCache(key, VELHO_MAX) : null;
     if (velha) {
-      if (!emAndamento.has(key)) {
+      // A busca por trás é da unidade de agora: se a pessoa trocar de unidade antes de ela chegar, não desenha.
+      const chave = prefixoUnidade() + key;
+      if (!emAndamento.has(chave)) {
         const busca = request(path)
-          .then((dados) => aoAtualizar(writeCache(key, dados)))
+          .then((dados) => {
+            if (prefixoUnidade() + key === chave) aoAtualizar(writeCache(key, dados));
+          })
           .catch(() => {
             // Falhou por trás: a tela segue com o dado guardado; o próximo prazo tenta de novo.
           })
-          .finally(() => emAndamento.delete(key));
-        emAndamento.set(key, busca);
+          .finally(() => emAndamento.delete(chave));
+        emAndamento.set(chave, busca);
       }
       return { ...velha, velho: true };
     }
@@ -201,9 +237,11 @@ export const comCache = async (key, path, maxAgeMs, { forcar = false, aoAtualiza
   return writeCache(key, await request(path));
 };
 
+// Há algo guardado da unidade atual?
 export const temCache = () => {
   try {
-    return Object.keys(sessionStorage).some((key) => key.startsWith(CACHE_PREFIX));
+    const prefixo = prefixoUnidade();
+    return Object.keys(sessionStorage).some((key) => key.startsWith(prefixo));
   } catch {
     return false;
   }

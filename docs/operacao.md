@@ -8,14 +8,26 @@ Para subir tudo do zero ou conferir um ambiente. Cada item tem o detalhe nas se�
 
 | # | Onde | O quê |
 |---|---|---|
-| 1 | SSMS | `sql/criar_tabelas_bloqueio.sql` (faltas, procedimentos, cadastros), `sql/criar_tabelas_painel.sql` (controle e auditoria), `sql/criar_tabelas_usuarios.sql` (usuários), `sql/criar_tabelas_solicitacoes.sql` (solicitações e `IdSolicitacao` na auditoria) e os `GRANT` do fim de cada script |
+| 1 | SSMS | `sql/criar_tabelas_bloqueio.sql` (faltas, procedimentos, cadastros), `sql/criar_tabelas_painel.sql` (controle e auditoria), `sql/criar_tabelas_usuarios.sql` (usuários), `sql/criar_tabelas_solicitacoes.sql` (solicitações e `IdSolicitacao` na auditoria), **por último** `sql/criar_tabelas_unidades.sql` (unidades e `IdUnidade`), e os `GRANT` do fim de cada script |
 | 2 | Terminal + SSMS | `npm run admin` e o `INSERT` do primeiro admin; guardar a senha temporária |
-| 3 | n8n | Credenciais `API CNN AUTH`, `TST Araguari` e Header Auth `X-Monitor-Key` |
-| 4 | n8n | Importar e ativar **Bloqueio**, **Liberação automática**, **Leitura**, **Ações**, **Usuários** e **Solicitações**; conferir credenciais, Error workflow e a paginação de `GET agenda do ciclo` |
+| 3 | n8n | Credenciais `API CNN AUTH`, `TST Araguari - Integracao` e Header Auth `X-Monitor-Key`; Variables `CNN_CID_ZARNS_SALVADOR` e `CNN_CID_ZARNS_POUSO_ALEGRE` (ver [unidades.md](unidades.md)) |
+| 4 | n8n | Importar e ativar **Bloqueio** (e o subfluxo **Bloqueio por unidade**, escolhido no nó `bloquear unidade`), **Liberação automática**, **Leitura**, **Ações**, **Usuários** e **Solicitações**; conferir credenciais, Error workflow e a paginação de `GET agenda do ciclo` |
 | 5 | Vercel | `SESSION_SECRET`, `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_SOLICITACOES_URL`, `N8N_WEBHOOK_SECRET`; Framework Preset **Other** |
-| 6 | Painel | Entrar como `admin`, trocar a senha, criar os usuários |
+| 6 | Painel | Entrar como `admin`, trocar a senha, criar os usuários e marcar as unidades de cada um |
 | 7 | n8n | 1ª execução do bloqueio pelo editor com o PATCH desconectado; conferir faltas e cadastros no banco; religar |
 | 8 | Painel | Testar num paciente combinado com a clínica: Bloquear → Solicitar desbloqueio (como Leitor) → Aprovar (Admin) → Liberar (Editor) → Bloquear |
+
+## Implantação das unidades (outubro de 2026)
+
+Para um ambiente que já tem o painel com Salvador. O passo a passo completo, com a ordem certa, está em [unidades.md](unidades.md#implantação-desta-mudança). Em resumo:
+
+1. **Banco:** `sql/criar_tabelas_unidades.sql`. Os fluxos atuais seguem funcionando com Salvador (`DEFAULT 1`).
+2. **n8n, Variables:** `CNN_CID_ZARNS_SALVADOR` e `CNN_CID_ZARNS_POUSO_ALEGRE`.
+3. **n8n:** colar todos os workflows; criar o subfluxo **Bloqueio por unidade** e escolhê-lo no nó `bloquear unidade` do Bloqueio.
+4. **Painel:** commit e push. Todos entram de novo (o token antigo não tem as unidades).
+5. **Usuários:** conferir as unidades de cada pessoa na tela Usuários.
+
+Faça os passos 3 e 4 juntos e fora das 01:00 e 02:00: no meio do caminho, o painel antigo não manda a unidade e recebe "Unidade inválida".
 
 ## Implantação das solicitações e da liberação automática (outubro de 2026)
 
@@ -23,12 +35,12 @@ Para um ambiente que já tem o painel funcionando. **A ordem importa:** o banco 
 
 1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) e o `GRANT` do comentário no fim. O resultado final lista `CtlCnnSolicitacao` e o tamanho da coluna `IdSolicitacao` na auditoria (8 bytes).
 2. **n8n, workflow novo:** importe [workflows/cnn-painel-solicitacoes.json](../workflows/cnn-painel-solicitacoes.json).
-   - Confira a credencial Header Auth no `Webhook` e `TST Araguari` no `Executar`.
+   - Confira a credencial Header Auth no `Webhook` e `TST Araguari - Integracao` no `Executar`.
    - Em **Settings**: "Save successful executions = Do not save" e o Error workflow.
    - **Publique** e copie a Production URL.
 3. **n8n, workflows que mudaram:** cole de novo **Ações**, **Leitura** e **Bloqueio** (ver "Lógica de um workflow"). Sem isso, liberar antes do prazo continua sem exigir solicitação, e a lista não mostra as solicitações.
 4. **n8n, liberação automática:** importe [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json).
-   - Credenciais `API CNN AUTH` (HTTP) e `TST Araguari` (SQL); Error workflow; salvar todas as execuções.
+   - Credenciais `API CNN AUTH` (HTTP) e `TST Araguari - Integracao` (SQL); Error workflow; salvar todas as execuções.
    - **Antes de ativar:** veja no painel quem está **Apto a liberar**. Esses pacientes serão liberados na primeira execução (02:00). Se quiser, rode uma vez pelo editor, de dia, para acompanhar.
    - Ative.
    - Se o workflow antigo de liberação ainda existir no n8n, apague-o.
@@ -56,11 +68,11 @@ flowchart TD
     G --> H["8. Corte da liberação automática"]
 ```
 
-1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql). O resultado final lista `CtlCnnAcaoPaciente` e `CtlCnnControlePaciente`. Dê ao usuário da credencial `TST Araguari` as permissões do comentário no fim do script. **Não** rode a carga inicial ainda.
+1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql). O resultado final lista `CtlCnnAcaoPaciente` e `CtlCnnControlePaciente`. Dê ao usuário da credencial `TST Araguari - Integracao` as permissões do comentário no fim do script. **Não** rode a carga inicial ainda.
 2. **n8n.**
    - Crie uma credencial **Header Auth**: nome `X-Monitor-Key`, valor = um segredo novo e longo (não reaproveite o do monitoramento).
    - Importe [workflows/cnn-painel-leitura.json](../workflows/cnn-painel-leitura.json) e [workflows/cnn-painel-acoes.json](../workflows/cnn-painel-acoes.json).
-   - Em cada um: no nó `Webhook`, escolha a credencial Header Auth; confira `API CNN AUTH` nos nós HTTP e `TST Araguari` nos nós SQL; em **Settings**, escolha o **Error workflow** (Error Handler do monitoramento). A Leitura já vem com "Save successful executions = Do not save" e as Ações com "salvar todas"; confira.
+   - Em cada um: no nó `Webhook`, escolha a credencial Header Auth; confira `API CNN AUTH` nos nós HTTP e `TST Araguari - Integracao` nos nós SQL; em **Settings**, escolha o **Error workflow** (Error Handler do monitoramento). A Leitura já vem com "Save successful executions = Do not save" e as Ações com "salvar todas"; confira.
    - Copie a **Production URL** de cada webhook.
 3. **Ative a Leitura.** Sem isso a URL de produção responde 404.
 4. **Vercel.**
@@ -85,7 +97,7 @@ Enquanto a carga inicial não roda, o painel mostra um aviso: quem tem prazo ven
 
 ## Instalação do zero (banco vazio)
 
-Siga o [checklist](#checklist-de-implantação-estado-atual). Credenciais: `API CNN AUTH` (HTTP Basic Auth) e `TST Araguari` (Microsoft SQL, com `SELECT`, `INSERT` e `UPDATE` nas tabelas do sistema e `DELETE` em `CtlCnnFaltaProcedimento`). O fuso da instância n8n precisa ser `America/Sao_Paulo`. A carga inicial é opcional.
+Siga o [checklist](#checklist-de-implantação-estado-atual). Credenciais: `API CNN AUTH` (HTTP Basic Auth) e `TST Araguari - Integracao` (Microsoft SQL, com `SELECT`, `INSERT` e `UPDATE` nas tabelas do sistema e `DELETE` em `CtlCnnFaltaProcedimento`). O fuso da instância n8n precisa ser `America/Sao_Paulo`. A carga inicial é opcional.
 
 ## Usuários do painel
 
@@ -93,9 +105,9 @@ Cada pessoa tem o próprio usuário, com um perfil: **Leitor** (vê e abre solic
 
 ### Implantação (uma vez)
 
-1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) e dê ao usuário da credencial `TST Araguari` as permissões do comentário no fim do script.
+1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) e dê ao usuário da credencial `TST Araguari - Integracao` as permissões do comentário no fim do script.
 2. **Primeiro admin.** Na sua máquina, no repositório: `npm run admin`. O comando imprime uma **senha aleatória** e um `INSERT` (login `admin`). Rode o `INSERT` no SSMS e guarde a senha: ela não fica gravada em lugar nenhum. Para outro login: `npm run admin -- maria.souza "Maria Souza"`.
-3. **n8n.** Importe [workflows/cnn-painel-usuarios.json](../workflows/cnn-painel-usuarios.json). No `Webhook`, escolha a credencial Header Auth (a mesma das outras); no `Executar`, `TST Araguari`; em **Settings**, confira "Save successful executions = Do not save" e o Error workflow. **Ative** e copie a Production URL.
+3. **n8n.** Importe [workflows/cnn-painel-usuarios.json](../workflows/cnn-painel-usuarios.json). No `Webhook`, escolha a credencial Header Auth (a mesma das outras); no `Executar`, `TST Araguari - Integracao`; em **Settings**, confira "Save successful executions = Do not save" e o Error workflow. **Ative** e copie a Production URL.
 4. **Vercel.** Crie `SESSION_SECRET` (gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) e `N8N_USUARIOS_URL` em Production (e em Preview, se quiser testar lá). Apague `DASHBOARD_USERS`. **Redeploy.**
 5. Entre como `admin` com a senha do passo 2. O painel pede uma senha nova. Depois, crie os usuários pela tela **Usuários**.
 
@@ -166,13 +178,18 @@ Nunca deixe duas cópias de um workflow ativas: o PATCH sai em dobro.
 | "Muitas tentativas erradas" | 5 senhas erradas seguidas | Espere 15 minutos ou peça a um admin para redefinir a senha |
 | "Seu acesso mudou desde o login. Entre de novo." | O admin mudou o perfil, desativou ou redefiniu a senha depois do login | Entre de novo |
 | "Seu perfil não permite esta ação." | Leitor tentando agir, ou não-admin na tela Usuários | Peça a um admin para mudar o perfil |
+| "Seu usuário não tem nenhuma unidade liberada" | Leitor ou Editor sem unidade marcada | Um admin marca a unidade na tela Usuários |
+| "Você não tem acesso a esta unidade" | O admin tirou a unidade da pessoa | Entre de novo e escolha uma unidade liberada |
+| "CID da unidade … não configurado no n8n" | Falta a variável `CNN_CID_<código>` nas Variables do n8n (nome diferente, ou Variables de outro projeto) | Crie a variável com o nome exato na aba Variables do projeto dos workflows ([unidades.md](unidades.md)) |
+| Bloqueio rodou numa unidade e não na outra | O subfluxo de uma unidade falhou (veja a execução dele) | O nó `bloquear unidade` mostra o erro de cada unidade; a outra seguiu normalmente |
+| Bloqueio das 01:00 não faz nada (nem erro) | O nó `bloquear unidade` está sem o subfluxo escolhido, ou nenhuma unidade com `Ativa = 1` | Escolha o workflow do subfluxo no nó; confira `dbo.CtlCnnUnidade` |
 | Paciente liberado no painel voltou a ser bloqueado | Falta nova no ciclo (a vigente mudou) | Comportamento esperado. Veja o detalhe: a falta vigente é outra |
 | Paciente reativado **direto no CNN** volta a ser bloqueado | O bloqueio das 01:00 bloqueia todo paciente com falta no período que esteja ativo e não tenha sido liberado pelo painel | Libere pelo painel |
 | "Apto a liberar" para quem já está ativo no CNN | Carga inicial não rodou, ou liberação feita direto no CNN | O detalhe mostra o status ao vivo. Liberar responde 409 sem mexer em nada |
 | Falta desfeita no CNN continua contando | A linha nunca é apagada | Apague a linha do `IdAgenda` em `CtlCnnFaltaPaciente`. A próxima execução renumera |
 | Ação com aviso "não foi gravada na auditoria" | O PATCH deu certo e o SQL de auditoria falhou | Registre à mão a partir da execução do n8n (o painel mostra o número) |
 | Bloquear pelo painel muito lento | A API ignorou `codigoPaciente` e trouxe a agenda inteira | Ver [fluxos/acoes.md](fluxos/acoes.md#limites-e-tempo) |
-| Bloqueio termina "sem faltas", mas havia faltas | `GET agenda do ciclo` falhou (credencial, `clinicaNasNuvens-cid`, API fora) | Abra a saída do nó, corrija e execute de novo pelo editor |
+| Bloqueio termina "sem faltas", mas havia faltas | `GET agenda do ciclo` falhou (credencial, CID da unidade, API fora) | Abra a saída do nó, corrija e execute de novo pelo editor |
 | Cron dispara em horário errado | Fuso do n8n diferente de `America/Sao_Paulo` | Ajuste o fuso da instância |
 | `NomePaciente` vazio | O GET do paciente daquele dia falhou | A execução seguinte completa sozinha |
 | Profissional, tipo de consulta ou rótulo sem nome (aparece "Código …") | A lista de cadastro falhou ou o item é novo | A execução seguinte atualiza `CtlCnnCadastro`. Veja a tela Configuração → Cadastros do CNN |

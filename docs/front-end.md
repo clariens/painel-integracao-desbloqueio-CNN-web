@@ -172,9 +172,20 @@ Vale para Pacientes (diálogo de ação e liberação por solicitação), Solici
 
 O botão **Entrar** do login tem um brilho que passa pelo texto e uma seta que desliza no hover. Entrando, mostra "Entrando" com três pontinhos piscando e o spinner. Com `prefers-reduced-motion`, nada se mexe.
 
+## Unidade escolhida
+
+Tudo o que as telas mostram é da **unidade escolhida** (Salvador ou Pouso Alegre). Ver [unidades.md](unidades.md).
+
+- **Escolha ao entrar:** quem tem mais de uma unidade vê **"Em qual unidade você vai trabalhar?"** logo depois do login (ou depois da troca obrigatória de senha), **antes** da tela "Preparando os dados…". Sem Cancelar e sem Esc. Quem tem uma unidade só entra direto.
+- **Onde aparece:** um chip com a unidade no topo da tela, ao lado do botão do menu (com mais de uma unidade, clicar nele abre a troca), e a linha **Unidade** no menu lateral, com **Trocar**.
+- **Trocar:** abre a mesma escolha, com Cancelar e a unidade atual marcada. Unidade ainda não vista na aba prepara as telas de novo; unidade já vista abre na hora, com o cache dela.
+- **Na API:** `request()` ([js/session.js](../js/session.js)) manda `X-Unidade: <IdUnidade>` em toda chamada. A unidade escolhida fica em `clariens.cnn.unidade` (`sessionStorage`). Sem unidade, a API responde `UNIDADE_OBRIGATORIA` e a página abre a escolha.
+- **Código:** `garantirUnidade`, `escolherUnidade`, `atualizarUnidade` e `trocarDeUnidade` em [js/pagina.js](../js/pagina.js). O diálogo e as linhas da unidade são montados pelo JS, sem repetir nas 7 páginas.
+- **Login antigo** (de antes da multiunidade, sem a lista de unidades): a aba pede o login de novo.
+
 ## Cache e filtros
 
-Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no prazo. Tudo fica no `sessionStorage`: some ao fechar a aba, e o login, o 401 e o Sair limpam. Funções em `js/session.js`: `comCache` ("cache primeiro"), `prefetchCache`, `clearCache`, `clearCaches(prefixo)`, `lerFiltros`/`salvarFiltros`.
+Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no prazo. Tudo fica no `sessionStorage`: some ao fechar a aba, e o login, o 401 e o Sair limpam. **Cada unidade tem o seu cache:** as chaves ficam em `clariens.cnn.cache:u<IdUnidade>:<chave>` (ex.: `clariens.cnn.cache:u2:pacientes`), e as chaves da tabela abaixo são as que vêm depois do prefixo. Funções em `js/session.js`: `comCache` ("cache primeiro"), `prefetchCache`, `clearCache`, `clearCaches(prefixo)`, `lerFiltros`/`salvarFiltros`.
 
 | Tela | Chave | Prazo |
 |---|---|---|
@@ -197,7 +208,7 @@ Trocar de tela não chama a API (nem o n8n) enquanto o dado da aba estiver no pr
 ## Login e perfis
 
 - Cada pessoa tem um usuário próprio, guardado no banco. Ver [operacao.md](operacao.md#usuários-do-painel).
-- O login chama `POST /api/sessao` e recebe um token assinado (8 h). A aba guarda o token e `{ login, nome, perfil }` no `sessionStorage`; a senha não fica guardada. Fechou a aba, o login some. **Sair** limpa a sessão e o cache.
+- O login chama `POST /api/sessao` e recebe um token assinado (8 h), com as unidades da pessoa. A aba guarda o token e `{ login, nome, perfil, unidades }` no `sessionStorage`; a senha não fica guardada. Fechou a aba, o login some. **Sair** limpa a sessão e o cache.
 - Com senha temporária, o painel abre **Trocar senha** logo depois do login e não deixa fechar. **Trocar senha** também fica no menu, para qualquer um. A senha nova precisa ter pelo menos 6 caracteres, um número e um caractere especial.
 - 5 senhas erradas seguidas bloqueiam o login daquele usuário por 15 minutos.
 - O perfil é marcado no `<html data-perfil>` antes da pintura: o **Leitor** vê só **Solicitar desbloqueio** (não vê Liberar, Bloquear nem Registrar); só o **Admin** vê Aprovar, Recusar e o menu Usuários. Quem decide é a API (403 `SEM_PERMISSAO`).

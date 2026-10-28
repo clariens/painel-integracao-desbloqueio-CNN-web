@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
   json(res, 200, {
     token: assinarSessao({ ...usuario, trocarSenha: false, versaoSessao: troca.data.versaoSessao }),
-    usuario: { login: usuario.login, nome: usuario.nome, perfil: usuario.perfil },
+    usuario: { login: usuario.login, nome: usuario.nome, perfil: usuario.perfil, unidades: usuario.unidades || [] },
     trocarSenha: false,
   });
 }

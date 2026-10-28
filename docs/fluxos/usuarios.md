@@ -48,6 +48,14 @@ flowchart LR
 
 Escritas rodam em transação (`XACT_ABORT`) e devolvem uma linha `Resultado`. A guarda do último admin fica no SQL: ninguém consegue rebaixar ou desativar o único `ADMIN` ativo, nem chamando o webhook direto.
 
+## Unidades do usuário
+
+- `login-buscar` e `sessao` devolvem `unidades: [{ id, codigo, nome }]`. O Admin recebe **todas as ativas**; Leitor e Editor, as de `dbo.CtlCnnUsuarioUnidade`.
+- `listar` devolve as unidades de cada pessoa (`unidades: [ids]`) e o catálogo (`unidades` na raiz), para a tela marcar.
+- `criar` exige ao menos uma unidade para Leitor e Editor (`unidades: [ids]`); o Admin não precisa.
+- `alterar` aceita `unidades` (troca todas). Se mudou, grava o evento `UNIDADES_ALTERADAS` e sobe a `VersaoSessao`. Quem não é Admin não pode ficar sem unidade (`SEM_UNIDADE`, 409); unidade inexistente ou desativada responde `UNIDADE_INVALIDA` (400).
+- Login de Leitor ou Editor sem nenhuma unidade é recusado pela Vercel (403 `SEM_UNIDADE`).
+
 ## Sessão e `VersaoSessao`
 
 - O login devolve um token assinado pela Vercel (`SESSION_SECRET`), com login, perfil e a `VersaoSessao` do momento. Ele vale por 8 horas.

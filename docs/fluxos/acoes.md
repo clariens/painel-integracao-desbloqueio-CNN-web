@@ -11,6 +11,10 @@ Executa as duas ações do painel sobre **um** paciente:
 
 Antes do PATCH confere banco e CNN; depois grava a auditoria **sempre** e a tabela de controle **só se o CNN aceitou**.
 
+## Unidade
+
+Todo pedido chega com `idUnidade` e `codigoUnidade` (a Vercel conferiu que a pessoa tem acesso). O `Validar` recusa pedido sem unidade (400) e para antes do CNN se o CID da unidade não estiver configurado (500, "CID da unidade … não configurado"). Todo SQL filtra pela unidade e os nós HTTP usam `={{ $vars['CNN_CID_' + $('Validar').first().json.codigoUnidade] || $env[…] }}`. Paciente ou solicitação de outra unidade não é encontrado. Ver [unidades.md](../unidades.md).
+
 ## Quando roda
 
 Na Vercel, todas viram um webhook POST com Header Auth (`X-Monitor-Key`):

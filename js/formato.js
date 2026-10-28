@@ -71,6 +71,7 @@ export const EVENTO_USUARIO = {
   SENHA_TROCADA: "Senha trocada",
   LOGIN_FALHA: "Senha errada",
   LOGIN_BLOQUEADO: "Login bloqueado",
+  UNIDADES_ALTERADAS: "Unidades alteradas",
 };
 export const ORIGEM = { AUTOMATICO: "Automático", PAINEL: "Painel", CARGA_INICIAL: "Carga inicial" };
 

@@ -12,7 +12,8 @@ const bloqueado = (res, ate) => {
   json(res, 429, { error: `Muitas tentativas erradas. Tente de novo depois das ${horaSp(ate)}.`, codigo: "LOGIN_BLOQUEADO" });
 };
 
-// POST /api/sessao { usuario, senha } → { token, usuario: { login, nome, perfil }, trocarSenha }.
+// POST /api/sessao { usuario, senha } → { token, usuario: { login, nome, perfil, unidades }, trocarSenha }.
+// unidades: [{ id, codigo, nome }] que a pessoa acessa (o admin, todas). O painel escolhe uma e manda em X-Unidade.
 // Erro sempre genérico: não diz se o login existe, está desativado ou se a senha é que está errada.
 export default async function handler(req, res) {
   if (!requireMethod(req, res, "POST")) return;
@@ -59,9 +60,15 @@ export default async function handler(req, res) {
     return;
   }
 
+  const unidades = Array.isArray(usuario.unidades) ? usuario.unidades : [];
+  if (!unidades.length) {
+    json(res, 403, { error: "Seu usuário não tem nenhuma unidade liberada. Fale com o administrador.", codigo: "SEM_UNIDADE" });
+    return;
+  }
+
   json(res, 200, {
     token: assinarSessao(usuario),
-    usuario: { login: usuario.login, nome: usuario.nome, perfil: usuario.perfil },
+    usuario: { login: usuario.login, nome: usuario.nome, perfil: usuario.perfil, unidades },
     trocarSenha: usuario.trocarSenha,
   });
 }

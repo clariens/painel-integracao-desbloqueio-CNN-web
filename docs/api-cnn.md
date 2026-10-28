@@ -19,13 +19,14 @@ Voltar ao [índice](README.md). Referência: [apidocs.json](../apidocs.json) (Sw
 ## Autenticação
 
 - Basic auth pela credencial `API CNN AUTH` do n8n (`genericAuthType: httpBasicAuth`). Usuário e senha ficam só no n8n.
-- Header `clinicaNasNuvens-cid` em toda requisição. Identifica a clínica. O Swagger declara esse header em todos os endpoints.
-- O valor do header está escrito em cada nó HTTP. Não copie para documentos.
+- Header `clinicaNasNuvens-cid` em toda requisição. Identifica a clínica (a **unidade**). O Swagger declara esse header em todos os endpoints.
+- O valor fica nas **Variables** do n8n, `CNN_CID_<código da unidade>` (ex.: `CNN_CID_ZARNS_SALVADOR`). Cada nó HTTP lê com uma expressão, por exemplo `={{ $vars['CNN_CID_' + $('Validar').first().json.codigoUnidade] || $env['CNN_CID_' + $('Validar').first().json.codigoUnidade] }}` (a variável de ambiente do servidor com o mesmo nome é a alternativa). Não copie o valor para documentos. Ver [unidades.md](unidades.md#o-cid-de-cada-unidade-variables-do-n8n).
+- O usuário e a senha (`API CNN AUTH`) são os mesmos para todas as unidades; só o CID muda.
 
 ```mermaid
 flowchart LR
     N["Nó HTTP Request"] -->|"Authorization: Basic (API CNN AUTH)"| A["api.clinicanasnuvens.com.br"]
-    N -->|"clinicaNasNuvens-cid"| A
+    N -->|"clinicaNasNuvens-cid<br/>(CNN_CID_ da unidade)"| A
     A -->|"200 JSON"| N
     A -->|"401 / 403 / 404"| E["item de erro<br/>(onError: continueRegularOutput)"]
 ```

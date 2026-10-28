@@ -4,6 +4,7 @@
 const validar = $('Validar').first().json;
 const id = sqlN(validar.id);
 const inicio = sqlDate(validar.inicioCiclo);
+const unidade = sqlN(validar.idUnidade);
 
 // Liberação a partir de uma solicitação: traz a solicitação junto (decidir confere paciente, falta e status).
 const colunasSolicitacao = validar.idSolicitacao
@@ -18,7 +19,8 @@ const colunasSolicitacao = validar.idSolicitacao
 const juntaSolicitacao = validar.idSolicitacao
   ? `
 LEFT JOIN dbo.CtlCnnSolicitacao s
-    ON s.Id = ${sqlN(validar.idSolicitacao)}`
+    ON s.Id = ${sqlN(validar.idSolicitacao)}
+   AND s.IdUnidade = ${unidade}`
   : '';
 
 const query = `USE INTEGRACAO;
@@ -31,15 +33,16 @@ SELECT
     CONVERT(char(10), v.DataFalta, 23) AS DataFalta,
     v.NumeroFalta,
     CAST(CASE WHEN v.DataFalta >= ${inicio} THEN 1 ELSE 0 END AS bit) AS VigenteNoCiclo,
-    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdPaciente = ${id} AND DataFalta >= ${inicio}) AS FaltasCiclo,
-    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdPaciente = ${id}) AS FaltasTotal,
+    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = ${unidade} AND IdPaciente = ${id} AND DataFalta >= ${inicio}) AS FaltasCiclo,
+    (SELECT COUNT(*) FROM dbo.CtlCnnFaltaPaciente WHERE IdUnidade = ${unidade} AND IdPaciente = ${id}) AS FaltasTotal,
     c.Situacao,
     c.IdAgendaReferencia${colunasSolicitacao}
 FROM (SELECT 1 AS base) b
 OUTER APPLY (
     SELECT TOP (1) f.IdAgenda, f.NomePaciente, f.DataFalta, f.NumeroFalta
     FROM dbo.CtlCnnFaltaPaciente f
-    WHERE f.IdPaciente = ${id}
+    WHERE f.IdUnidade = ${unidade}
+      AND f.IdPaciente = ${id}
     ORDER BY
         CASE WHEN f.DataFalta >= ${inicio} THEN 0 ELSE 1 END,
         f.NumeroFalta DESC,
@@ -47,6 +50,7 @@ OUTER APPLY (
         f.IdAgenda DESC
 ) v
 LEFT JOIN dbo.CtlCnnControlePaciente c
-    ON c.IdPaciente = ${id}${juntaSolicitacao};`;
+    ON c.IdUnidade = ${unidade}
+   AND c.IdPaciente = ${id}${juntaSolicitacao};`;
 
 return [{ json: { query } }];

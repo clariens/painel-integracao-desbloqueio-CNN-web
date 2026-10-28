@@ -120,7 +120,7 @@ BEGIN
 END;
 
 /*
-  Permissões do login usado pela credencial "TST Araguari" no n8n (troque o nome do usuário do banco):
+  Permissões do login usado pela credencial "TST Araguari - Integracao" no n8n (troque o nome do usuário do banco):
 
   GRANT SELECT, INSERT, UPDATE ON dbo.CtlCnnControlePaciente TO [usuario_n8n];
   GRANT SELECT, INSERT ON dbo.CtlCnnAcaoPaciente TO [usuario_n8n];

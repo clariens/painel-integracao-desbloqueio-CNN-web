@@ -14,6 +14,7 @@ const resposta = alvo.apenasRegistrar
   : lerRespostaHttp($input.first().json);
 
 const query = sqlRegistrarAcao({
+  idUnidade: unidadeAtual().idUnidade,
   idPaciente: alvo.idPaciente,
   nomePaciente: alvo.nomePaciente,
   acao: 'BLOQUEIO',

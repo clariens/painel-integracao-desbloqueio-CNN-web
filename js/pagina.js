@@ -1,6 +1,21 @@
 // Partes comuns de todas as páginas: login, usuário no menu, relógio, barra de status, erro da API e aviso rápido.
 import { PERFIL, escapeHtml, hojeSp, inicioCiclo } from "./formato.js";
-import { clearAuth, clearCaches, comCache, getAuth, getUsuario, pode, readCache, request, setAuth, temCache, writeCache } from "./session.js";
+import {
+  clearAuth,
+  clearCaches,
+  comCache,
+  getAuth,
+  getUnidade,
+  getUsuario,
+  pode,
+  readCache,
+  request,
+  setAuth,
+  setUnidade,
+  temCache,
+  unidadesDoUsuario,
+  writeCache,
+} from "./session.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -118,6 +133,127 @@ const atualizarUsuario = () => {
   const usuario = getUsuario();
   if (els.usuario) els.usuario.textContent = usuario?.nome || usuario?.login || "—";
   if (els.perfil) els.perfil.textContent = PERFIL[usuario?.perfil] || "";
+  atualizarUnidade();
+};
+
+// ---------- unidade ----------
+// Tudo o que aparece é da unidade escolhida. Quem tem mais de uma escolhe logo depois do login, antes de qualquer
+// dado carregar, e pode trocar pelo menu (Trocar). Quem tem uma só nem vê a escolha.
+let trocarDeUnidade = null;
+
+// "Clínica Escola Zarns Salvador" → "Zarns Salvador" (o chip da barra de cima tem pouco espaço).
+const nomeCurto = (nome) => String(nome || "").replace(/^Clínica Escola\s+/i, "");
+
+// A unidade atual no menu lateral, junto do usuário, e num chip na barra de cima (que aparece também no celular,
+// com o menu fechado). Montados aqui para não repetir nas 7 páginas.
+const atualizarUnidade = () => {
+  const unidade = getUnidade();
+  const varias = unidadesDoUsuario().length > 1;
+
+  const barra = $(".statusbar__left");
+  if (barra) {
+    $("#unidade-barra")?.remove();
+    if (unidade) {
+      const chip = document.createElement(varias ? "button" : "span");
+      chip.id = "unidade-barra";
+      chip.className = "statusbar__unidade";
+      chip.textContent = nomeCurto(unidade.nome);
+      chip.title = varias ? `Unidade: ${unidade.nome}. Clique para trocar.` : `Unidade: ${unidade.nome}`;
+      if (varias) {
+        chip.type = "button";
+        chip.addEventListener("click", () => void trocarDeUnidade?.());
+      }
+      barra.querySelector(".nav-toggle")?.after(chip);
+    }
+  }
+
+  const caixa = $(".sidebar__user");
+  if (!caixa) return;
+  let linha = $("#unidade-atual");
+  if (!linha) {
+    linha = document.createElement("p");
+    linha.id = "unidade-atual";
+    linha.className = "sidebar__unidade";
+    caixa.prepend(linha);
+  }
+  linha.hidden = !unidade;
+  linha.innerHTML = unidade
+    ? `<span class="sidebar__unidade-rotulo">Unidade</span> <strong>${escapeHtml(unidade.nome)}</strong>${
+        varias ? ' <button type="button" id="trocar-unidade">Trocar</button>' : ""
+      }`
+    : "";
+  $("#trocar-unidade")?.addEventListener("click", () => void trocarDeUnidade?.());
+};
+
+const dialogoUnidade = () => {
+  let dialogo = $("#unidade");
+  if (dialogo) return dialogo;
+  dialogo = document.createElement("dialog");
+  dialogo.className = "modal";
+  dialogo.id = "unidade";
+  dialogo.setAttribute("aria-labelledby", "unidade-titulo");
+  dialogo.innerHTML = `
+    <form class="modal__form" method="dialog">
+      <p class="modal__kicker">Unidade</p>
+      <h2 id="unidade-titulo">Em qual unidade você vai trabalhar?</h2>
+      <p class="modal__contexto">Pacientes, solicitações, dashboard e relatórios mostram só a unidade escolhida. Dá para trocar depois pelo menu.</p>
+      <ul class="escolha escolha--unidade" id="unidade-lista"></ul>
+      <div class="modal__acoes"><button class="btn" type="button" id="unidade-cancelar">Cancelar</button></div>
+    </form>`;
+  document.body.append(dialogo);
+  return dialogo;
+};
+
+/**
+ * Abre a escolha de unidade e devolve a unidade escolhida (ou null se cancelou).
+ * obrigatoria: sem Cancelar e sem Esc (ainda não há unidade nesta aba).
+ */
+const escolherUnidade = ({ obrigatoria }) =>
+  new Promise((resolve) => {
+    const dialogo = dialogoUnidade();
+    const atual = getUnidade();
+    const lista = dialogo.querySelector("#unidade-lista");
+    const cancelar = dialogo.querySelector("#unidade-cancelar");
+    lista.innerHTML = unidadesDoUsuario()
+      .map(
+        (u) => `<li><button type="button" data-unidade="${Number(u.id)}" aria-selected="${Number(u.id) === atual?.id}">
+          <span>${escapeHtml(u.nome)}</span>${Number(u.id) === atual?.id ? '<span class="sub">Unidade atual</span>' : ""}
+        </button></li>`,
+      )
+      .join("");
+    cancelar.hidden = obrigatoria;
+
+    const fechar = (unidade) => {
+      dialogo.removeEventListener("cancel", aoCancelar);
+      lista.onclick = null;
+      cancelar.onclick = null;
+      if (dialogo.open) dialogo.close();
+      resolve(unidade);
+    };
+    const aoCancelar = (event) => {
+      event.preventDefault();
+      if (!obrigatoria) fechar(null);
+    };
+    dialogo.addEventListener("cancel", aoCancelar);
+    cancelar.onclick = () => fechar(null);
+    lista.onclick = (event) => {
+      const botao = event.target.closest("button[data-unidade]");
+      if (!botao) return;
+      const unidade = unidadesDoUsuario().find((u) => Number(u.id) === Number(botao.dataset.unidade));
+      if (unidade) fechar(unidade);
+    };
+
+    if (!dialogo.open) dialogo.showModal();
+    lista.querySelector("button")?.focus();
+  });
+
+// Garante uma unidade escolhida antes de carregar dados. Com uma só, ela já vem escolhida (setAuth).
+const garantirUnidade = async () => {
+  if (getUnidade()) return getUnidade();
+  const unidade = await escolherUnidade({ obrigatoria: true });
+  setUnidade(unidade.id);
+  atualizarUnidade();
+  return unidade;
 };
 
 // Troca da própria senha. Obrigatória (sem Cancelar e sem Esc) quando a senha é temporária.
@@ -274,12 +410,24 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
     }
   };
 
-  // Prepara todas as telas e abre esta já com o dado guardado.
+  // Escolhe a unidade (se tiver mais de uma), prepara todas as telas e abre esta já com o dado guardado.
   const entrarComDados = async () => {
+    await garantirUnidade();
     await prepararDados();
     await executar(false).catch(() => {});
   };
   aposTrocarSenha = () => entrarComDados();
+
+  // Trocar de unidade pelo menu: o cache de cada unidade fica guardado; unidade ainda não vista prepara tudo.
+  trocarDeUnidade = async () => {
+    const unidade = await escolherUnidade({ obrigatoria: false });
+    if (!unidade || unidade.id === getUnidade()?.id) return;
+    setUnidade(unidade.id);
+    atualizarUnidade();
+    if (!temCache()) await prepararDados();
+    await executar(false).catch(() => {});
+    avisar(`Unidade: ${unidade.nome}.`);
+  };
 
   els.loginForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -370,6 +518,11 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
   els.trocarSenha?.addEventListener("click", () => abrirTrocaSenha(false));
   // A API respondeu TROCAR_SENHA (senha temporária ainda não trocada): abre a troca obrigatória.
   document.addEventListener("cnn:trocar-senha", () => abrirTrocaSenha(true));
+  // A API pediu a unidade (aba sem unidade escolhida): escolhe e carrega de novo.
+  document.addEventListener("cnn:escolher-unidade", () => {
+    if (getUnidade() || $("#unidade")?.open) return;
+    void entrarComDados();
+  });
 
   // Login fechado: o painel volta a aparecer (o CSS o esconde enquanto data-sessao="nao").
   els.login?.addEventListener("close", () => {
@@ -402,9 +555,15 @@ export const iniciarPagina = (carregar, { prazoMs } = {}) => {
     }, prazoMs);
   }
 
-  if (getAuth()) {
-    // Aba já logada mas sem nada guardado (ex.: recarregou depois de limpar): prepara tudo de uma vez.
-    const abrir = temCache() ? Promise.resolve() : prepararDados();
+  if (getAuth() && !unidadesDoUsuario().length) {
+    // Login de antes da multiunidade (sem a lista de unidades): entra de novo.
+    clearAuth();
+    clearCaches();
+    document.documentElement.dataset.sessao = "nao";
+    els.login.showModal();
+  } else if (getAuth()) {
+    // Aba já logada: sem unidade escolhida, escolhe; sem nada guardado da unidade, prepara tudo de uma vez.
+    const abrir = getUnidade() && temCache() ? Promise.resolve() : garantirUnidade().then(() => (temCache() ? null : prepararDados()));
     void abrir.then(() =>
       executar(false).catch(() => {
         if (!getAuth() && !els.login.open) els.login.showModal();

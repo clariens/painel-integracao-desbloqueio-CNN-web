@@ -27,10 +27,12 @@ flowchart TB
 
 | # | Trecho | Proteção | Onde está |
 |---|---|---|---|
-| 1 | Navegador → Vercel | HTTPS. Login com usuário e senha; depois, um token de sessão assinado (8 h) em cada chamada. Sem token válido, a resposta é 401. Sem o perfil exigido, 403 | [lib/auth.js](../lib/auth.js) |
+| 1 | Navegador → Vercel | HTTPS. Login com usuário e senha; depois, um token de sessão assinado (8 h) em cada chamada. Sem token válido, a resposta é 401. Sem o perfil exigido, 403. **Unidade:** cada chamada leva a unidade escolhida (`X-Unidade`), que tem que estar entre as da sessão; fora dela, 403 | [lib/auth.js](../lib/auth.js) |
 | 2 | Vercel → n8n | Cabeçalho `X-Monitor-Key`, conferido pela credencial **Header Auth** dos quatro webhooks. Sem a chave, o n8n recusa (403) | [lib/n8n.js](../lib/n8n.js), nós `Webhook` da [Leitura](fluxos/leitura.md), das [Ações](fluxos/acoes.md), dos [Usuários](fluxos/usuarios.md) e das [Solicitações](fluxos/solicitacoes.md) |
-| 3 | n8n → SQL Server | Credencial `TST Araguari`, só no n8n. O banco não tem porta aberta para a internet | Credenciais do n8n |
-| 4 | n8n → API do CNN | Credencial `API CNN AUTH` (Basic) e o cabeçalho `clinicaNasNuvens-cid` | Credenciais e nós HTTP do n8n |
+| 3 | n8n → SQL Server | Credencial `TST Araguari - Integracao`, só no n8n. O banco não tem porta aberta para a internet | Credenciais do n8n |
+| 4 | n8n → API do CNN | Credencial `API CNN AUTH` (Basic) e o cabeçalho `clinicaNasNuvens-cid` da unidade, lido da variável `CNN_CID_<código>` das Variables do n8n | Credenciais e Variables do n8n |
+
+**Isolamento entre unidades.** Além da conferência na Vercel, todo SQL dos workflows leva `IdUnidade = @unidade`: um id de paciente ou de solicitação de outra unidade não é encontrado (404), mesmo que alguém chame o webhook com a chave. Detalhes em [unidades.md](unidades.md#como-a-unidade-é-protegida).
 
 O bloqueio das 01:00 e a liberação das 02:00 não têm porta de entrada: são disparados pelo relógio do próprio n8n.
 
@@ -73,9 +75,9 @@ sequenceDiagram
 | `SESSION_SECRET` | Assinar os tokens de sessão | Variável da Vercel; `.env.local` no desenvolvimento | Só quem administra a Vercel |
 | `N8N_WEBHOOK_SECRET` | Chave enviada no `X-Monitor-Key` | Variável da Vercel **e** Value da credencial Header Auth no n8n (os dois iguais) | Só quem administra a Vercel e o n8n |
 | `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_SOLICITACOES_URL` | Endereço dos webhooks | Variáveis da Vercel | Só quem administra a Vercel |
-| Credencial SQL (`TST Araguari`) | Ler e gravar no banco | Credenciais do n8n | Só quem administra o n8n |
+| Credencial SQL (`TST Araguari - Integracao`) | Ler e gravar no banco | Credenciais do n8n | Só quem administra o n8n |
 | Credencial `API CNN AUTH` | Chamar a API do CNN | Credenciais do n8n | Só quem administra o n8n |
-| `clinicaNasNuvens-cid` | Identifica a clínica na API do CNN | Escrito nos nós HTTP e, por isso, nos JSON de `workflows/` | Quem tem acesso ao repositório |
+| CID de cada unidade (`clinicaNasNuvens-cid`) | Identifica a clínica na API do CNN | Variables do n8n: `CNN_CID_ZARNS_SALVADOR`, `CNN_CID_ZARNS_POUSO_ALEGRE`. Não fica nos fluxos nem no Git (o `npm run check` recusa CID escrito no nó) | Quem tem acesso ao projeto no n8n |
 | Senhas dos usuários | Login no painel | Só salt e hash no `dbo.CtlCnnUsuario` | Ninguém (nem o admin vê a senha) |
 
 Nenhum segredo vai para o Git: o `.gitignore` cobre `.env` e `.env.local`, e o [.env.example](../.env.example) lista só os nomes. Nenhum vai para o navegador.
@@ -214,10 +216,10 @@ Para um painel interno, o nível atual é bom. Estes são os pontos a melhorar, 
 | Risco | Por que importa | O que fazer |
 |---|---|---|
 | **Histórico do n8n com dados de paciente** | As Ações salvam todas as execuções, de propósito (a auditoria aponta para o número da execução). O Bloqueio usa o padrão da instância, que normalmente também salva. Ali aparecem nome, CPF e contato do paciente que veio do CNN. Quem tem acesso ao n8n vê tudo. É dado de saúde (LGPD) | Restringir quem acessa o n8n; definir por quanto tempo o n8n guarda execuções (*pruning*) |
-| **Usuário de banco com permissão ampla** | `TST Araguari` provavelmente alcança muito mais que as 7 tabelas do sistema | Usuário próprio do sistema, só com `SELECT/INSERT/UPDATE` nas tabelas `CtlCnn*` e `DELETE` só em `CtlCnnFaltaProcedimento` |
+| **Usuário de banco com permissão ampla** | `TST Araguari - Integracao` provavelmente alcança muito mais que as 7 tabelas do sistema | Usuário próprio do sistema, só com `SELECT/INSERT/UPDATE` nas tabelas `CtlCnn*` e `DELETE` só em `CtlCnnFaltaProcedimento` |
 | **Leitura até 8 h depois de desativado** | As leituras confiam no token até ele expirar. Quem foi desativado ainda consegue **ver** a lista por até 8 horas (mas não libera, não bloqueia e não entra de novo) | Se for urgente, trocar o `SESSION_SECRET` (desloga todos). Depois: conferir o banco também nas leituras, ou encurtar o token |
 | **Sem limite de chamadas por IP** | O login trava por usuário, mas alguém pode testar muitos usuários diferentes; e quem tem login pode chamar a API em loop, gerando execuções no n8n | Limite por IP no Vercel Firewall |
-| **`clinicaNasNuvens-cid` no repositório** | Está escrito nos JSON dos workflows. Sozinho não dá acesso (a API exige também a credencial), mas ajuda quem tentar | Manter o repositório privado e interno; se possível, mover para uma credencial do n8n |
+| **CID de Salvador no histórico do Git** | Saiu dos JSON (agora fica nas Variables do n8n), mas continua nos commits antigos. Sozinho não dá acesso (a API exige também a credencial) | Manter o repositório privado e interno; se a TI quiser, pedir um CID novo ao CNN |
 | **SQL montado como texto** | O escape funciona, mas consulta parametrizada é mais robusta | Migrar para parâmetros quando mexer nesses nós |
 | **n8n na internet** | A instância do n8n é pública; o login e as contas do próprio n8n também protegem os dados | Senhas fortes e 2FA nas contas do n8n; revisar periodicamente quem tem acesso |
 | **Token na aba** | Fica no `sessionStorage` enquanto a aba está aberta; um script malicioso na página poderia lê-lo (não a senha) | Só scripts servidos pelo próprio site rodam na página. A única biblioteca de terceiros, o Chart.js do Dashboard, fica copiada no repositório (`js/vendor/`, versão fixa), não vem de CDN. Próximo passo: uma `Content-Security-Policy` |
@@ -229,7 +231,8 @@ Revise esta lista quando alguém entrar ou sair da equipe:
 - **Painel:** a lista da tela **Usuários** (só admin vê). Desative quem saiu.
 - **Vercel:** quem vê e muda as variáveis (segredos e URLs) e faz deploy.
 - **n8n:** quem edita os workflows e as credenciais (banco, CNN, `X-Monitor-Key`) e quem vê o histórico de execuções, que tem dados de pacientes.
-- **Repositório no GitHub:** quem muda o código. Não há senha no repositório, mas há o `clinicaNasNuvens-cid`, e uma mudança de código chega à produção com um deploy.
+- **Repositório no GitHub:** quem muda o código. Não há senha nem CID nos arquivos atuais (o CID de Salvador ficou no histórico), e uma mudança de código chega à produção com um deploy.
+- **Variables do n8n:** quem vê e muda os CIDs das unidades (quem tem acesso ao projeto).
 - **SQL Server:** quem administra o banco `INTEGRACAO`.
 
 Regras de negócio sobre usuários e LGPD: [regras.md](regras.md).
