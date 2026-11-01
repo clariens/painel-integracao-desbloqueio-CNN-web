@@ -12,7 +12,7 @@ Além do painel, há dois workflows agendados: o bloqueio das 01:00 e a liberaç
 
 ## Onde cada peça está
 
-**Unidades.** Tudo abaixo vale para cada unidade (Salvador e Pouso Alegre): o navegador manda a unidade escolhida em `X-Unidade`, a Vercel confere se ela está na sessão e repassa `idUnidade` e `codigoUnidade` ao n8n, e o n8n filtra o SQL e escolhe o CID do CNN por ela. O bloqueio das 01:00 roda um subfluxo por unidade. Detalhes em [unidades.md](unidades.md).
+**Unidades.** Tudo abaixo vale para cada unidade ativa em `dbo.CtlCnnUnidade` (hoje Salvador, Pouso Alegre e José Gomes da Rocha): o navegador manda a unidade escolhida em `X-Unidade`, a Vercel confere se ela está na sessão e repassa `idUnidade` e `codigoUnidade` ao n8n, e o n8n filtra o SQL e escolhe o CID do CNN por ela. O bloqueio das 01:00 roda um subfluxo por unidade. Detalhes em [unidades.md](unidades.md).
 
 | Peça | Onde roda | No repositório |
 |---|---|---|

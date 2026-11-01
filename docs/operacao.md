@@ -10,19 +10,28 @@ Para subir tudo do zero ou conferir um ambiente. Cada item tem o detalhe nas se�
 |---|---|---|
 | 1 | SSMS | `sql/criar_tabelas_bloqueio.sql` (faltas, procedimentos, cadastros), `sql/criar_tabelas_painel.sql` (controle e auditoria), `sql/criar_tabelas_usuarios.sql` (usuários), `sql/criar_tabelas_solicitacoes.sql` (solicitações e `IdSolicitacao` na auditoria), **por último** `sql/criar_tabelas_unidades.sql` (unidades e `IdUnidade`), e os `GRANT` do fim de cada script |
 | 2 | Terminal + SSMS | `npm run admin` e o `INSERT` do primeiro admin; guardar a senha temporária |
-| 3 | n8n | Credenciais `API CNN AUTH`, `TST Araguari - Integracao` e Header Auth `X-Monitor-Key`; Variables `CNN_CID_ZARNS_SALVADOR` e `CNN_CID_ZARNS_POUSO_ALEGRE` (ver [unidades.md](unidades.md)) |
+| 3 | n8n | Credenciais `API CNN AUTH`, `TST Araguari - Integracao` e Header Auth `X-Monitor-Key`; Variables `CNN_CID_<código>`, uma por unidade: `CNN_CID_ZARNS_SALVADOR`, `CNN_CID_ZARNS_POUSO_ALEGRE` e `CNN_CID_JOSE_GOMES_DA_ROCHA` (ver [unidades.md](unidades.md)) |
 | 4 | n8n | Importar e ativar **Bloqueio** (e o subfluxo **Bloqueio por unidade**, escolhido no nó `bloquear unidade`), **Liberação automática**, **Leitura**, **Ações**, **Usuários** e **Solicitações**; conferir credenciais, Error workflow e a paginação de `GET agenda do ciclo` |
 | 5 | Vercel | `SESSION_SECRET`, `N8N_LEITURA_URL`, `N8N_ACOES_URL`, `N8N_USUARIOS_URL`, `N8N_SOLICITACOES_URL`, `N8N_WEBHOOK_SECRET`; Framework Preset **Other** |
 | 6 | Painel | Entrar como `admin`, trocar a senha, criar os usuários e marcar as unidades de cada um |
 | 7 | n8n | 1ª execução do bloqueio pelo editor com o PATCH desconectado; conferir faltas e cadastros no banco; religar |
 | 8 | Painel | Testar num paciente combinado com a clínica: Bloquear → Solicitar desbloqueio (como Leitor) → Aprovar (Admin) → Liberar (Editor) → Bloquear |
 
-## Implantação das unidades (outubro de 2026)
+## Incluir uma unidade nova
 
-Para um ambiente que já tem o painel com Salvador. O passo a passo completo, com a ordem certa, está em [unidades.md](unidades.md#implantação-desta-mudança). Em resumo:
+Sem mudar código, fluxos nem a Vercel. Passo a passo completo, com conferência e problemas comuns, em [unidades.md](unidades.md#incluir-uma-unidade-nova). Em resumo:
+
+1. **SSMS:** `INSERT INTO dbo.CtlCnnUnidade (IdUnidade, Codigo, Nome) VALUES (<próximo número>, N'<CODIGO>', N'<Nome>');`. Código só com `A-Z`, `0-9` e `_`.
+2. **n8n, Variables:** `CNN_CID_<CODIGO>` com o CID da clínica.
+3. **Painel, Usuários:** marcar a unidade nas pessoas. Todos, inclusive o admin, entram de novo.
+4. **Conferir:** rodar o Bloqueio pelo editor do n8n (bloqueia de verdade) ou esperar a madrugada. A primeira execução bloqueia todo mundo com falta no ciclo e prazo correndo.
+
+## Implantação das unidades (concluída em novembro de 2026)
+
+Feita e testada em 1º/11/2026 com Salvador, Pouso Alegre e José Gomes da Rocha. Fica como registro, para um ambiente que já tem o painel com Salvador. O passo a passo completo está em [unidades.md](unidades.md#implantação-da-multiunidade). Em resumo:
 
 1. **Banco:** `sql/criar_tabelas_unidades.sql`. Os fluxos atuais seguem funcionando com Salvador (`DEFAULT 1`).
-2. **n8n, Variables:** `CNN_CID_ZARNS_SALVADOR` e `CNN_CID_ZARNS_POUSO_ALEGRE`.
+2. **n8n, Variables:** uma `CNN_CID_<código>` por unidade.
 3. **n8n:** colar todos os workflows; criar o subfluxo **Bloqueio por unidade** e escolhê-lo no nó `bloquear unidade` do Bloqueio.
 4. **Painel:** commit e push. Todos entram de novo (o token antigo não tem as unidades).
 5. **Usuários:** conferir as unidades de cada pessoa na tela Usuários.

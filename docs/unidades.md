@@ -1,13 +1,14 @@
 # Unidades (multiunidade)
 
-Voltar ao [índice](README.md). O painel atende mais de uma clínica do CNN. Hoje são duas:
+Voltar ao [índice](README.md). O painel atende mais de uma clínica do CNN. Hoje são três:
 
 | IdUnidade | Código | Nome | Variável do CID no n8n |
 |---|---|---|---|
 | 1 | `ZARNS_SALVADOR` | Clínica Escola Zarns Salvador | `CNN_CID_ZARNS_SALVADOR` |
 | 2 | `ZARNS_POUSO_ALEGRE` | Clínica Escola Zarns Pouso Alegre | `CNN_CID_ZARNS_POUSO_ALEGRE` |
+| 3 | `JOSE_GOMES_DA_ROCHA` | Centro Ambulatório José Gomes da Rocha | `CNN_CID_JOSE_GOMES_DA_ROCHA` |
 
-A variável do CID fica na tela **Variables** do n8n.
+A variável do CID fica na tela **Variables** do n8n. Para incluir outra, veja [Incluir uma unidade nova](#incluir-uma-unidade-nova).
 
 Cada unidade tem os seus pacientes, faltas, bloqueios, solicitações e cadastros. **Nada de uma unidade aparece na outra.** As regras (prazos 60/90/180, ciclo em 1/10, 01:00 e 02:00) são as mesmas para todas.
 
@@ -56,11 +57,12 @@ A API do CNN identifica a clínica pelo header `clinicaNasNuvens-cid`. Cada unid
 |---|---|
 | `CNN_CID_ZARNS_SALVADOR` | CID de Salvador |
 | `CNN_CID_ZARNS_POUSO_ALEGRE` | CID de Pouso Alegre |
+| `CNN_CID_JOSE_GOMES_DA_ROCHA` | CID do Centro Ambulatório José Gomes da Rocha |
 
 O nome é sempre `CNN_CID_` mais o **código** da unidade em `dbo.CtlCnnUnidade`. Nos nós HTTP, o header é uma expressão, por exemplo `={{ $vars['CNN_CID_' + $('Validar').first().json.codigoUnidade] || $env['CNN_CID_' + $('Validar').first().json.codigoUnidade] }}`: lê primeiro as Variables (`$vars`) e, se não tiver, a variável de ambiente do servidor (`$env`) com o mesmo nome. Os nós Code fazem o mesmo (`cidDaUnidade` em [`_unidade.js`](../workflows/code/_unidade.js)). O `npm run check` recusa um CID escrito direto no nó.
 
 **Como configurar:**
-1. No n8n, abra o projeto dos workflows, aba **Variables**, e crie as duas variáveis acima. Não precisa reiniciar o n8n.
+1. No n8n, abra o projeto dos workflows, aba **Variables**, e crie uma variável por unidade, como na tabela acima. Não precisa reiniciar o n8n.
 2. As Variables têm que estar disponíveis para o projeto onde estão os workflows (globais, ou do mesmo projeto).
 3. Confira: abra o workflow Ações e rode um teste. Se faltar o CID, o nó `Validar` responde "CID da unidade … não configurado no n8n (variável CNN_CID_… em Variables)".
 
@@ -95,25 +97,91 @@ Script: [sql/criar_tabelas_unidades.sql](../sql/criar_tabelas_unidades.sql). Pod
 - **`dbo.CtlCnnUnidade`**: `IdUnidade`, `Codigo` (só A–Z, 0–9 e `_`, porque vira nome de variável), `Nome`, `Ativa`.
 - **`dbo.CtlCnnUsuarioUnidade`**: `IdUsuario` + `IdUnidade` dos Leitores e Editores. O Admin não tem linha.
 - **`IdUnidade`** (`DEFAULT 1`) em faltas, procedimentos, cadastros, controle, auditoria e solicitações. O que já existia ficou em Salvador.
-- **Chaves com a unidade na frente.** Por exemplo, o controle passa a ser `(IdUnidade, IdPaciente)`. O mesmo número de paciente pode existir nas duas clínicas.
+- **Chaves com a unidade na frente.** Por exemplo, o controle passa a ser `(IdUnidade, IdPaciente)`. O mesmo número de paciente pode existir em mais de uma clínica.
 
 Detalhes em [banco-de-dados.md](banco-de-dados.md#unidades).
 
 ## Incluir uma unidade nova
 
-1. **Banco:** `INSERT INTO dbo.CtlCnnUnidade (IdUnidade, Codigo, Nome) VALUES (3, N'ZARNS_X', N'Clínica Escola Zarns X');`
-2. **n8n:** em **Variables**, crie `CNN_CID_ZARNS_X` com o CID da clínica.
-3. **Usuários:** marque a unidade nova nas pessoas que vão usá-la. O admin já tem acesso, mas precisa **entrar de novo** para a unidade aparecer na lista.
-4. Na madrugada seguinte, o bloqueio das 01:00 já roda para ela. Pela regra, o primeiro dia **bloqueia todo mundo** com falta no ciclo e prazo correndo.
+Incluir uma unidade **não muda código, fluxos nem a Vercel**. São três passos de configuração: uma linha no banco, uma variável no n8n e as pessoas na tela Usuários. Leva poucos minutos.
 
-Para tirar uma unidade de operação sem apagar nada: `UPDATE dbo.CtlCnnUnidade SET Ativa = 0 WHERE IdUnidade = 3;`. Ela some da escolha, do bloqueio e da liberação; os dados continuam no banco.
+### Antes de começar, tenha em mãos
 
-## Implantação desta mudança
+| O quê | Quem passa | Exemplo |
+|---|---|---|
+| **Nome** da unidade, como deve aparecer no painel | Gestão | Centro Ambulatório José Gomes da Rocha |
+| **CID** da clínica no CNN (o hash do header `clinicaNasNuvens-cid`) | CNN ou TI | Não copie em documento, e-mail ou chat. Vai direto para o n8n |
+| **Quem** vai usar e com qual perfil | Gestão | — |
+
+A unidade nova usa a **mesma credencial `API CNN AUTH`** e as **mesmas regras** (prazos, ciclo, horários). Se o CNN der um usuário e senha diferentes para essa clínica, o caso é outro: fale com quem mantém o sistema antes.
+
+### Passo 1: banco (SSMS, no INTEGRACAO)
+
+Veja o próximo número livre:
+
+```sql
+SELECT IdUnidade, Codigo, Nome, Ativa FROM dbo.CtlCnnUnidade ORDER BY IdUnidade;
+```
+
+Insira a unidade com o próximo número (no exemplo, 4):
+
+```sql
+INSERT INTO dbo.CtlCnnUnidade (IdUnidade, Codigo, Nome)
+VALUES (4, N'ZARNS_EXEMPLO', N'Clínica Escola Zarns Exemplo');
+```
+
+| Campo | Regra |
+|---|---|
+| `IdUnidade` | O próximo número. **Nunca reaproveite** o de uma unidade desativada: os dados antigos dela continuam com esse número |
+| `Codigo` | Só letras **maiúsculas sem acento**, números e `_` (o banco recusa o resto). Ele vira o nome da variável do n8n, então **não troque depois** |
+| `Nome` | O nome do painel, com acento. Pode trocar quando quiser (`UPDATE … SET Nome = …`). No topo da tela, "Clínica Escola" é omitido para economizar espaço |
+
+Não é preciso rodar de novo o `sql/criar_tabelas_unidades.sql`. Se preferir rodar, inclua a unidade na lista `novas` do começo do script, como as outras.
+
+### Passo 2: n8n (aba Variables)
+
+Crie a variável `CNN_CID_` + o código, com o CID da clínica no valor. No exemplo: `CNN_CID_ZARNS_EXEMPLO`. Não precisa reiniciar o n8n nem colar fluxos.
+
+Confira o nome letra por letra: se ele não bater com o código do banco, o n8n não acha o CID (ver [Sem o CID de uma unidade](#o-cid-de-cada-unidade-variables-do-n8n)).
+
+### Passo 3: painel (tela Usuários)
+
+- Marque a unidade nova em cada Leitor e Editor que vai usá-la. A pessoa entra de novo para ela aparecer.
+- O **Admin** já tem acesso a todas, sem marcar nada, mas também precisa **sair e entrar de novo**.
+
+### Passo 4: conferir
+
+1. Entre como admin, escolha a unidade nova e abra **Pacientes**. A lista começa **vazia**: os dados só aparecem depois da primeira execução do bloqueio.
+2. Para não esperar a madrugada, rode o **Bloqueio de faltas** pelo editor do n8n (**Execute workflow**). Atenção: a execução manual **bloqueia de verdade** no CNN, em todas as unidades ativas.
+3. Na execução, o nó `bloquear unidade` mostra um item por unidade. Abra o subfluxo da unidade nova e confira se ele passou do `conferir unidade` e se a agenda trouxe faltas.
+4. No painel, a unidade nova mostra pacientes e o Dashboard. Os bloqueios dela aparecem no **Histórico**.
+
+**Primeira noite:** pela regra, a primeira execução **bloqueia todo mundo** daquela clínica que tem falta no ciclo com o prazo correndo. Avise a recepção da clínica antes.
+
+### Problemas comuns
+
+| Sintoma | Causa provável | O que fazer |
+|---|---|---|
+| A unidade não aparece na escolha | A pessoa não saiu e entrou de novo, ou não está marcada nela, ou `Ativa = 0` | Marcar na tela Usuários e entrar de novo |
+| "CID da unidade … não configurado no n8n" | A variável não existe ou o nome está diferente do código | Conferir `CNN_CID_<código>` em Variables |
+| O subfluxo da unidade para no `conferir unidade` | Mesmo caso acima | Idem |
+| Erro 401 ou 403 do CNN só nessa unidade | O CID está errado, ou a credencial `API CNN AUTH` não tem acesso a essa clínica | Conferir o CID com o CNN |
+| A lista de pacientes continua vazia depois do bloqueio | A clínica não teve faltas no ciclo, ou a agenda veio vazia | Ver a saída do `GET agenda do ciclo` no subfluxo |
+
+### Desativar ou renomear
+
+- **Tirar de operação sem apagar nada:** `UPDATE dbo.CtlCnnUnidade SET Ativa = 0 WHERE IdUnidade = 4;`. Ela some da escolha, do bloqueio e da liberação. Os dados continuam no banco, e `Ativa = 1` volta tudo como estava. Atenção: os pacientes bloqueados por ela **não** são liberados enquanto ela estiver desativada.
+- **Trocar o nome:** `UPDATE dbo.CtlCnnUnidade SET Nome = N'…' WHERE IdUnidade = 4;`. Aparece no próximo login.
+- **Não apague** a linha da unidade: as tabelas de dados apontam para ela (FK).
+
+## Implantação da multiunidade
+
+**Concluída em 1º de novembro de 2026**, com Salvador, Pouso Alegre e José Gomes da Rocha. O bloqueio foi executado manualmente no n8n e funcionou nas unidades. Os passos abaixo ficam como registro, e servem para subir um ambiente novo.
 
 Fazer fora dos horários das 01:00 e das 02:00, nesta ordem:
 
 1. **Banco:** rode `sql/criar_tabelas_unidades.sql` no INTEGRACAO. Com o `DEFAULT 1`, os fluxos atuais continuam funcionando com Salvador.
-2. **n8n, Variables:** crie `CNN_CID_ZARNS_SALVADOR` e `CNN_CID_ZARNS_POUSO_ALEGRE`.
+2. **n8n, Variables:** crie uma `CNN_CID_<código>` para cada unidade (tabela do início).
 3. **n8n:** cole os workflows novos:
    - Ações, Leitura, Solicitações, Usuários e Liberação: como sempre (apague os nós e cole o JSON).
    - **Subfluxo:** crie um workflow novo, "CNN - Bloqueio por unidade", e cole `bloqueioPacientesFaltasUnidade.json`.
@@ -125,11 +193,14 @@ Entre o passo 3 e o 4, o painel antigo não manda a unidade e recebe "Unidade in
 
 ## Perguntas frequentes
 
-**Um paciente que frequenta as duas clínicas é bloqueado nas duas?**
+**Um paciente que frequenta duas clínicas é bloqueado nas duas?**
 Cada clínica tem o seu cadastro no CNN, com o seu número. A falta numa clínica bloqueia o paciente **naquela** clínica.
 
-**O admin consegue ver as duas unidades juntas?**
+**O admin consegue ver todas as unidades juntas?**
 Não. Ele troca de unidade pelo topo da tela ou pelo menu. Uma por vez.
 
-**Onde vejo se o bloqueio rodou nas duas?**
+**Quantas unidades o sistema aguenta?**
+Não há limite no painel. O bloqueio roda as unidades uma depois da outra, então cada unidade nova soma alguns minutos à execução das 01:00. A liberação das 02:00 é uma rodada só para todas.
+
+**Onde vejo se o bloqueio rodou em todas?**
 No n8n, a execução do "Bloqueio de faltas" mostra um item por unidade no nó `bloquear unidade`, e cada unidade tem a sua execução do subfluxo. No painel, **Configuração** mostra o último bloqueio e a última liberação **da unidade escolhida**.

@@ -8,7 +8,7 @@
 - **Liberação antes do prazo:** só com uma **solicitação de desbloqueio** aprovada pelo administrador. Qualquer usuário (a recepção, por exemplo) abre o pedido, com o motivo; o admin aprova ou recusa; Editor ou Admin libera no CNN.
 - **Painel rápido:** ao entrar, prepara todas as telas de uma vez; depois, a navegação não espera o servidor.
 - **Bloquear pelo painel:** roda o fluxo de bloqueio só para um paciente (busca a agenda dele, grava as faltas novas e bloqueia pela falta vigente, se o prazo dela ainda corre).
-- **Unidades:** Clínica Escola Zarns Salvador e Pouso Alegre. Cada uma com os seus dados; o Admin vê todas e troca uma por vez, Leitor e Editor veem as marcadas no cadastro. Quem tem mais de uma escolhe ao entrar (ver [unidades.md](unidades.md)).
+- **Unidades:** Clínica Escola Zarns Salvador, Clínica Escola Zarns Pouso Alegre e Centro Ambulatório José Gomes da Rocha. Cada uma com os seus dados; o Admin vê todas e troca uma por vez, Leitor e Editor veem as marcadas no cadastro. Quem tem mais de uma escolhe ao entrar (ver [unidades.md](unidades.md)).
 - **Usuários:** cada pessoa tem login próprio, com perfil Leitor (vê e abre solicitações), Editor (também bloqueia e libera o que foi aprovado) ou Admin (também aprova solicitações e gerencia usuários). Os usuários ficam em `dbo.CtlCnnUsuario`; o admin cuida deles pela tela Usuários.
 - **Rastreabilidade:** cada PATCH no CNN, automático ou pelo painel, vira uma linha em `dbo.CtlCnnAcaoPaciente` (quem, quando, motivo, resposta da API). A situação atual de cada paciente fica em `dbo.CtlCnnControlePaciente`.
 - **Ciclo:** começa em 1º de outubro. De outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.
@@ -42,7 +42,7 @@ flowchart TB
 | [visao-geral.md](visao-geral.md) | Todos, inclusive quem não é técnico | O que o sistema faz, telas, situações do paciente, perfis, perguntas frequentes, glossário |
 | [seguranca-resumo.md](seguranca-resumo.md) | Liderança, gestão | Segurança sem termos técnicos: barreiras, perfis, registro das ações, LGPD, "e se acontecer…", o que está implantado e próximos passos |
 | [regras.md](regras.md) | Todos | As regras de negócio (R1 a R95): faltas, ciclo, prazos, bloqueio, liberação, auditoria, usuários, LGPD, desempenho, unidades |
-| [unidades.md](unidades.md) | Todos | As unidades (Salvador e Pouso Alegre): escolha ao entrar, quem acessa o quê, CID nas Variables do n8n, como incluir uma unidade, implantação |
+| [unidades.md](unidades.md) | Todos | As unidades (Salvador, Pouso Alegre e José Gomes da Rocha): escolha ao entrar, quem acessa o quê, CID nas Variables do n8n, **passo a passo para incluir uma unidade nova**, implantação |
 | [arquitetura.md](arquitetura.md) | Quem mantém | Peças, ligações, rotas, sequências, segurança, configuração e deploy |
 | [front-end.md](front-end.md) | Quem opera e quem mantém | O painel: telas (inclusive o Dashboard), situações do paciente, liberar e bloquear, carregamento nas ações, login |
 | [bloqueio.md](bloqueio.md) | Quem mantém ou opera | Workflow de bloqueio (01:00), nó a nó |

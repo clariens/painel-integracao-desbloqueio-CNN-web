@@ -165,7 +165,7 @@ Multiunidade ([unidades.md](unidades.md)). Pode rodar mais de uma vez e **nada �
 
 | # | O que faz |
 |---|---|
-| 1 | Cria `dbo.CtlCnnUnidade` e insere Salvador (1, `ZARNS_SALVADOR`) e Pouso Alegre (2, `ZARNS_POUSO_ALEGRE`), se não existirem |
+| 1 | Cria `dbo.CtlCnnUnidade` e insere Salvador (1, `ZARNS_SALVADOR`), Pouso Alegre (2, `ZARNS_POUSO_ALEGRE`) e José Gomes da Rocha (3, `JOSE_GOMES_DA_ROCHA`), se não existirem |
 | 2 | Cria `dbo.CtlCnnUsuarioUnidade` |
 | 3 | Em `CtlCnnFaltaPaciente`, `CtlCnnFaltaProcedimento`, `CtlCnnCadastro`, `CtlCnnControlePaciente`, `CtlCnnAcaoPaciente` e `CtlCnnSolicitacao`: coluna `IdUnidade SMALLINT NOT NULL DEFAULT 1` (o que existe fica em Salvador) e chave estrangeira para `CtlCnnUnidade` |
 | 4 | Refaz as chaves e os índices com `IdUnidade` na frente, **com os mesmos nomes** (os scripts antigos conferem pelo nome e não recriam a versão sem unidade). Se o índice já tem `IdUnidade`, não mexe. Lista em [banco-de-dados.md](banco-de-dados.md#unidades) |
@@ -175,6 +175,8 @@ Multiunidade ([unidades.md](unidades.md)). Pode rodar mais de uma vez e **nada �
 | 8 | `SELECT` de conferência: as unidades, o nome da variável do CID no n8n e quantos usuários cada uma tem |
 
 **Rode antes de colar os workflows novos.** Eles gravam e filtram `IdUnidade`. Com o `DEFAULT 1`, os workflows antigos continuam funcionando enquanto isso (tudo em Salvador).
+
+Para incluir uma unidade depois, basta o `INSERT` em `dbo.CtlCnnUnidade`; não precisa rodar o script de novo. Ver [Incluir uma unidade nova](unidades.md#incluir-uma-unidade-nova).
 
 ## carga_inicial_controle.sql
 

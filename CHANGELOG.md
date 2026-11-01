@@ -2,6 +2,24 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-11-01 — Terceira unidade e multiunidade implantada
+
+### Adicionado
+
+- **Unidade 3, Centro Ambulatório José Gomes da Rocha** (código `JOSE_GOMES_DA_ROCHA`, variável `CNN_CID_JOSE_GOMES_DA_ROCHA` no n8n). Ela usa a mesma credencial do CNN e as mesmas regras, e bloqueia desde a primeira noite. Entrou no `sql/criar_tabelas_unidades.sql`.
+- **Passo a passo para incluir uma unidade nova** em [docs/unidades.md](docs/unidades.md#incluir-uma-unidade-nova):
+  - o que pedir antes;
+  - o `INSERT` e as regras do código;
+  - a variável do n8n e os usuários;
+  - como conferir e os problemas comuns;
+  - como desativar ou renomear.
+  
+  Um resumo está em [docs/operacao.md](docs/operacao.md#incluir-uma-unidade-nova).
+
+### Alterado
+
+- **A multiunidade está em produção:** script do banco, Variables, fluxos colados e o bloqueio executado manualmente no n8n com sucesso. As docs deixam de tratar a implantação como pendente e passam a citar as três unidades.
+
 ## 2026-10-28 — Multiunidade: Salvador e Pouso Alegre
 
 ### Adicionado

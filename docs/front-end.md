@@ -174,7 +174,7 @@ O botão **Entrar** do login tem um brilho que passa pelo texto e uma seta que d
 
 ## Unidade escolhida
 
-Tudo o que as telas mostram é da **unidade escolhida** (Salvador ou Pouso Alegre). Ver [unidades.md](unidades.md).
+Tudo o que as telas mostram é da **unidade escolhida** (Salvador, Pouso Alegre ou José Gomes da Rocha). Ver [unidades.md](unidades.md).
 
 - **Escolha ao entrar:** quem tem mais de uma unidade vê **"Em qual unidade você vai trabalhar?"** logo depois do login (ou depois da troca obrigatória de senha), **antes** da tela "Preparando os dados…". Sem Cancelar e sem Esc. Quem tem uma unidade só entra direto.
 - **Onde aparece:** um chip com a unidade no topo da tela, ao lado do botão do menu (com mais de uma unidade, clicar nele abre a troca), e a linha **Unidade** no menu lateral, com **Trocar**.

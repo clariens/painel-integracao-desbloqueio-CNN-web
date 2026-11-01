@@ -49,7 +49,7 @@ Script: [sql/criar_tabelas_unidades.sql](../sql/criar_tabelas_unidades.sql). Vis
 
 | Coluna | Tipo | Observação |
 |---|---|---|
-| `IdUnidade` | `SMALLINT` | PK. 1 = Salvador, 2 = Pouso Alegre |
+| `IdUnidade` | `SMALLINT` | PK, sem `IDENTITY` (o número é escolhido no `INSERT`). 1 = Salvador, 2 = Pouso Alegre, 3 = José Gomes da Rocha |
 | `Codigo` | `NVARCHAR(40)` | Único. Só `A–Z`, `0–9` e `_` (CHECK): vira o nome da variável `CNN_CID_<Codigo>` no n8n |
 | `Nome` | `NVARCHAR(100)` | Nome mostrado no painel |
 | `Ativa` | `BIT` | `0` tira a unidade da escolha, do bloqueio e da liberação, sem apagar nada |

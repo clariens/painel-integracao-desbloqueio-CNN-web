@@ -25,7 +25,7 @@ flowchart LR
 
 ## Unidades
 
-Atende **Clínica Escola Zarns Salvador** e **Clínica Escola Zarns Pouso Alegre**. Cada unidade tem os seus dados e uma não vê a outra. Quem tem mais de uma escolhe ao entrar e troca pelo topo da tela; o Admin acessa todas. O CID do CNN de cada unidade fica nas Variables do n8n, `CNN_CID_<código>`. Ver [docs/unidades.md](docs/unidades.md).
+Atende **Clínica Escola Zarns Salvador**, **Clínica Escola Zarns Pouso Alegre** e **Centro Ambulatório José Gomes da Rocha**. Cada unidade tem os seus dados e uma não vê a outra. Quem tem mais de uma escolhe ao entrar e troca pelo topo da tela; o Admin acessa todas. O CID do CNN de cada unidade fica nas Variables do n8n, `CNN_CID_<código>`. Incluir outra unidade não muda código: ver [docs/unidades.md](docs/unidades.md#incluir-uma-unidade-nova).
 
 ## Regra
 

@@ -18,7 +18,7 @@ O botão **Bloquear** do painel reutiliza o código deste fluxo (`separar faltas
 
 ## Uma unidade por vez
 
-O bloqueio roda para **cada unidade ativa** (Salvador e Pouso Alegre), uma depois da outra:
+O bloqueio roda para **cada unidade ativa** em `dbo.CtlCnnUnidade` (hoje Salvador, Pouso Alegre e José Gomes da Rocha), uma depois da outra:
 
 ```mermaid
 flowchart LR
@@ -32,7 +32,7 @@ flowchart LR
 - **Subfluxo** (`bloqueioPacientesFaltasUnidade.json`): tudo o que está descrito abaixo, para a unidade que chega no nó `Unidade` (`{ idUnidade, codigoUnidade }`). O nó `conferir unidade` para logo se o CID da unidade não estiver configurado.
 - Os nós HTTP usam o CID da unidade: `={{ $vars['CNN_CID_' + $('Unidade').first().json.codigoUnidade] || $env[…] }}`.
 - Toda gravação leva o `IdUnidade` (faltas, procedimentos, cadastros, controle e auditoria).
-- **Ao importar:** crie o subfluxo como um workflow próprio e, no nó `bloquear unidade` do principal, escolha esse workflow. Ver [unidades.md](unidades.md#implantação-desta-mudança).
+- **Ao importar:** crie o subfluxo como um workflow próprio e, no nó `bloquear unidade` do principal, escolha esse workflow. Ver [unidades.md](unidades.md#implantação-da-multiunidade). Unidade nova não exige mexer no fluxo: ver [Incluir uma unidade nova](unidades.md#incluir-uma-unidade-nova).
 
 ## Regra
 

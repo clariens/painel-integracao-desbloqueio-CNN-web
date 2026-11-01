@@ -140,12 +140,13 @@ Regras simples:
 
 ## Unidades
 
-O sistema atende duas clínicas: **Clínica Escola Zarns Salvador** e **Clínica Escola Zarns Pouso Alegre**. Cada uma tem os seus pacientes, faltas, bloqueios e pedidos, e **uma não vê a outra**. As regras (prazos e horários) são as mesmas nas duas.
+O sistema atende três clínicas: **Clínica Escola Zarns Salvador**, **Clínica Escola Zarns Pouso Alegre** e **Centro Ambulatório José Gomes da Rocha**. Cada uma tem os seus pacientes, faltas, bloqueios e pedidos, e **uma não vê a outra**. As regras (prazos e horários) são as mesmas em todas.
 
-- **Ao entrar,** quem trabalha nas duas escolhe em qual vai trabalhar agora. Quem trabalha numa só entra direto.
+- **Ao entrar,** quem trabalha em mais de uma escolhe em qual vai trabalhar agora. Quem trabalha numa só entra direto.
 - **A unidade atual** fica no topo da tela e no menu. Dá para **trocar** a qualquer momento, sem sair.
-- **O administrador** acessa as duas e troca entre elas. Os outros acessam as unidades que o administrador marcou no cadastro.
-- **Toda madrugada,** o bloqueio e a liberação rodam para as duas unidades, uma de cada vez. Se der problema numa, a outra segue normalmente.
+- **O administrador** acessa todas e troca entre elas. Os outros acessam as unidades que o administrador marcou no cadastro.
+- **Toda madrugada,** o bloqueio e a liberação rodam para todas as unidades, uma de cada vez. Se der problema numa, as outras seguem normalmente.
+- **Incluir uma clínica nova** não exige mudar o sistema: é uma linha no banco, o código da clínica no n8n e marcar as pessoas.
 
 Detalhes em [unidades.md](unidades.md).
 

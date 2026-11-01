@@ -36,7 +36,8 @@ INSERT INTO dbo.CtlCnnUnidade (IdUnidade, Codigo, Nome)
 SELECT novas.IdUnidade, novas.Codigo, novas.Nome
 FROM (VALUES
     (CAST(1 AS SMALLINT), N'ZARNS_SALVADOR', N'Clínica Escola Zarns Salvador'),
-    (CAST(2 AS SMALLINT), N'ZARNS_POUSO_ALEGRE', N'Clínica Escola Zarns Pouso Alegre')
+    (CAST(2 AS SMALLINT), N'ZARNS_POUSO_ALEGRE', N'Clínica Escola Zarns Pouso Alegre'),
+    (CAST(3 AS SMALLINT), N'JOSE_GOMES_DA_ROCHA', N'Centro Ambulatório José Gomes da Rocha')
 ) AS novas (IdUnidade, Codigo, Nome)
 WHERE NOT EXISTS (SELECT 1 FROM dbo.CtlCnnUnidade u WHERE u.IdUnidade = novas.IdUnidade);
 
