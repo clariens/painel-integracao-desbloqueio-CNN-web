@@ -998,7 +998,7 @@ textarea:focus {
   position: relative;
   z-index: 1;
   width: min(400px, calc(100vw - 32px));
-  padding: 36px 32px 32px;
+  padding: 20px 32px 32px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1008,15 +1008,25 @@ textarea:focus {
 }
 
 .login form h1 {
-  margin: 4px 0 6px;
-  font-size: 22px;
+  margin: 10px 0 0;
+  font-size: 26px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   text-align: center;
 }
 
+/* Subtítulo colado no nome (o gap do formulário separaria demais). */
+.login__subtitulo {
+  margin: -10px 0 6px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Logo da empresa pequena, no alto do cartão; o nome do produto é o destaque. */
 .login__logo {
   justify-self: center;
-  width: 180px;
+  width: 120px;
   height: auto;
 }
 
