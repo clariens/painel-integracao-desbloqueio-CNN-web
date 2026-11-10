@@ -43,6 +43,7 @@ flowchart TB
 | [seguranca-resumo.md](seguranca-resumo.md) | Liderança, gestão | Segurança sem termos técnicos: barreiras, perfis, registro das ações, LGPD, "e se acontecer…", o que está implantado e próximos passos |
 | [regras.md](regras.md) | Todos | As regras de negócio (R1 a R95): faltas, ciclo, prazos, bloqueio, liberação, auditoria, usuários, LGPD, desempenho, unidades |
 | [unidades.md](unidades.md) | Todos | As unidades (Salvador, Pouso Alegre e José Gomes da Rocha): escolha ao entrar, quem acessa o quê, CID nas Variables do n8n, **passo a passo para incluir uma unidade nova**, implantação |
+| [homologacao.md](homologacao.md) | Quem testa e quem aprova a entrega | Roteiro de testes para entregar como pronto, por unidade, com resultado esperado, teste das Variables e aceite |
 | [arquitetura.md](arquitetura.md) | Quem mantém | Peças, ligações, rotas, sequências, segurança, configuração e deploy |
 | [front-end.md](front-end.md) | Quem opera e quem mantém | O painel: telas (inclusive o Dashboard), situações do paciente, liberar e bloquear, carregamento nas ações, login |
 | [bloqueio.md](bloqueio.md) | Quem mantém ou opera | Workflow de bloqueio (01:00), nó a nó |

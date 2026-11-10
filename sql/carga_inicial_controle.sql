@@ -35,7 +35,7 @@ DECLARE @inicio DATE = DATEFROMPARTS(CASE WHEN MONTH(@hoje) >= 10 THEN YEAR(@hoj
     WHERE f.DataFalta >= @inicio
 ),
 Vigente AS (
-    SELECT
+    SELECT'
         IdUnidade,
         IdPaciente,
         IdAgenda,

@@ -15,6 +15,10 @@ Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / A
   - como desativar ou renomear.
   
   Um resumo está em [docs/operacao.md](docs/operacao.md#incluir-uma-unidade-nova).
+- **Roteiro de homologação** em [docs/homologacao.md](docs/homologacao.md) (Word `20 - Homologação (testes de entrega).docx`):
+  - os testes de entrega por unidade, com o resultado esperado;
+  - o teste das Variables do n8n, que confere o CID sem mostrar o valor;
+  - o quadro de aceite.
 
 ### Alterado
 
