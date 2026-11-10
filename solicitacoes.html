@@ -35,22 +35,29 @@
 
     <dialog class="login" id="login" aria-labelledby="login-title">
       <div class="login__fundo" aria-hidden="true"><span></span><span></span><span></span></div>
-      <form id="login-form" method="dialog">
-        <img class="login__logo login__logo--preta" src="/img/logo-clariens-preto.png" alt="Clariens Educação" width="120" height="44" />
-        <img class="login__logo login__logo--branca" src="/img/clariens-logo.png" alt="Clariens Educação" width="120" height="35" />
-        <h1 id="login-title">ClinicBoard</h1>
+      <section class="login__marca">
+        <h1 class="login__produto" id="login-title">ClinicBoard</h1>
         <p class="login__subtitulo">Gestão inteligente das operações clínicas</p>
-        <label>
-          Usuário
-          <input id="login-user" name="user" autocomplete="username" required />
-        </label>
-        <label>
-          Senha
-          <input id="login-password" name="password" type="password" autocomplete="current-password" required />
-        </label>
-        <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
-        <button class="login__entrar" type="submit"><span class="login__texto">Entrar</span><span class="login__seta" aria-hidden="true">→</span></button>
-      </form>
+        <p class="login__empresa">
+          <span>Uma solução</span>
+          <img src="/img/clariens-logo.png" alt="Clariens Educação" width="130" height="38" />
+        </p>
+      </section>
+      <div class="login__lado">
+        <form id="login-form" method="dialog">
+          <h2 class="login__titulo">Acesse sua conta</h2>
+          <label>
+            Usuário
+            <input id="login-user" name="user" autocomplete="username" required />
+          </label>
+          <label>
+            Senha
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <p class="login__error" id="login-error" hidden>Usuário ou senha inválidos.</p>
+          <button class="login__entrar" type="submit"><span class="login__texto">Entrar</span><span class="login__seta" aria-hidden="true">→</span></button>
+        </form>
+      </div>
     </dialog>
 
     <dialog class="modal" id="senha" aria-labelledby="senha-titulo">

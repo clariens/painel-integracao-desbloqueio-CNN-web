@@ -33,6 +33,8 @@
   --login-luz-1: rgba(160, 70, 255, 0.85);
   --login-luz-2: rgba(70, 190, 255, 0.55);
   --login-luz-3: rgba(255, 255, 255, 0.35);
+  --login-texto: #ffffff;
+  --login-texto-suave: rgba(255, 255, 255, 0.8);
   --line: rgba(74, 32, 140, 0.14);
   --text: #20183a;
   --muted: #625a7e;
@@ -94,6 +96,8 @@
   --login-luz-1: rgba(196, 160, 86, 0.45);
   --login-luz-2: rgba(111, 154, 118, 0.4);
   --login-luz-3: rgba(232, 185, 90, 0.25);
+  --login-texto: #ece6d4;
+  --login-texto-suave: #a29c8b;
   --line: rgba(232, 224, 204, 0.12);
   --text: #ece6d4;
   --muted: #a29c8b;
@@ -994,52 +998,75 @@ textarea:focus {
   background: var(--backdrop);
 }
 
-.login form {
+/* Tela dividida: à esquerda a marca do ClinicBoard sobre o fundo animado; à direita o formulário. */
+.login__marca {
   position: relative;
   z-index: 1;
-  width: min(400px, calc(100vw - 32px));
-  padding: 20px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 56px clamp(32px, 6vw, 88px);
+  color: var(--login-texto);
+}
+
+.login__produto {
+  margin: 0;
+  font-size: clamp(40px, 5.2vw, 68px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.login__subtitulo {
+  margin: 0;
+  max-width: 22ch;
+  color: var(--login-texto-suave);
+  font-size: clamp(18px, 1.8vw, 24px);
+  line-height: 1.35;
+}
+
+/* A Clariens assina a solução no pé do lado da marca; o destaque é o ClinicBoard. */
+.login__empresa {
+  position: absolute;
+  left: clamp(32px, 6vw, 88px);
+  bottom: 40px;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  color: var(--login-texto-suave);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* A imagem da logo tem margem transparente à esquerda: a margem negativa alinha o "C" com o texto de cima. */
+.login__empresa img {
+  width: 130px;
+  height: auto;
+  margin-left: -12px;
+}
+
+.login__lado {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 40px 32px;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.25);
+}
+
+.login form {
+  width: min(360px, 100%);
   display: grid;
   gap: 14px;
 }
 
-.login form h1 {
-  margin: 10px 0 0;
-  font-size: 26px;
+.login__titulo {
+  margin: 0 0 6px;
+  font-size: 24px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  text-align: center;
-}
-
-/* Subtítulo colado no nome (o gap do formulário separaria demais). */
-.login__subtitulo {
-  margin: -10px 0 6px;
-  color: var(--muted);
-  font-size: 14px;
-  text-align: center;
-}
-
-/* Logo da empresa pequena, no alto do cartão; o nome do produto é o destaque. */
-.login__logo {
-  justify-self: center;
-  width: 120px;
-  height: auto;
-}
-
-.login__logo--branca {
-  display: none;
-}
-
-:root[data-theme="dark"] .login__logo--preta {
-  display: none;
-}
-
-:root[data-theme="dark"] .login__logo--branca {
-  display: block;
 }
 
 .login__kicker,
@@ -1624,9 +1651,51 @@ dl.dados dd {
   max-height: none;
   margin: 0;
   display: grid;
-  place-items: center;
+  grid-template-columns: minmax(0, 1.2fr) minmax(400px, 1fr);
   overflow: hidden;
   background: var(--login-bg);
+}
+
+/* Celular e janela estreita: a marca vira uma faixa no alto, com a Clariens primeiro, e o formulário embaixo. */
+@media (max-width: 860px) {
+  .login[open],
+  :root[data-sessao="nao"] .login {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    overflow-y: auto;
+  }
+
+  .login__marca {
+    gap: 8px;
+    padding: 32px 24px 28px;
+  }
+
+  .login__produto {
+    font-size: 36px;
+  }
+
+  .login__subtitulo {
+    max-width: none;
+    font-size: 17px;
+  }
+
+  .login__empresa {
+    position: static;
+    order: -1;
+    margin-bottom: 20px;
+  }
+
+  .login__empresa img {
+    width: 100px;
+    margin-left: -9px;
+  }
+
+  .login__lado {
+    place-items: start center;
+    padding: 32px 24px 40px;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.2);
+  }
 }
 
 :root[data-sessao="nao"] .login:not([open]) {
