@@ -2593,3 +2593,78 @@ dl.dados dd {
     padding: 8px 16px 16px;
   }
 }
+
+/* ---------- cantos arredondados ---------- */
+/* Três tamanhos: controles (botão, campo), cartões e painéis grandes. Selos e filtros de situação viram pílulas.
+   Fica no fim para valer sobre as regras de cada componente, sem mexer nelas. */
+:root {
+  --raio-sm: 8px;
+  --raio: 12px;
+  --raio-lg: 16px;
+  --raio-pilula: 999px;
+}
+
+.btn,
+.ghost,
+.login button,
+.nav-toggle,
+.sidebar__close,
+.tema-toggle,
+input,
+select,
+textarea {
+  border-radius: var(--raio-sm);
+}
+
+.segmented button,
+.selo,
+.faltas-selo,
+.statusbar__unidade,
+.sidebar__perfil,
+.sidebar__badge {
+  border-radius: var(--raio-pilula);
+}
+
+.selo {
+  padding-inline: 10px;
+}
+
+.selo::before {
+  border-radius: 50%;
+}
+
+.stats > *,
+.cartao,
+.grafico,
+.painel-card,
+.toast,
+.dica,
+.unidades-campo,
+.senha-temp,
+.escolha button,
+.modal__alerta {
+  border-radius: var(--raio);
+}
+
+.sidebar__nav a {
+  border-radius: 10px;
+}
+
+.modal__form,
+.preparo__cartao {
+  border-radius: var(--raio-lg);
+}
+
+/* A gaveta do paciente encosta na direita: só os cantos do lado de dentro arredondam. */
+.gaveta {
+  border-radius: var(--raio-lg) 0 0 var(--raio-lg);
+}
+
+.gaveta__head {
+  border-top-left-radius: var(--raio-lg);
+}
+
+/* Faixa de cor dos números: canto do lado da faixa quase reto (arredondado, ela curvava); o resto arredonda. */
+.stats > * {
+  border-radius: 3px var(--raio) var(--raio) 3px;
+}
