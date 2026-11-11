@@ -13,6 +13,17 @@ Voltar ao [índice](README.md).
 
 Os seis rodam no banco `INTEGRACAO`, no SSMS ou num nó `executeQuery` do n8n (com `USE INTEGRACAO;` na primeira linha). Nenhum tem `GO` nem `USE`.
 
+## Produção (GMUD)
+
+Para um banco **sem** as tabelas do sistema, a produção não usa os seis scripts acima: eles carregam passos de migração do desenvolvimento.
+
+| Script | Para quê |
+|---|---|
+| [sql/prod/01_gmud_criar_estrutura.sql](../sql/prod/01_gmud_criar_estrutura.sql) | Cria as 10 tabelas já na forma final (com `IdUnidade`, chaves e índices iguais aos do desenvolvimento) e cadastra as unidades da produção: 1 = Salvador e 3 = José Gomes da Rocha. Uma transação só; pode rodar de novo. No fim, os `GRANT` comentados para o usuário do n8n de produção |
+| [sql/prod/99_gmud_rollback.sql](../sql/prod/99_gmud_rollback.sql) | Desfaz a GMUD: apaga as 10 tabelas, mas só se ainda não houver dados de uso |
+
+Depois do 01: os `GRANT` e o primeiro administrador (`npm run admin`, que imprime o `INSERT`). A carga inicial do controle não se aplica: o banco começa sem faltas.
+
 ## criar_tabelas_bloqueio.sql
 
 ### Para que serve
