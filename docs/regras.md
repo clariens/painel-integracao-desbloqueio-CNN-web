@@ -9,7 +9,7 @@ Fonte única dos parâmetros (prazos, ciclo, fuso): [`workflows/code/_regra.js`]
 | # | Regra | Onde |
 |---|---|---|
 | R1 | **Falta** é todo agendamento do CNN com status `FALTOU`. Outros status (cancelado, finalizado, em espera…) não contam | `separar faltas` ([bloqueio-separar-faltas.js](../workflows/code/bloqueio-separar-faltas.js)) |
-| R2 | O **ciclo** começa em **1º de outubro**. De outubro a dezembro, vale o 1/10 do ano corrente; de janeiro a setembro, o 1/10 do ano anterior. (Até 08/10/2026 o ciclo começava em 1º de agosto.) | `_regra.js` (`cicloInicio`), URL do nó `GET agenda do ciclo`, `js/formato.js` |
+| R2 | O **ciclo** começa em **1º de novembro**. Em novembro e dezembro, vale o 1/11 do ano corrente; de janeiro a outubro, o 1/11 do ano anterior. (Até 08/10/2026 o ciclo começava em 1º de agosto; de 08/10 a 11/11/2026, em 1º de outubro.) | `_regra.js` (`cicloInicio`), URL do nó `GET agenda do ciclo`, `js/formato.js` |
 | R3 | Só contam as faltas **do início do ciclo até hoje**. Faltas de ciclos anteriores ficam no banco, mas não entram na contagem | `separar faltas`, consultas da Leitura |
 | R4 | Cada falta é gravada **uma vez**, identificada pelo id do agendamento (`IdAgenda`). Ler a agenda de novo atualiza a falta, não duplica | `preparar insert SQL`, `UQ_CtlCnnFaltaPaciente_IdAgenda` |
 | R5 | **Número da falta** (`NumeroFalta`) é a ordem da falta do paciente dentro do ciclo, por data (e por `IdAgenda` no empate): 1ª, 2ª, 3ª… É recalculado a cada gravação, então uma falta antiga que aparece depois entra na posição certa | `preparar insert SQL` (renumeração com `ROW_NUMBER`) |

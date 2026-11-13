@@ -11,13 +11,13 @@
 
   Só insere quem ainda não tem linha no controle: rodar de novo não muda nada.
   Por unidade: rode depois de sql/criar_tabelas_unidades.sql (cada unidade tem o seu ciclo de faltas).
-  Prazos 60/90/180 e início do ciclo em 1/10: os mesmos de workflows/code/_regra.js.
+  Prazos 60/90/180 e início do ciclo em 1/11: os mesmos de workflows/code/_regra.js.
 */
 
 SET NOCOUNT ON;
 
 DECLARE @hoje DATE = CAST(DATEADD(HOUR, -3, SYSUTCDATETIME()) AS DATE); -- America/Sao_Paulo (sem horário de verão)
-DECLARE @inicio DATE = DATEFROMPARTS(CASE WHEN MONTH(@hoje) >= 10 THEN YEAR(@hoje) ELSE YEAR(@hoje) - 1 END, 10, 1);
+DECLARE @inicio DATE = DATEFROMPARTS(CASE WHEN MONTH(@hoje) >= 11 THEN YEAR(@hoje) ELSE YEAR(@hoje) - 1 END, 11, 1);
 
 ;WITH Ciclo AS (
     SELECT

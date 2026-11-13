@@ -10,7 +10,7 @@ Voltar ao [índice](README.md). O painel atende mais de uma clínica do CNN. Hoj
 
 A variável do CID fica na tela **Variables** do n8n. Para incluir outra, veja [Incluir uma unidade nova](#incluir-uma-unidade-nova).
 
-Cada unidade tem os seus pacientes, faltas, bloqueios, solicitações e cadastros. **Nada de uma unidade aparece na outra.** As regras (prazos 60/90/180, ciclo em 1/10, 01:00 e 02:00) são as mesmas para todas.
+Cada unidade tem os seus pacientes, faltas, bloqueios, solicitações e cadastros. **Nada de uma unidade aparece na outra.** As regras (prazos 60/90/180, ciclo em 1/11, 01:00 e 02:00) são as mesmas para todas.
 
 ## Para quem usa o painel
 

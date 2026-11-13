@@ -35,7 +35,7 @@ flowchart TB
 
 ## Quanto tempo o paciente fica bloqueado
 
-O prazo depende de **quantas vezes ele faltou no ciclo**. O ciclo é um "ano de contagem" que começa todo **1º de outubro**: a contagem de faltas zera nessa data.
+O prazo depende de **quantas vezes ele faltou no ciclo**. O ciclo é um "ano de contagem" que começa todo **1º de novembro**: a contagem de faltas zera nessa data.
 
 | Falta no ciclo | O bloqueio dura |
 |---|---|
@@ -191,7 +191,7 @@ Abra uma solicitação de desbloqueio com o motivo "falta lançada por engano". 
 **Abri uma solicitação errada. E agora?**
 Na tela Solicitações, clique em **Cancelar** na sua solicitação. Ela fica no histórico como cancelada.
 
-**O que muda em 1º de outubro?**
+**O que muda em 1º de novembro?**
 Começa um novo ciclo: a contagem de faltas zera. Quem ainda estiver bloqueado por falta do ciclo anterior continua na lista, marcado como "ciclo anterior", até o prazo terminar.
 
 ## Glossário
@@ -200,7 +200,7 @@ Começa um novo ciclo: a contagem de faltas zera. Quem ainda estiver bloqueado p
 |---|---|
 | **CNN** | Clínica nas Nuvens, o sistema de agenda e cadastro da clínica |
 | **Falta** | Atendimento marcado como **FALTOU** no CNN |
-| **Ciclo** | Período de contagem das faltas. Começa todo 1º de outubro |
+| **Ciclo** | Período de contagem das faltas. Começa todo 1º de novembro |
 | **Falta vigente** | A falta mais recente do paciente no ciclo. É dela que conta o prazo |
 | **Prazo** | Tempo do bloqueio: 60, 90 ou 180 dias, conforme o número da falta |
 | **Bloquear** | Desativar o paciente no CNN, para que ele não consiga agendar |

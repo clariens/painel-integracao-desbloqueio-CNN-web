@@ -18,12 +18,12 @@ Além do painel, há dois workflows agendados: o bloqueio das 01:00 e a liberaç
 |---|---|---|
 | Painel (páginas, css, js) | Vercel (estático) | `*.html`, [css/](../css/), [js/](../js/) |
 | API do painel | Vercel (funções Node) | [api/](../api/), [lib/](../lib/). São **9 funções**: o plano Hobby da Vercel aceita até 12 por deploy. Pacientes, solicitações e usuários têm uma função cada (`api/pacientes.js`, `api/solicitacoes.js`, `api/usuarios.js`). O `vercel.json` reescreve `/api/pacientes/:id/liberar` e afins para essa função, com `id` e `op` na query, e o código de cada rota fica em [lib/rotas/](../lib/rotas/). Rota nova: acrescente em `lib/rotas/` e no despachante, não um arquivo novo em `api/` |
-| Workflow de bloqueio (01:00) | n8n | [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json) |
-| Workflow CNN Painel - Leitura | n8n (webhook) | [workflows/cnn-painel-leitura.json](../workflows/cnn-painel-leitura.json) |
-| Workflow CNN Painel - Ações | n8n (webhook) | [workflows/cnn-painel-acoes.json](../workflows/cnn-painel-acoes.json) |
-| Workflow CNN Painel - Usuários | n8n (webhook) | [workflows/cnn-painel-usuarios.json](../workflows/cnn-painel-usuarios.json) |
-| Workflow CNN Painel - Solicitações | n8n (webhook) | [workflows/cnn-painel-solicitacoes.json](../workflows/cnn-painel-solicitacoes.json) |
-| Workflow de liberação automática (02:00) | n8n | [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json) |
+| Workflow de bloqueio (01:00) | n8n | [workflows/dev/bloqueioPacientesFaltas.json](../workflows/dev/bloqueioPacientesFaltas.json) |
+| Workflow CNN Painel - Leitura | n8n (webhook) | [workflows/dev/cnn-painel-leitura.json](../workflows/dev/cnn-painel-leitura.json) |
+| Workflow CNN Painel - Ações | n8n (webhook) | [workflows/dev/cnn-painel-acoes.json](../workflows/dev/cnn-painel-acoes.json) |
+| Workflow CNN Painel - Usuários | n8n (webhook) | [workflows/dev/cnn-painel-usuarios.json](../workflows/dev/cnn-painel-usuarios.json) |
+| Workflow CNN Painel - Solicitações | n8n (webhook) | [workflows/dev/cnn-painel-solicitacoes.json](../workflows/dev/cnn-painel-solicitacoes.json) |
+| Workflow de liberação automática (02:00) | n8n | [workflows/dev/liberacaoPacientesFaltas.json](../workflows/dev/liberacaoPacientesFaltas.json) |
 | Código dos nós Code | Copiado para os JSON por `npm run inject` | [workflows/code/](../workflows/code/) |
 | Tabelas | SQL Server, banco `INTEGRACAO`, schema `dbo` | [sql/](../sql/) |
 | API do CNN | `https://api.clinicanasnuvens.com.br` | [apidocs.json](../apidocs.json) (Swagger antigo) |
@@ -190,7 +190,7 @@ sequenceDiagram
     Cron->>WB: dispara
     WB->>API: 5 listas de cadastro (tipo de consulta, executores, rótulos, locais, especialidades)
     loop todas as páginas (até 1000)
-        WB->>API: GET /agenda/lista (1/10 do ciclo até hoje)
+        WB->>API: GET /agenda/lista (1/11 do ciclo até hoje)
     end
     WB->>WB: separar faltas (FALTOU, no ciclo)
     loop uma vez por paciente

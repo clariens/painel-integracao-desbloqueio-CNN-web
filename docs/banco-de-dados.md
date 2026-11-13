@@ -353,7 +353,7 @@ Calculada pelo workflow [Leitura](fluxos/leitura.md#situação-de-cada-paciente)
 
 | Campo | Cálculo | Onde |
 |---|---|---|
-| Falta vigente | Linha com `MAX(NumeroFalta)` do paciente e `DataFalta >= 1/10 do ciclo` | `consultar bloqueios`, `consultar vencidos` |
+| Falta vigente | Linha com `MAX(NumeroFalta)` do paciente e `DataFalta >= 1/11 do ciclo` | `consultar bloqueios`, `consultar vencidos` |
 | `DiasBloqueio` | `NumeroFalta >= 3` → 180, `= 2` → 90, senão 60 | `montar info bloqueio` (JS), `consultar vencidos` (SQL) |
 | `DataFimBloqueio` | `DataFalta` + `DiasBloqueio` | Idem |
 | `nivelBloqueio` | `Math.min(NumeroFalta, 3)` | `montar info bloqueio` |
@@ -388,7 +388,7 @@ O painel está descrito em [front-end.md](front-end.md). Abaixo, o que aparece n
 
 ## Consultas úteis
 
-Todas rodam em `INTEGRACAO`. Troque as datas de exemplo. `@inicio` é 1/10 do ciclo e `@hoje` é a data de hoje em São Paulo.
+Todas rodam em `INTEGRACAO`. Troque as datas de exemplo. `@inicio` é 1/11 do ciclo e `@hoje` é a data de hoje em São Paulo.
 
 ### Histórico de um paciente
 
@@ -404,7 +404,7 @@ ORDER BY DataFalta, IdAgenda;
 ### Situação de cada paciente no ciclo
 
 ```sql
-DECLARE @inicio DATE = '2026-10-01';
+DECLARE @inicio DATE = '2026-11-01';
 DECLARE @hoje   DATE = '2026-09-30';
 
 ;WITH Vigente AS (
@@ -436,7 +436,7 @@ ORDER BY DataFimBloqueio;
 Pacientes cuja última falta é do ciclo anterior, cujo prazo não tinha vencido até 31/07 e que não têm falta no ciclo atual. O bloqueio das 01:00 não os vê mais; o painel os lista com "ciclo anterior" enquanto estiverem `BLOQUEADO` no controle (ver [operacao.md](operacao.md#rotina)).
 
 ```sql
-DECLARE @inicio DATE = '2026-10-01';
+DECLARE @inicio DATE = '2026-11-01';
 DECLARE @inicioAnterior DATE = DATEADD(year, -1, @inicio);
 
 ;WITH CicloAnterior AS (
@@ -480,7 +480,7 @@ O bloqueio roda à 01:00 de São Paulo, que em UTC já é o mesmo dia. Uma data 
 Deve voltar vazio. Qualquer linha indica `NumeroFalta` repetido ou fora da ordem por data.
 
 ```sql
-DECLARE @inicio DATE = '2026-10-01';
+DECLARE @inicio DATE = '2026-11-01';
 
 ;WITH Esperado AS (
     SELECT Id, IdPaciente, DataFalta, IdAgenda, NumeroFalta,

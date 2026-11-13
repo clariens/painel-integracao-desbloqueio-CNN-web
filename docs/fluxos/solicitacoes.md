@@ -1,6 +1,6 @@
 # Workflow CNN Painel - Solicitações
 
-Voltar ao [índice](../README.md). Arquivo: [workflows/cnn-painel-solicitacoes.json](../../workflows/cnn-painel-solicitacoes.json). Código: [solicitacoes-preparar.js](../../workflows/code/solicitacoes-preparar.js), [solicitacoes-montar-resposta.js](../../workflows/code/solicitacoes-montar-resposta.js). Tabela: [sql/criar_tabelas_solicitacoes.sql](../../sql/criar_tabelas_solicitacoes.sql).
+Voltar ao [índice](../README.md). Arquivo: [workflows/dev/cnn-painel-solicitacoes.json](../../workflows/dev/cnn-painel-solicitacoes.json). Código: [solicitacoes-preparar.js](../../workflows/code/solicitacoes-preparar.js), [solicitacoes-montar-resposta.js](../../workflows/code/solicitacoes-montar-resposta.js). Tabela: [sql/criar_tabelas_solicitacoes.sql](../../sql/criar_tabelas_solicitacoes.sql).
 
 ## Para que serve
 
@@ -99,7 +99,7 @@ Escritas rodam em transação (`XACT_ABORT`) e leem a solicitação com `UPDLOCK
 O `criar` aceita o paciente quando todas as condições abaixo valem (as mesmas que a tela usa para mostrar o botão **Solicitar desbloqueio**):
 
 1. Tem falta vigente: a de maior número no ciclo, ou, sem falta no ciclo, a mais recente de antes dele.
-2. A falta é do ciclo atual, **ou** é de um ciclo anterior com bloqueio registrado para ela (bloqueio que atravessou a virada de 1º de outubro).
+2. A falta é do ciclo atual, **ou** é de um ciclo anterior com bloqueio registrado para ela (bloqueio que atravessou a virada de 1º de novembro).
 3. O prazo dessa falta **ainda corre** (fim do prazo ≥ hoje).
 4. O paciente **não foi liberado** no painel para essa falta.
 5. Não há outra solicitação aberta para ele.

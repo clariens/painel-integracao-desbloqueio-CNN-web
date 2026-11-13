@@ -7,9 +7,10 @@ const REGRA = {
   // o prazo não é bloqueado. Antes do fim do prazo, liberar só com solicitação aprovada pelo admin;
   // depois, a liberação automática (02:00) libera.
   prazosDias: { 1: 60, 2: 90, 3: 180 },
-  // Início do ciclo: de outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.
-  // Mudou de 1/8 para 1/10 em 2026-10-08. Mudar aqui exige mudar também a URL do nó "GET agenda do ciclo".
-  cicloInicio: { mes: 10, dia: 1 },
+  // Início do ciclo: em novembro e dezembro, 1/11 do ano corrente; de janeiro a outubro, 1/11 do ano anterior.
+  // Mudou de 1/8 para 1/10 em 2026-10-08 e de 1/10 para 1/11 em 2026-11-11 (base limpa, coleta do zero).
+  // Mudar aqui exige mudar também a URL do nó "GET agenda do ciclo" e o CICLO_MES de js/formato.js.
+  cicloInicio: { mes: 11, dia: 1 },
   fuso: 'America/Sao_Paulo',
   // Só informativos (os crons ficam nos nós "Todo dia 01:00" e "Todo dia 02:00" dos workflows).
   horarioBloqueio: '01:00',

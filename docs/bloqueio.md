@@ -1,6 +1,6 @@
 # Fluxo de bloqueio por falta
 
-Voltar ao [índice](README.md). Arquivos: [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json) (fluxo principal, 01:00) e [workflows/bloqueioPacientesFaltasUnidade.json](../workflows/bloqueioPacientesFaltasUnidade.json) (subfluxo, uma unidade). Código dos nós: `workflows/code/bloqueio-*.js`, com a regra em [`_regra.js`](../workflows/code/_regra.js) e a unidade em [`_unidade.js`](../workflows/code/_unidade.js).
+Voltar ao [índice](README.md). Arquivos: [workflows/dev/bloqueioPacientesFaltas.json](../workflows/dev/bloqueioPacientesFaltas.json) (fluxo principal, 01:00) e [workflows/dev/bloqueioPacientesFaltasUnidade.json](../workflows/dev/bloqueioPacientesFaltasUnidade.json) (subfluxo, uma unidade). Código dos nós: `workflows/code/bloqueio-*.js`, com a regra em [`_regra.js`](../workflows/code/_regra.js) e a unidade em [`_unidade.js`](../workflows/code/_unidade.js).
 
 ## Para que serve
 
@@ -36,7 +36,7 @@ flowchart LR
 
 ## Regra
 
-- **Bloqueia todo paciente com falta no período** (de 1/10 do ciclo até hoje) que esteja **ativo** no CNN, **enquanto o prazo da falta vigente corre**.
+- **Bloqueia todo paciente com falta no período** (de 1/11 do ciclo até hoje) que esteja **ativo** no CNN, **enquanto o prazo da falta vigente corre**.
 - **Quem já cumpriu o prazo não é bloqueado** (por exemplo, uma falta lançada atrasada no CNN). Até 22/10/2026 o prazo não decidia o bloqueio; agora, com a [liberação automática das 02:00](liberacao.md), bloquear quem já cumpriu o prazo só para liberar uma hora depois não faz sentido.
 - O prazo é gravado no controle (`DataFimBloqueio`). Quando termina, a liberação automática libera. Antes disso, só com uma [solicitação de desbloqueio](fluxos/solicitacoes.md) aprovada.
 
@@ -46,11 +46,11 @@ flowchart LR
 | 2 | 90 dias |
 | 3 ou mais | 180 dias |
 
-- Falta vigente = a linha com `MAX(NumeroFalta)` do paciente desde 1/10 do ciclo.
+- Falta vigente = a linha com `MAX(NumeroFalta)` do paciente desde 1/11 do ciclo.
 - Início do prazo = `DataFalta` dessa linha. Fim = início + dias.
 - Não bloqueia quem está `LIBERADO` na tabela de controle com `IdAgendaReferencia` igual à falta vigente (liberado ou isento pelo painel).
 - Quem **já está inativo** no CNN não recebe PATCH. Se ainda não há bloqueio registrado para a falta vigente, o paciente entra no laço só para **registrar** (`apenasRegistrar`). O controle passa a espelhar o CNN, e o painel tira o paciente de "Aguardando bloqueio".
-- Ciclo: de outubro a dezembro, 1/10 do ano corrente. De janeiro a setembro, 1/10 do ano anterior. (Até 08/10/2026 o ciclo começava em 1/8.)
+- Ciclo: em novembro e dezembro, 1/11 do ano corrente. De janeiro a outubro, 1/11 do ano anterior. (Até 08/10/2026 o ciclo começava em 1/8; de 08/10 a 11/11/2026, em 1/10.)
 
 Exemplo: 1ª falta em 2026-08-03 → bloqueado na execução seguinte e liberável a partir de 2026-10-02. Se a 2ª falta vier em 2026-09-10, a vigente passa a ser a 2ª e o paciente só pode ser liberado a partir de 2026-12-09 (90 dias a partir de 2026-09-10). Se ele ainda estiver ativo em 10/10 com essa falta (por exemplo, porque o fluxo não rodou), é bloqueado mesmo assim.
 
@@ -111,8 +111,8 @@ flowchart TD
 |---|---|---|---|
 | 1 | `Todo dia 01:00` | Schedule Trigger | Dispara com o cron `0 1 * * *` |
 | 1a | `GET tipos de consulta`, `GET executores`, `GET rótulos`, `GET locais`, `GET especialidades` | HTTP Request | Uma vez cada (`executeOnce`), paginados até `lista` vazia: `/tipo-consulta/lista`, `/executor-agenda/lista`, `/agenda-rotulo/lista`, `/local-agenda/lista`, `/especialidade/lista` (com `somenteAtivos=false` onde existe, para os nomes antigos também). Se um falhar, o bloqueio segue e só aquele nome não é atualizado |
-| 2 | `GET agenda do ciclo` | HTTP Request | `GET /agenda/lista` de 1/10 do ciclo até hoje, `dataPor=AGENDAMENTO`, 100 por página, **todas as páginas**. Roda uma vez (`executeOnce`). Para quando `lista` volta vazia (ou a resposta não é uma página) ou após 1000 requisições. **A paginação não pode ser desligada**: a API devolve no máximo 100 agendamentos por chamada |
-| 3 | [`separar faltas`](../workflows/code/bloqueio-separar-faltas.js) | Code | Fica com `status === 'FALTOU'`, com `id` e `idPaciente`, e `data` entre 1/10 e hoje. Ordena por data e `id`. Sem nenhuma, devolve um item `{ semFaltas: true }` |
+| 2 | `GET agenda do ciclo` | HTTP Request | `GET /agenda/lista` de 1/11 do ciclo até hoje, `dataPor=AGENDAMENTO`, 100 por página, **todas as páginas**. Roda uma vez (`executeOnce`). Para quando `lista` volta vazia (ou a resposta não é uma página) ou após 1000 requisições. **A paginação não pode ser desligada**: a API devolve no máximo 100 agendamentos por chamada |
+| 3 | [`separar faltas`](../workflows/code/bloqueio-separar-faltas.js) | Code | Fica com `status === 'FALTOU'`, com `id` e `idPaciente`, e `data` entre 1/11 e hoje. Ordena por data e `id`. Sem nenhuma, devolve um item `{ semFaltas: true }` |
 | 4 | `sem faltas no periodo?` | If | `semFaltas = true` vai para o nó `sem faltas`. O resto segue |
 | 5 | `sem faltas` | Microsoft SQL | `SELECT CAST(0 AS int) AS quantidadeFaltas`. Só fecha o ramo |
 | 6 | [`pacientes únicos`](../workflows/code/bloqueio-pacientes-unicos.js) | Code | Um item por paciente distinto, para o GET seguinte rodar uma vez por paciente (e não por falta) |
@@ -166,7 +166,7 @@ Os procedimentos (`procedimentos[]` do agendamento) vão para `CtlCnnFaltaProced
 
 ### Renumeração
 
-Depois dos inserts, `gravar faltas` recalcula `NumeroFalta` com `ROW_NUMBER() OVER (PARTITION BY IdPaciente ORDER BY DataFalta, IdAgenda)`. Só para os pacientes do lote e só para `DataFalta >= 1/10 do ciclo`. Só atualiza linhas cujo número mudou.
+Depois dos inserts, `gravar faltas` recalcula `NumeroFalta` com `ROW_NUMBER() OVER (PARTITION BY IdPaciente ORDER BY DataFalta, IdAgenda)`. Só para os pacientes do lote e só para `DataFalta >= 1/11 do ciclo`. Só atualiza linhas cujo número mudou.
 
 Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 
@@ -186,7 +186,7 @@ Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 
 ## Limites conhecidos
 
-- **Relê o ciclo inteiro todo dia.** A agenda vem desde 1/10, todas as páginas, então o volume e o tempo crescem até setembro. Em outubro são ~80 páginas; um ano inteiro fica perto de 500. O teto é 1000 requisições × 100 = 100.000 agendamentos de qualquer status.
+- **Relê o ciclo inteiro todo dia.** A agenda vem desde 1/11, todas as páginas, então o volume e o tempo crescem até outubro. No primeiro mês são ~80 páginas; um ano inteiro fica perto de 500. O teto é 1000 requisições × 100 = 100.000 agendamentos de qualquer status.
 - **Chama o CNN por paciente.** `GET paciente por id` roda uma vez para cada paciente com falta no ciclo, inclusive os já gravados (é dele que sai o `ativo` usado no bloqueio).
 - **Rebloqueia todo dia.** Se alguém reativar um paciente ainda no prazo **direto no CNN**, ele volta a ser bloqueado à 01:00 do dia seguinte. Pelo painel isso não acontece: a liberação fica no controle e é respeitada.
 - **Auditoria depois do PATCH.** Se `registrar bloqueio` falhar, o paciente fica bloqueado no CNN sem linha na auditoria. O erro aparece na saída do nó, na execução do n8n.
@@ -208,7 +208,7 @@ Isso corrige a ordem quando uma falta mais antiga chega depois de uma mais nova.
 | Lote do GET de paciente | `batchSize: 1` | `GET paciente por id` |
 | Lote do PATCH | `batchSize: 1`, `batchInterval: 3000` ms | `PATCH status paciente` |
 | Corpo do PATCH | `={{ { ativo: false } }}` | `PATCH status paciente` |
-| Prazos e ciclo | `REGRA` em [`_regra.js`](../workflows/code/_regra.js) | Nós Code (via `npm run inject`) e URL de `GET agenda do ciclo` (1/10 escrito na expressão) |
+| Prazos e ciclo | `REGRA` em [`_regra.js`](../workflows/code/_regra.js) | Nós Code (via `npm run inject`) e URL de `GET agenda do ciclo` (1/11 escrito na expressão) |
 | Credenciais | `API CNN AUTH`, `TST Araguari - Integracao` | Nós HTTP e SQL |
 | CID de cada unidade | Variables do n8n, `CNN_CID_<código>` | Header `clinicaNasNuvens-cid` dos nós HTTP do subfluxo |
 | Subfluxo chamado | `bloqueioPacientesFaltasUnidade` (escolhido à mão depois de importar) | `bloquear unidade` (fluxo principal) |

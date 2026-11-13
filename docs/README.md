@@ -11,7 +11,7 @@
 - **Unidades:** Clínica Escola Zarns Salvador, Clínica Escola Zarns Pouso Alegre e Centro Ambulatório José Gomes da Rocha. Cada uma com os seus dados; o Admin vê todas e troca uma por vez, Leitor e Editor veem as marcadas no cadastro. Quem tem mais de uma escolhe ao entrar (ver [unidades.md](unidades.md)).
 - **Usuários:** cada pessoa tem login próprio, com perfil Leitor (vê e abre solicitações), Editor (também bloqueia e libera o que foi aprovado) ou Admin (também aprova solicitações e gerencia usuários). Os usuários ficam em `dbo.CtlCnnUsuario`; o admin cuida deles pela tela Usuários.
 - **Rastreabilidade:** cada PATCH no CNN, automático ou pelo painel, vira uma linha em `dbo.CtlCnnAcaoPaciente` (quem, quando, motivo, resposta da API). A situação atual de cada paciente fica em `dbo.CtlCnnControlePaciente`.
-- **Ciclo:** começa em 1º de outubro. De outubro a dezembro, 1/10 do ano corrente; de janeiro a setembro, 1/10 do ano anterior.
+- **Ciclo:** começa em 1º de novembro. Em novembro e dezembro, 1/11 do ano corrente; de janeiro a outubro, 1/11 do ano anterior.
 - **Onde fica a regra:** [`workflows/code/_regra.js`](../workflows/code/_regra.js), copiada para todos os workflows por `npm run inject`. A tela Configuração mostra os valores em uso.
 
 ## Fluxograma geral

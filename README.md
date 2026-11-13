@@ -4,13 +4,13 @@ Bloqueia no Clínica nas Nuvens (CNN) o paciente que faltou e libera quando o pr
 
 | Peça | Onde | O que faz |
 |---|---|---|
-| Bloqueio automático | n8n, `workflows/bloqueioPacientesFaltas.json` (01:00) e o subfluxo `workflows/bloqueioPacientesFaltasUnidade.json` (uma unidade por vez) | Grava as faltas, bloqueia (`{ "ativo": false }`) e registra cada PATCH na auditoria |
+| Bloqueio automático | n8n, `workflows/dev/bloqueioPacientesFaltas.json` (01:00) e o subfluxo `workflows/dev/bloqueioPacientesFaltasUnidade.json` (uma unidade por vez) | Grava as faltas, bloqueia (`{ "ativo": false }`) e registra cada PATCH na auditoria |
 | Painel | Vercel (HTML estático + `api/`) | Dashboard com indicadores e gráficos (Chart.js servido pelo próprio site), lista os bloqueados, recebe e decide solicitações de desbloqueio, libera, bloqueia um paciente, mostra relatórios, histórico e configuração |
-| CNN Painel - Leitura | n8n, `workflows/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
-| CNN Painel - Ações | n8n, `workflows/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
-| CNN Painel - Usuários | n8n, `workflows/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |
-| CNN Painel - Solicitações | n8n, `workflows/cnn-painel-solicitacoes.json` (webhook) | Pedidos de desbloqueio: abrir, aprovar, recusar, cancelar |
-| Liberação automática | n8n, `workflows/liberacaoPacientesFaltas.json`, 02:00 | Libera quem cumpriu o prazo (só quem o sistema bloqueou), com auditoria |
+| CNN Painel - Leitura | n8n, `workflows/dev/cnn-painel-leitura.json` (webhook) | Consultas do painel (só leitura) |
+| CNN Painel - Ações | n8n, `workflows/dev/cnn-painel-acoes.json` (webhook) | Liberar e bloquear pelo painel, com auditoria |
+| CNN Painel - Usuários | n8n, `workflows/dev/cnn-painel-usuarios.json` (webhook) | Login e gestão de usuários (perfis Leitor, Editor, Admin) |
+| CNN Painel - Solicitações | n8n, `workflows/dev/cnn-painel-solicitacoes.json` (webhook) | Pedidos de desbloqueio: abrir, aprovar, recusar, cancelar |
+| Liberação automática | n8n, `workflows/dev/liberacaoPacientesFaltas.json`, 02:00 | Libera quem cumpriu o prazo (só quem o sistema bloqueou), com auditoria |
 | Banco | SQL Server `INTEGRACAO` | `CtlCnnFaltaPaciente` (faltas), `CtlCnnFaltaProcedimento` (procedimentos), `CtlCnnCadastro` (nomes do CNN), `CtlCnnControlePaciente` (controle), `CtlCnnAcaoPaciente` (auditoria), `CtlCnnSolicitacao` (solicitações de desbloqueio), `CtlCnnUsuario` e `CtlCnnUsuarioEvento` (usuários), `CtlCnnUnidade` e `CtlCnnUsuarioUnidade` (unidades) |
 
 ```mermaid
@@ -39,7 +39,7 @@ Atende **Clínica Escola Zarns Salvador**, **Clínica Escola Zarns Pouso Alegre*
 | 2ª | 90 dias |
 | 3ª ou mais | 180 dias |
 
-Ciclo: começa em 1º de outubro. Fonte única: [`workflows/code/_regra.js`](workflows/code/_regra.js). A liberação pelo painel pode ser antes do prazo, com motivo obrigatório; o bloqueio das 01:00 respeita essa liberação até surgir uma falta nova.
+Ciclo: começa em 1º de novembro. Fonte única: [`workflows/code/_regra.js`](workflows/code/_regra.js). A liberação pelo painel pode ser antes do prazo, com motivo obrigatório; o bloqueio das 01:00 respeita essa liberação até surgir uma falta nova.
 
 ## Comandos
 

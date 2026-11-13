@@ -37,7 +37,7 @@ flowchart LR
 
 | Parâmetro | Valor usado | Observação |
 |---|---|---|
-| `dataInicial` | 1/10 do ciclo (`yyyy-10-01`) | Calculado com `$now.setZone('America/Sao_Paulo')` |
+| `dataInicial` | 1/11 do ciclo (`yyyy-11-01`) | Calculado com `$now.setZone('America/Sao_Paulo')` |
 | `dataFinal` | Hoje (`yyyy-MM-dd`) | |
 | `dataPor` | `AGENDAMENTO` | O Swagger aceita `AGENDAMENTO` ou `CRIACAO` |
 | `pagina` | `0`, depois `$pageCount` | Atualizado a cada página |

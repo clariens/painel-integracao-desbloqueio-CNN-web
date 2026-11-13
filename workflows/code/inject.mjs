@@ -2,12 +2,16 @@
 // Cada nó recebe uma lista de arquivos, concatenados na ordem: _regra.js e _sql.js vêm antes do código do nó,
 // e assim a regra (prazos, ciclo) e os helpers de SQL têm uma fonte só.
 // Depois de rodar: no n8n, apague os nós do workflow e cole o JSON no canvas (mantém id e URL do webhook).
-import { readFileSync, writeFileSync } from "node:fs";
+// Os fluxos ficam em workflows/dev (projeto desenvolvimento do n8n) e workflows/prod (projeto produção):
+// o mesmo fluxo nas duas, só o webhook (path e webhookId) muda. O inject atualiza as duas pastas.
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const codeDir = dirname(fileURLToPath(import.meta.url));
 const workflowsDir = join(codeDir, "..");
+export const AMBIENTES = ["dev", "prod"];
+export const pastaDoAmbiente = (ambiente) => join(workflowsDir, ambiente);
 
 const REGRA = "_regra.js";
 const SQL = "_sql.js";
@@ -63,20 +67,25 @@ const read = (file) => readFileSync(join(codeDir, file), "utf8").replace(/\r\n/g
 export const buildCode = (sources) => `${sources.map(read).join("\n\n")}\n`;
 
 const main = () => {
-  for (const [file, nodes] of Object.entries(targets)) {
-    const workflowPath = join(workflowsDir, file);
-    const workflow = JSON.parse(readFileSync(workflowPath, "utf8"));
-
-    for (const [name, sources] of Object.entries(nodes)) {
-      const node = workflow.nodes.find((item) => item.name === name);
-      if (!node) {
-        throw new Error(`Nó ${name} não encontrado em ${file}.`);
+  for (const ambiente of AMBIENTES) {
+    for (const [file, nodes] of Object.entries(targets)) {
+      const workflowPath = join(pastaDoAmbiente(ambiente), file);
+      if (!existsSync(workflowPath)) {
+        throw new Error(`Fluxo ${ambiente}/${file} não encontrado.`);
       }
-      node.parameters.jsCode = buildCode(sources);
-    }
+      const workflow = JSON.parse(readFileSync(workflowPath, "utf8"));
 
-    writeFileSync(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`);
-    console.log(`Fluxo ${file} atualizado.`);
+      for (const [name, sources] of Object.entries(nodes)) {
+        const node = workflow.nodes.find((item) => item.name === name);
+        if (!node) {
+          throw new Error(`Nó ${name} não encontrado em ${ambiente}/${file}.`);
+        }
+        node.parameters.jsCode = buildCode(sources);
+      }
+
+      writeFileSync(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`);
+      console.log(`Fluxo ${ambiente}/${file} atualizado.`);
+    }
   }
 };
 

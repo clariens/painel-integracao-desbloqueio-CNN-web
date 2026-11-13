@@ -92,8 +92,8 @@ export const seloSolicitacao = (status, texto = SOLICITACAO[status] || status) =
 export const hojeSp = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
-// Mesma regra do ciclo de workflows/code/_regra.js (início em 1/10), usada só nos atalhos de período.
-export const CICLO_MES = 10;
+// Mesma regra do ciclo de workflows/code/_regra.js (início em 1/11), usada só nos atalhos de período.
+export const CICLO_MES = 11;
 export const inicioCiclo = (hoje = hojeSp()) => {
   const [ano, mes] = hoje.split("-").map(Number);
   return `${mes >= CICLO_MES ? ano : ano - 1}-${String(CICLO_MES).padStart(2, "0")}-01`;

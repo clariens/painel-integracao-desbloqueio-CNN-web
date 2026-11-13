@@ -2,6 +2,17 @@
 
 Mudanças que afetam quem usa ou opera, por data. Cada entrada em Adicionado / Alterado / Corrigido.
 
+## 2026-11-11 — Ciclo em 1º de novembro e base limpa
+
+### Alterado
+
+- **O ciclo passa a começar em 1º de novembro** (antes, 1º de outubro): `_regra.js`, URL do nó `GET agenda do ciclo`, atalhos de período (`js/formato.js`) e `sql/carga_inicial_controle.sql`. Colar de novo no n8n: bloqueio (subfluxo da unidade), liberação automática, Leitura, Ações e Solicitações.
+
+### Adicionado
+
+- **Fluxos por ambiente:** `workflows/dev/` (projeto desenvolvimento do n8n) e `workflows/prod/` (projeto produção). Mesmo fluxo, com webhooks próprios em produção. `npm run inject` atualiza as duas pastas e `npm run check` confere se produção é cópia de desenvolvimento.
+- **`sql/limpar_dados_desenvolvimento.sql`**: apaga faltas, cadastros, controle, ações, solicitações, eventos de usuário e os usuários que não são admin. Ficam as unidades e os admins. Só para desenvolvimento: a coleta recomeça do zero na próxima 01:00.
+
 ## 2026-11-01 — Terceira unidade e multiunidade implantada
 
 ### Adicionado

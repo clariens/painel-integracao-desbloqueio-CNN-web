@@ -1,6 +1,6 @@
 # Liberação automática (02:00)
 
-Voltar ao [índice](README.md). Arquivo: [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json). Código: [liberacao-preparar-consulta.js](../workflows/code/liberacao-preparar-consulta.js), [liberacao-montar-candidatos.js](../workflows/code/liberacao-montar-candidatos.js), [liberacao-decidir.js](../workflows/code/liberacao-decidir.js), [liberacao-montar-registro.js](../workflows/code/liberacao-montar-registro.js).
+Voltar ao [índice](README.md). Arquivo: [workflows/dev/liberacaoPacientesFaltas.json](../workflows/dev/liberacaoPacientesFaltas.json). Código: [liberacao-preparar-consulta.js](../workflows/code/liberacao-preparar-consulta.js), [liberacao-montar-candidatos.js](../workflows/code/liberacao-montar-candidatos.js), [liberacao-decidir.js](../workflows/code/liberacao-decidir.js), [liberacao-montar-registro.js](../workflows/code/liberacao-montar-registro.js).
 
 ## Para que serve
 

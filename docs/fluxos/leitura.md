@@ -1,6 +1,6 @@
 # Workflow CNN Painel - Leitura
 
-Voltar ao [índice](../README.md). Arquivo: [workflows/cnn-painel-leitura.json](../../workflows/cnn-painel-leitura.json). Código: [leitura-preparar.js](../../workflows/code/leitura-preparar.js), [leitura-montar-resposta.js](../../workflows/code/leitura-montar-resposta.js).
+Voltar ao [índice](../README.md). Arquivo: [workflows/dev/cnn-painel-leitura.json](../../workflows/dev/cnn-painel-leitura.json). Código: [leitura-preparar.js](../../workflows/code/leitura-preparar.js), [leitura-montar-resposta.js](../../workflows/code/leitura-montar-resposta.js).
 
 ## Para que serve
 

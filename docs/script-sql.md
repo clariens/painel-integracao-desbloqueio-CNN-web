@@ -195,7 +195,7 @@ Roda no corte da liberação automática, **depois** da última execução manua
 
 > **Só rode se a automação antiga realmente bloqueou** (o PATCH rodou). O script supõe que todo paciente com prazo correndo está inativo no CNN. Se as faltas foram gravadas sem PATCH (fluxo cortado antes do laço, por exemplo), **não rode**: os pacientes ficariam "Bloqueado" no painel sem estar bloqueados. Sem a carga, eles aparecem como "Aguardando bloqueio", e a execução das 01:00 bloqueia quem está ativo e registra quem já está inativo.
 
-- Calcula hoje em São Paulo (`SYSUTCDATETIME()` − 3 h) e o início do ciclo (1/10).
+- Calcula hoje em São Paulo (`SYSUTCDATETIME()` − 3 h) e o início do ciclo (1/11).
 - Para cada paciente com falta no ciclo, pega a falta vigente (maior `NumeroFalta`) e o prazo 60/90/180.
 - Prazo correndo → `BLOQUEADO`; vencido → `LIBERADO`. `OrigemUltimaAcao = CARGA_INICIAL`, `UltimaAcaoPor = carga-inicial`.
 - Só insere quem ainda não tem linha no controle. Não grava auditoria (não houve PATCH).

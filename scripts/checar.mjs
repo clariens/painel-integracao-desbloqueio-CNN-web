@@ -1,19 +1,45 @@
 // `npm run check`: confere os workflows antes de colar no n8n.
 // - o código de cada nó Code compila (como corpo de função assíncrona, igual ao n8n);
 // - todo $('nó') citado no código e toda conexão apontam para um nó que existe;
-// - o JSON está em dia com workflows/code/*.js (senão: rode `npm run inject`).
+// - o JSON está em dia com workflows/code/*.js (senão: rode `npm run inject`);
+// - workflows/prod é cópia de workflows/dev, com webhooks diferentes (path e webhookId).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { buildCode, targets } from "../workflows/code/inject.mjs";
+import { AMBIENTES, buildCode, pastaDoAmbiente, targets } from "../workflows/code/inject.mjs";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
-const workflowsDir = join(root, "workflows");
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 const problemas = [];
+const fluxos = {}; // fluxos[ambiente][arquivo] = workflow
 
-for (const file of readdirSync(workflowsDir).filter((name) => name.endsWith(".json"))) {
-  const workflow = JSON.parse(readFileSync(join(workflowsDir, file), "utf8"));
+for (const ambiente of AMBIENTES) {
+  fluxos[ambiente] = {};
+  for (const nome of readdirSync(pastaDoAmbiente(ambiente)).filter((item) => item.endsWith(".json"))) {
+    fluxos[ambiente][nome] = JSON.parse(readFileSync(join(pastaDoAmbiente(ambiente), nome), "utf8"));
+  }
+}
+
+// Produção = desenvolvimento, menos o webhook. Compara tudo, tirando path, webhookId e o que o n8n muda sozinho.
+const semWebhook = (workflow) =>
+  JSON.stringify(workflow.nodes.map(({ webhookId, ...node }) => ({
+    ...node,
+    parameters: node.type === "n8n-nodes-base.webhook" ? { ...node.parameters, path: undefined } : node.parameters,
+  })).concat(workflow.connections));
+const webhooks = (workflow) => workflow.nodes.filter((node) => node.type === "n8n-nodes-base.webhook").map((node) => node.parameters.path);
+
+for (const nome of Object.keys(fluxos.prod)) {
+  const dev = fluxos.dev[nome];
+  const prod = fluxos.prod[nome];
+  if (!dev) {
+    problemas.push(`prod/${nome}: não existe em dev`);
+  } else if (semWebhook(dev) !== semWebhook(prod)) {
+    problemas.push(`prod/${nome}: diferente de dev/${nome} (além do webhook); copie a mudança para as duas pastas`);
+  } else if (webhooks(dev).some((path) => webhooks(prod).includes(path))) {
+    problemas.push(`prod/${nome}: webhook com o mesmo path de dev; produção precisa de webhook próprio`);
+  }
+}
+
+for (const [ambiente, arquivos] of Object.entries(fluxos)) for (const [nomeArquivo, workflow] of Object.entries(arquivos)) {
+  const file = `${ambiente}/${nomeArquivo}`;
   const nomes = new Set(workflow.nodes.map((node) => node.name));
 
   for (const node of workflow.nodes) {
@@ -78,7 +104,7 @@ for (const file of readdirSync(workflowsDir).filter((name) => name.endsWith(".js
     }
   }
 
-  for (const [nome, fontes] of Object.entries(targets[file] || {})) {
+  for (const [nome, fontes] of Object.entries(targets[nomeArquivo] || {})) {
     const node = workflow.nodes.find((item) => item.name === nome);
     if (!node) {
       problemas.push(`${file}: inject.mjs aponta para o nó inexistente '${nome}'`);

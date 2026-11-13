@@ -1,6 +1,6 @@
 # Workflow CNN Painel - Ações
 
-Voltar ao [índice](../README.md). Arquivo: [workflows/cnn-painel-acoes.json](../../workflows/cnn-painel-acoes.json). Código: `workflows/code/acoes-*.js` e, no bloquear, os mesmos `bloqueio-*.js` do bloqueio das 01:00.
+Voltar ao [índice](../README.md). Arquivo: [workflows/dev/cnn-painel-acoes.json](../../workflows/dev/cnn-painel-acoes.json). Código: `workflows/code/acoes-*.js` e, no bloquear, os mesmos `bloqueio-*.js` do bloqueio das 01:00.
 
 ## Para que serve
 

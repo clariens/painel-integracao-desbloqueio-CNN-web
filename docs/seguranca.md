@@ -192,7 +192,7 @@ Cabeçalhos de segurança enviados em todas as respostas:
 | POST num webhook **sem** `X-Monitor-Key` (comando abaixo) | 403 (ou 401) |
 | Ver os cabeçalhos de uma página (comando abaixo) | Os cinco cabeçalhos da tabela acima |
 | Abrir o painel dentro de um `<iframe>` em outro site | Bloqueado |
-| Abrir `/workflows/cnn-painel-acoes.json` ou `/docs/seguranca.md` no site | 404 |
+| Abrir `/workflows/dev/cnn-painel-acoes.json` ou `/docs/seguranca.md` no site | 404 |
 
 ```powershell
 # Sem login: deve dar 401

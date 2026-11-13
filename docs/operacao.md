@@ -43,12 +43,12 @@ Faça os passos 3 e 4 juntos e fora das 01:00 e 02:00: no meio do caminho, o pai
 Para um ambiente que já tem o painel funcionando. **A ordem importa:** o banco primeiro, porque os workflows novos gravam `IdSolicitacao` na auditoria e atualizam `CtlCnnSolicitacao`.
 
 1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_solicitacoes.sql](../sql/criar_tabelas_solicitacoes.sql) e o `GRANT` do comentário no fim. O resultado final lista `CtlCnnSolicitacao` e o tamanho da coluna `IdSolicitacao` na auditoria (8 bytes).
-2. **n8n, workflow novo:** importe [workflows/cnn-painel-solicitacoes.json](../workflows/cnn-painel-solicitacoes.json).
+2. **n8n, workflow novo:** importe [workflows/dev/cnn-painel-solicitacoes.json](../workflows/dev/cnn-painel-solicitacoes.json).
    - Confira a credencial Header Auth no `Webhook` e `TST Araguari - Integracao` no `Executar`.
    - Em **Settings**: "Save successful executions = Do not save" e o Error workflow.
    - **Publique** e copie a Production URL.
 3. **n8n, workflows que mudaram:** cole de novo **Ações**, **Leitura** e **Bloqueio** (ver "Lógica de um workflow"). Sem isso, liberar antes do prazo continua sem exigir solicitação, e a lista não mostra as solicitações.
-4. **n8n, liberação automática:** importe [workflows/liberacaoPacientesFaltas.json](../workflows/liberacaoPacientesFaltas.json).
+4. **n8n, liberação automática:** importe [workflows/dev/liberacaoPacientesFaltas.json](../workflows/dev/liberacaoPacientesFaltas.json).
    - Credenciais `API CNN AUTH` (HTTP) e `TST Araguari - Integracao` (SQL); Error workflow; salvar todas as execuções.
    - **Antes de ativar:** veja no painel quem está **Apto a liberar**. Esses pacientes serão liberados na primeira execução (02:00). Se quiser, rode uma vez pelo editor, de dia, para acompanhar.
    - Ative.
@@ -80,7 +80,7 @@ flowchart TD
 1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_painel.sql](../sql/criar_tabelas_painel.sql). O resultado final lista `CtlCnnAcaoPaciente` e `CtlCnnControlePaciente`. Dê ao usuário da credencial `TST Araguari - Integracao` as permissões do comentário no fim do script. **Não** rode a carga inicial ainda.
 2. **n8n.**
    - Crie uma credencial **Header Auth**: nome `X-Monitor-Key`, valor = um segredo novo e longo (não reaproveite o do monitoramento).
-   - Importe [workflows/cnn-painel-leitura.json](../workflows/cnn-painel-leitura.json) e [workflows/cnn-painel-acoes.json](../workflows/cnn-painel-acoes.json).
+   - Importe [workflows/dev/cnn-painel-leitura.json](../workflows/dev/cnn-painel-leitura.json) e [workflows/dev/cnn-painel-acoes.json](../workflows/dev/cnn-painel-acoes.json).
    - Em cada um: no nó `Webhook`, escolha a credencial Header Auth; confira `API CNN AUTH` nos nós HTTP e `TST Araguari - Integracao` nos nós SQL; em **Settings**, escolha o **Error workflow** (Error Handler do monitoramento). A Leitura já vem com "Save successful executions = Do not save" e as Ações com "salvar todas"; confira.
    - Copie a **Production URL** de cada webhook.
 3. **Ative a Leitura.** Sem isso a URL de produção responde 404.
@@ -90,7 +90,7 @@ flowchart TD
    - Deploy. Mudou uma variável depois? Faça **Redeploy**: ela só vale no deploy seguinte.
 5. **Teste a leitura:** entre em `/pacientes`, abra o detalhe de um paciente, veja `/relatorios`, `/historico` (vazio) e `/configuracao`.
 6. **Ative as Ações** e teste com **um paciente combinado com a clínica**: Bloquear → Liberar → Bloquear de novo. Depois de cada passo, confira a ficha no CNN e as duas tabelas (consultas em [banco-de-dados.md](banco-de-dados.md#auditoria-do-dia)). Confira no primeiro bloquear que a execução de `GET agenda do paciente` trouxe só agendamentos desse paciente (`codigoPaciente`).
-7. **Bloqueio.** Publique a versão nova de [workflows/bloqueioPacientesFaltas.json](../workflows/bloqueioPacientesFaltas.json) (ver "Lógica de um workflow" abaixo). Na primeira vez, rode pelo editor com o `PATCH status paciente` desconectado e confira a saída de `consultar bloqueios`. Na manhã seguinte, confira as linhas `AUTOMATICO` na auditoria.
+7. **Bloqueio.** Publique a versão nova de [workflows/dev/bloqueioPacientesFaltas.json](../workflows/dev/bloqueioPacientesFaltas.json) (ver "Lógica de um workflow" abaixo). Na primeira vez, rode pelo editor com o `PATCH status paciente` desconectado e confira a saída de `consultar bloqueios`. Na manhã seguinte, confira as linhas `AUTOMATICO` na auditoria.
 8. **Corte da liberação automática** (abaixo).
 
 ### Corte da liberação automática
@@ -116,7 +116,7 @@ Cada pessoa tem o próprio usuário, com um perfil: **Leitor** (vê e abre solic
 
 1. **Banco.** No SSMS, banco `INTEGRACAO`, rode [sql/criar_tabelas_usuarios.sql](../sql/criar_tabelas_usuarios.sql) e dê ao usuário da credencial `TST Araguari - Integracao` as permissões do comentário no fim do script.
 2. **Primeiro admin.** Na sua máquina, no repositório: `npm run admin`. O comando imprime uma **senha aleatória** e um `INSERT` (login `admin`). Rode o `INSERT` no SSMS e guarde a senha: ela não fica gravada em lugar nenhum. Para outro login: `npm run admin -- maria.souza "Maria Souza"`.
-3. **n8n.** Importe [workflows/cnn-painel-usuarios.json](../workflows/cnn-painel-usuarios.json). No `Webhook`, escolha a credencial Header Auth (a mesma das outras); no `Executar`, `TST Araguari - Integracao`; em **Settings**, confira "Save successful executions = Do not save" e o Error workflow. **Ative** e copie a Production URL.
+3. **n8n.** Importe [workflows/dev/cnn-painel-usuarios.json](../workflows/dev/cnn-painel-usuarios.json). No `Webhook`, escolha a credencial Header Auth (a mesma das outras); no `Executar`, `TST Araguari - Integracao`; em **Settings**, confira "Save successful executions = Do not save" e o Error workflow. **Ative** e copie a Production URL.
 4. **Vercel.** Crie `SESSION_SECRET` (gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) e `N8N_USUARIOS_URL` em Production (e em Preview, se quiser testar lá). Apague `DASHBOARD_USERS`. **Redeploy.**
 5. Entre como `admin` com a senha do passo 2. O painel pede uma senha nova. Depois, crie os usuários pela tela **Usuários**.
 
@@ -144,8 +144,8 @@ O admin não muda o próprio perfil nem se desativa: outro admin faz isso. O ban
 | Mudança | Onde mexer | Como publicar |
 |---|---|---|
 | Painel (páginas, css, js, `api/`, `lib/`) | Raiz do repo | Teste antes com `npm run dev`. Commit e push na `main`: a Vercel publica sozinha. Se o deploy aparecer como **Blocked** (autor do commit fora do time na Vercel), publique com `vercel deploy --prod`, logado na conta do time |
-| Lógica de um workflow | `workflows/code/*.js` (nós Code); demais nós, no JSON ou no n8n | Rode `npm run inject` e `npm run check`. No n8n, abra o workflow, **apague os nós e cole o JSON** no canvas: continua o mesmo workflow, com o mesmo id e a mesma URL de webhook. Confira as credenciais e salve. Commit. Se mexeu no n8n, exporte e copie o código de volta para `workflows/code/` |
-| Prazos 60 / 90 / 180 ou início do ciclo | [`workflows/code/_regra.js`](../workflows/code/_regra.js) | `npm run inject`, `npm run check`, publicar **bloqueio, liberação automática, Leitura, Ações e Solicitações**. O início do ciclo também está escrito na URL do nó `GET agenda do ciclo` (1/10) e em `sql/carga_inicial_controle.sql` |
+| Lógica de um workflow | `workflows/code/*.js` (nós Code); demais nós, no JSON ou no n8n | Rode `npm run inject` e `npm run check`. No n8n, abra o workflow, **apague os nós e cole o JSON** no canvas: continua o mesmo workflow, com o mesmo id e a mesma URL de webhook. Confira as credenciais e salve. Commit. Se mexeu no n8n, exporte e copie o código de volta para `workflows/code/`. **Dois ambientes:** `workflows/dev/` (projeto desenvolvimento do n8n) e `workflows/prod/` (projeto produção) têm o mesmo fluxo, só com webhook diferente. O inject atualiza as duas pastas; mudança fora dos nós Code vai nas duas, e o `npm run check` acusa se ficarem diferentes |
+| Prazos 60 / 90 / 180 ou início do ciclo | [`workflows/code/_regra.js`](../workflows/code/_regra.js) | `npm run inject`, `npm run check`, publicar **bloqueio, liberação automática, Leitura, Ações e Solicitações**. O início do ciclo também está escrito na URL do nó `GET agenda do ciclo` (1/11) e em `sql/carga_inicial_controle.sql` |
 | Horário do bloqueio ou da liberação | Nós `Todo dia 01:00` / `Todo dia 02:00` e `horarioBloqueio` / `horarioLiberacao` em `_regra.js` (só exibição) | Os dois juntos. A liberação deve rodar **depois** do bloqueio |
 | Nome de nó | Qualquer nó citado por `$('…')` ou pelo `inject.mjs` | `npm run check` aponta referência quebrada |
 | Tabela | `sql/criar_tabelas_bloqueio.sql`, `criar_tabelas_painel.sql` ou `criar_tabelas_usuarios.sql` | Mantenha idempotente (`OBJECT_ID`, `COL_LENGTH`, `IF NOT EXISTS`). Rode em `INTEGRACAO` antes de publicar os workflows que usam a coluna |
@@ -170,7 +170,7 @@ Nunca deixe duas cópias de um workflow ativas: o PATCH sai em dobro.
 | Todo dia, de manhã | Histórico → filtro **Origem: Automático**, **Resultado: Falhou**. Execução "verde" no n8n não garante que o PATCH deu certo |
 | Toda semana | "Numeração quebrada no ciclo" e "Controle diferente da última auditoria" em [banco-de-dados.md](banco-de-dados.md#consultas-úteis) (devem vir vazias) |
 | Toda semana | "Linhas gravadas sem dados do CNN" |
-| Em 1º de outubro | Pacientes de ciclo anterior ainda bloqueados aparecem na lista com "ciclo anterior"; libere pelo painel quem já cumpriu o prazo |
+| Em 1º de novembro | Pacientes de ciclo anterior ainda bloqueados aparecem na lista com "ciclo anterior"; libere pelo painel quem já cumpriu o prazo |
 | Ao longo do ciclo | Volume da agenda: o bloqueio lê todas as páginas do ciclo (teto de 1000 páginas, 100.000 agendamentos); a execução fica mais longa até setembro |
 
 ## Problemas conhecidos
